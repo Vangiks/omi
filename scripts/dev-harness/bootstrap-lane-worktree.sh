@@ -73,11 +73,6 @@ echo "lane-bootstrap:   (make lane-backend is the wheel install; make setup-back
 echo "lane-bootstrap: the Flutter generated-output gate needs 'flutter pub get' in app/"
 echo "lane-bootstrap:   (this command already ran it; re-run after adding Dart deps)."
 
-if [[ ! -x "$(git rev-parse --git-path hooks)/pre-commit" ]]; then
-  bash scripts/install-git-hooks.sh
-else
-  echo "lane-bootstrap: git hooks already installed"
-fi
 
 # Git-ignored mobile build inputs (same copies as app/test.sh). Never rewrite
 # an existing .dev.env — refuse a remote API instead.
@@ -115,5 +110,5 @@ bash scripts/dev-harness/generate-app-env.sh
 
 elapsed=$((SECONDS - STARTED))
 echo "lane-bootstrap: done in ${elapsed}s"
-echo "lane-bootstrap: next: bash app/test.sh   # or scripts/pre-push for cheap gates"
+echo "lane-bootstrap: next: bash app/test.sh  "
 echo "lane-bootstrap: full backend (uvicorn/pyright) remains opt-in: make lane-backend"

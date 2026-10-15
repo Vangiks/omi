@@ -166,10 +166,6 @@ if [ ! -e backend/.env ]; then
 fi
 step "backend offline env stage seeded (.env -> .env.offline)"
 
-# ── Git hooks (pre-commit auto-format + bounded pre-push gate) ──────────────
-bash scripts/install-git-hooks.sh
-step "git hooks installed"
-
 # ── Orb guidance for agents working in this repo ─────────────────────────────
 AMP_AGENTS="$HOME/.config/amp/AGENTS.md"
 mkdir -p "$(dirname "$AMP_AGENTS")"
