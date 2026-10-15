@@ -76,12 +76,5 @@ case "$output" in
   *) fail "missing formatter error did not point to the uv install path" ;;
 esac
 
-# The pin lives only in the shared primitive; all callers delegate to it.
-for caller in scripts/pre-commit scripts/pre-push .github/workflows/repo-checks.yml; do
-  grep -Fq 'scripts/backend-python-format' "$ROOT/$caller" || fail "$caller bypasses the formatter primitive"
-  if grep -Eq 'black==[0-9]+\.[0-9]+\.[0-9]+' "$ROOT/$caller"; then
-    fail "$caller duplicates the Black version pin"
-  fi
-done
 
 echo "backend Python formatter contract tests passed"

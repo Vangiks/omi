@@ -10,7 +10,7 @@ look for `CLAUDE.md` by name — it is the one such pointer in the repo.
 
 - Start with the root [`AGENTS.md`](./AGENTS.md): cross-component rules plus an index.
 - When working inside a directory, also read the **nearest `AGENTS.md` at or above it** —
-  `backend/`, `app/`, `desktop/macos/`, `.github/`, `web/admin/`, `omi/firmware/`.
+  `desktop/windows/`, `web/app/`, `web/admin/`, `backend/`, `desktop/macos/`, `docs/`.
   Those carry the detail the root file deliberately omits.
 - Add or change rules in the relevant `AGENTS.md`. **Never add instructions here** — this
   file stays a pointer so there is only ever one source of truth to maintain.

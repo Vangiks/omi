@@ -27,7 +27,7 @@ dev_harness_python() {
 }
 EOF
 
-for script in setup-refresh-main.sh install-git-hooks.sh; do
+for script in setup-refresh-main.sh; do
   cat >"$TMPDIR/repo/scripts/$script" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
@@ -48,7 +48,7 @@ chmod +x "$TMPDIR/repo/backend/scripts/sync-python-deps.sh"
   make setup >/dev/null
 )
 
-expected=$'setup-refresh-main.sh\ninstall-git-hooks.sh\nbackend-sync'
+expected=$'setup-refresh-main.sh\nbackend-sync'
 actual="$(cat "$TMPDIR/repo/setup-order.txt")"
 if [ "$actual" != "$expected" ]; then
   echo "FAIL: make setup did not provision baseline pre-push prerequisites in order." >&2
@@ -57,26 +57,6 @@ if [ "$actual" != "$expected" ]; then
 fi
 
 echo "make setup baseline prerequisites test passed."
-
-# The automatic linked-worktree bootstrap must use the same canonical setup
-# target. This is a static configuration check: it prevents the worktree
-# launcher from silently falling back to ambient pip installs that do not
-# install the shared Git hook dispatcher or the locked backend environment.
-python3 - "$ROOT/.cursor/worktrees.json" <<'PY'
-import json
-import sys
-from pathlib import Path
-
-config_path = Path(sys.argv[1])
-config = json.loads(config_path.read_text(encoding="utf-8"))
-for name in ("setup-worktree", "setup-worktree-unix", "setup-worktree-windows"):
-    commands = config.get(name)
-    if not isinstance(commands, list) or not any(command.strip() == "make setup" for command in commands):
-        raise SystemExit(f"FAIL: {name} must invoke the canonical 'make setup' target")
-    if any("pip install -r requirements.txt" in command for command in commands):
-        raise SystemExit(f"FAIL: {name} still uses an ambient requirements.txt install")
-print("automatic worktree bootstrap uses canonical make setup")
-PY
 
 # The baseline target is intentionally safe to rerun: an agent should not have
 # to delete a healthy venv just to repeat setup after a branch change.

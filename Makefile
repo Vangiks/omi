@@ -7,7 +7,6 @@ SHELL := bash
 BASH := bash
 endif
 
-HOOKS_DIR := $(shell git rev-parse --git-path hooks)
 # Fall back to the working directory (where make runs, i.e. the repo root) when
 # `git rev-parse --show-toplevel` cannot resolve a work tree. In a linked
 # worktree whose git context resolves to a git dir rather than a work tree,
@@ -38,18 +37,15 @@ CHAT_FIRST_E2E_ACTION ?= prepare
 CHAT_FIRST_E2E_CASE ?= enabled
 CHAT_FIRST_E2E_SECONDS ?= 86400
 
-.PHONY: setup setup-main setup-hooks setup-backend lane-backend lane-bootstrap preflight runtime-image-source-closure runtime-image-smoke dev-check dev-up dev-status dev-summary dev-reset dev-down dev-logs mobile-session mobile-verify dev dev-desktop dev-init dev-verify list-memory-scenarios seed-memory-scenario reset-memory-scenario desktop-run-local chat-first-e2e-fixture run-canonical-maintenance
+.PHONY: setup setup-main setup-backend lane-backend lane-bootstrap preflight runtime-image-source-closure runtime-image-smoke dev-check dev-up dev-status dev-summary dev-reset dev-down dev-logs mobile-session mobile-verify dev dev-desktop dev-init dev-verify list-memory-scenarios seed-memory-scenario reset-memory-scenario desktop-run-local chat-first-e2e-fixture run-canonical-maintenance
 
 # Baseline setup is deliberately limited to prerequisites that the default
 # pre-push gate may require; app and desktop runtime environments stay opt-in.
-setup: setup-main setup-hooks setup-backend
-	@echo "Worktree setup complete: hooks installed and backend pre-push environment ready."
+setup: setup-main setup-backend
+	@echo "Worktree setup complete: backend environment ready."
 
 setup-main:
 	@$(BASH) scripts/setup-refresh-main.sh
-
-setup-hooks:
-	@$(BASH) scripts/install-git-hooks.sh
 
 setup-backend:
 	@$(BASH) backend/scripts/sync-python-deps.sh

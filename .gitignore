@@ -115,7 +115,6 @@ web/app/public/firebase-messaging-sw.js
 # Miscellaneous
 !app/pubspec.lock
 !app/ios/Podfile.lock
-!mcp/uv.lock
 *.lock
 # After *.lock: the last matching pattern wins, so a re-include must follow it.
 !web/app/bun.lock
@@ -222,7 +221,6 @@ web-report/
 .metro-cache/
 .aider*
 
-lefthook.yml
 omiGlass/.expo
 
 # Logs

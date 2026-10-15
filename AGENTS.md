@@ -1,37 +1,33 @@
-# Omi agent guide
+# Omi fork agent guide
 
-Read the guide for the area you are changing. `CLAUDE.md` points here.
+Fork of BasedHardware/omi (`upstream`) at Vangiks/omi (`origin`). Scope: the Electron desktop
+app in `desktop/windows`, developed and run on Linux, and `web/`. The mobile app, firmware,
+omiGlass and device SDKs were removed. `CLAUDE.md` points here.
 
 ## Routes
 
 | Working on | Read |
 |---|---|
-| Backend | `backend/AGENTS.md` |
-| Flutter app | `app/AGENTS.md` |
-| macOS desktop | `desktop/macos/AGENTS.md` |
-| Windows/Linux desktop | `desktop/windows/AGENTS.md` |
+| Desktop app (Electron, Windows/Linux) | `desktop/windows/AGENTS.md` |
 | Web app / admin | `web/app/AGENTS.md` / `web/admin/AGENTS.md` |
-| Firmware | `omi/firmware/AGENTS.md` |
-| CI / deployment workflows | `.github/AGENTS.md` |
+| Backend (the Omi server the clients call) | `backend/AGENTS.md` |
+| macOS desktop (Swift, kept for reference) | `desktop/macos/AGENTS.md` |
 | Public documentation | `docs/AGENTS.md` |
-| Product behavior / UI | `PRODUCT.md`, `product/invariants/`; macOS UI: `desktop/macos/docs/ux-contract.md` |
-| Shared client behavior | `contracts/parity/README.md` |
-| Released-client compatibility | `contracts/client-compat/` |
-| Fallbacks / fail-open paths | `.github/agent-docs/fallback-telemetry.md` |
-| Plan catalog | `.github/agent-docs/plan-catalog.md` |
-| App E2E | `app/e2e/SKILL.md`, `desktop/macos/e2e/SKILL.md` |
-| Cursor Cloud environment | `.cursor/cloud-agent-environment.md` |
-| Contributions / PR requirements | `docs/doc/developer/Contribution.mdx` |
-| Failure-class classification | `product/failure-classes.md`, `scripts/failure-class` |
-| Formatting | `.github/agent-docs/formatting.md` |
-| Agent documentation / new checks | `.github/agent-docs/doc-maintenance.md` |
+| Product behavior | `PRODUCT.md`, `product/invariants/` |
+| Behavior shared with the macOS app | `contracts/parity/README.md` |
+| Current work: capability map, specs, plans | `CAPABILITY-MAP.md`, `SPEC-*.md`, `tasks/` |
 
 ## Repository conventions
 
-- Use a task worktree based on current `origin/main`. `make setup` installs the repository hooks, including staged-file formatting. Keep Git identity in the user's configuration; temporary test identities use `git -c`.
-- Upstream `main` changes land through PRs with merge commits, never squash or direct pushes.
-- macOS development uses dev or `omi-*` named bundles. Do not stop or replace the production Omi or Omi Beta apps; bundle details and commands live in the macOS guide.
-- Migrate in-tree callers together rather than preserving retired APIs with compatibility wrappers. Released clients follow the compatibility contracts above.
-- Run the component's documented verification and `make preflight`. For PR metadata, start with `scripts/pr-preflight --suggest`, then validate the draft with `scripts/pr-preflight --pr-body-file <file>`. These tools identify required invariant citations and failure-class declarations.
+- Git hooks come from `lefthook.yml` and install with `npx pnpm@10 install` in `desktop/windows`.
+  Pre-push runs desktop typecheck, lint and the meeting tests. Keep Git identity in the user's
+  configuration; temporary test identities use `git -c`.
+- Run desktop commands in `desktop/windows` through `npx pnpm@10`: the system pnpm breaks
+  `node-linker=hoisted`. Never run `npm install` there.
+- Ask before pushing to `origin` or opening a PR to `upstream`. Keep code meant for upstream free
+  of fork-only changes so it can go out from a branch based on `upstream/main`.
+- Upstream release and PR tooling is gone from this fork (most of `.github/`, Codemagic,
+  `make preflight`, `scripts/pr-preflight`). Do not rely on it or restore it.
+- Migrate in-tree callers together rather than preserving retired APIs with compatibility wrappers.
 
-Keep this file a router. Add repository-specific facts at their owning guide; omit generic agent behavior and duplicated procedures. Size budgets live in `.github/scripts/check_agents_md_lean.py`.
+Keep this file a router. Add component facts to the owning guide.

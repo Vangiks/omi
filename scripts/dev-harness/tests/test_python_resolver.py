@@ -19,8 +19,6 @@ REPO_ROOT = HARNESS_ROOT.parents[1]
 RESOLVER = HARNESS_ROOT / "_resolve_python.sh"
 PYTHON_RUNNER = HARNESS_ROOT / "run-python.sh"
 MAKEFILE = REPO_ROOT / "Makefile"
-PRE_PUSH_SINGLEFLIGHT = REPO_ROOT / "scripts/pre-push-singleflight"
-PREFLIGHT_RUNNER = REPO_ROOT / ".github/scripts/preflight_runner.py"
 
 
 def _bash_command() -> str:
@@ -586,55 +584,6 @@ def test_make_uses_git_bash_when_bare_bash_resolves_to_wsl(tmp_path: Path) -> No
     assert result.returncode == 0, result.stderr
     assert calls.read_text(encoding="utf-8") == "ran"
     assert "WSL" not in result.stdout + result.stderr
-
-
-@pytest.mark.skipif(os.name != "nt", reason="native Windows hook entrypoint regression")
-def test_pre_push_singleflight_runs_shell_child_with_native_windows_python(tmp_path: Path) -> None:
-    repo = tmp_path / "omi 路径 hook"
-    repo.mkdir()
-    _git_init(repo)
-
-    resolver = repo / "scripts/dev-harness/_resolve_python.sh"
-    resolver.parent.mkdir(parents=True)
-    shutil.copy2(RESOLVER, resolver)
-    wrapper = repo / "scripts/pre-push-singleflight"
-    shutil.copy2(PRE_PUSH_SINGLEFLIGHT, wrapper)
-    runner = repo / ".github/scripts/preflight_runner.py"
-    runner.parent.mkdir(parents=True)
-    shutil.copy2(PREFLIGHT_RUNNER, runner)
-    pre_push = repo / "scripts/pre-push"
-    pre_push.write_text(
-        "#!/usr/bin/env bash\n"
-        "set -euo pipefail\n"
-        "printf 'hook-output: 路径🚀\\n'\n"
-        'printf "args: %s | %s\\n" "${1:-}" "${2:-}"\n',
-        encoding="utf-8",
-    )
-    pre_push.chmod(pre_push.stat().st_mode | stat.S_IXUSR)
-
-    state_root = tmp_path / "preflight-state"
-    env = _shell_env()
-    env["PYTHON"] = _as_bash_path(Path(sys.executable))
-    env["OMI_PREFLIGHT_STATE_DIR"] = str(state_root)
-    env.pop("PYTHONPATH", None)
-    result = subprocess.run(
-        [_bash_command(), _as_bash_path(wrapper), "fork", "https://example.invalid/repo.git"],
-        cwd=repo,
-        env=env,
-        input="",
-        text=True,
-        encoding="utf-8",
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        timeout=10,
-        check=False,
-    )
-
-    assert result.returncode == 0, result.stdout
-    assert "hook-output: 路径🚀" in result.stdout
-    assert "args: fork | https://example.invalid/repo.git" in result.stdout
-    log = (state_root / "pre-push" / "preflight.log").read_text(encoding="utf-8")
-    assert "hook-output: 路径🚀" in log
 
 
 def test_make_harness_targets_run_resolved_python_from_checkout_with_unicode_and_spaces(tmp_path: Path) -> None:
