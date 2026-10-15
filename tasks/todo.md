@@ -17,12 +17,12 @@
 
 **Критерии приемки:**
 - [ ] `npx pnpm@10 dev` запускает Omi, вход через свой аккаунт работает
-- [ ] Список падающих тестов, ошибок `typecheck` и `lint` записан поименно в `docs/naparnik/linux-run-notes.md`
+- [x] Список падающих тестов, ошибок `typecheck` и `lint` записан поименно в `docs/naparnik/linux-run-notes.md`
 
 **Проверка:**
-- [ ] `tesseract --list-langs` показывает `eng` и `rus`
-- [ ] `npx pnpm@10 test`, `checks` прогнаны, вывод сохранен
-- [ ] `git status`: `.env` не попал в индекс
+- [x] `tesseract --list-langs` показывает `eng` и `rus`
+- [x] `npx pnpm@10 test`, `checks` прогнаны, вывод сохранен
+- [x] `git status`: `.env` не попал в индекс
 
 **Зависимости:** нет
 **Файлы:** `.env` (не коммитить), `docs/naparnik/linux-run-notes.md`
