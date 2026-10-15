@@ -25,6 +25,9 @@ export type ConversationRow = {
   // the star/folder/merge actions are gated to cloud rows; see filtering.ts).
   starred?: boolean
   folderId?: string | null
+  // Fork: the backend hid this conversation as not meaningful. Only present when
+  // the list is fetched with include_discarded (the "Discarded" toggle).
+  discarded?: boolean
   sortAt: number
 }
 
@@ -55,10 +58,7 @@ export function publishConversationsCache(rows: ConversationRow[]): void {
   // the next launch paints it instantly (see hydrateConversationsFromDisk).
   // Optimistic "pending" placeholders are transient, so they're excluded.
   // Best-effort and bounded.
-  writePersistedCache(
-    CONV_SURFACE,
-    rows.filter((r) => !r.pending).slice(0, CONV_PERSIST_CAP)
-  )
+  writePersistedCache(CONV_SURFACE, rows.filter((r) => !r.pending).slice(0, CONV_PERSIST_CAP))
   cacheSubscribers.forEach((cb) => cb(rows))
 }
 

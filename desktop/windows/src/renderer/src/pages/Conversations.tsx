@@ -7,6 +7,7 @@ import {
   CheckSquare,
   MessageSquare,
   Radio,
+  EyeOff,
   type LucideIcon
 } from 'lucide-react'
 import { omiApi } from '../lib/apiClient'
@@ -68,9 +69,14 @@ import type { Conversation as CloudConversation } from '../lib/omiApi.generated'
 // The "default view" = all folders + no date range. Only this view is written to
 // the shared conversationsCache (filtered fetches keep it clean) and it's the only
 // one whose warm cache lets the first mount skip a fetch. Type + search stay
-// client-side so they don't affect this.
-function isDefaultView(folder: FolderFilter, dateRange: DateRange): boolean {
-  return folder.kind === 'all' && dateRange.start == null && dateRange.end == null
+// client-side so they don't affect this. Showing discarded rows is not the default
+// view either, so they never leak into the shared cache.
+function isDefaultView(
+  folder: FolderFilter,
+  dateRange: DateRange,
+  showDiscarded: boolean
+): boolean {
+  return !showDiscarded && folder.kind === 'all' && dateRange.start == null && dateRange.end == null
 }
 
 // Chat/recording type filter — a client-side segmented control over the merged rows.
@@ -153,6 +159,8 @@ export function Conversations(): React.JSX.Element {
   const [type, setType] = useState<FilterKind>('all')
   const [folderFilter, setFolderFilter] = useState<FolderFilter>({ kind: 'all' })
   const [dateRange, setDateRange] = useState<DateRange>(NO_DATE_RANGE)
+  // Fork: also list conversations the backend discarded as not meaningful.
+  const [showDiscarded, setShowDiscarded] = useState(false)
   const [folders, setFolders] = useState<ConversationFolder[]>([])
   const [selectMode, setSelectMode] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -205,7 +213,10 @@ export function Conversations(): React.JSX.Element {
       let cloudIds: Set<string> | null = null
       try {
         const r = await omiApi.get<CloudConversation[]>('/v1/conversations', {
-          params: buildConversationQuery(folderFilter, dateRange)
+          params: {
+            ...buildConversationQuery(folderFilter, dateRange),
+            ...(showDiscarded ? { include_discarded: true } : {})
+          }
         })
         const list = Array.isArray(r.data) ? r.data : []
         cloudLite = list
@@ -224,6 +235,7 @@ export function Conversations(): React.JSX.Element {
             source: 'cloud',
             starred: c.starred ?? undefined,
             folderId: c.folder_id ?? null,
+            discarded: c.discarded || undefined,
             sortAt: created
           })
         }
@@ -281,14 +293,14 @@ export function Conversations(): React.JSX.Element {
       if (
         cloudFailed &&
         !showLoading &&
-        isDefaultView(folderFilter, dateRange) &&
+        isDefaultView(folderFilter, dateRange, showDiscarded) &&
         (conversationsCache.rows?.length ?? 0) > 0
       ) {
         setLoading(false)
         return cloudIds
       }
       // Only the default view is the canonical shared cache.
-      if (isDefaultView(folderFilter, dateRange)) {
+      if (isDefaultView(folderFilter, dateRange, showDiscarded)) {
         publishConversationsCache(merged)
         conversationsCache.loaded = true
       }
@@ -296,7 +308,7 @@ export function Conversations(): React.JSX.Element {
       setLoading(false)
       return cloudIds
     },
-    [folderFilter, dateRange]
+    [folderFilter, dateRange, showDiscarded]
   )
 
   // Leaving the panel must invalidate in-flight loadAll commits so a fetch that
@@ -328,7 +340,7 @@ export function Conversations(): React.JSX.Element {
     if (!panelIsActive) return
     const firstMount = !didInitRef.current
     didInitRef.current = true
-    const defaultView = isDefaultView(folderFilter, dateRange)
+    const defaultView = isDefaultView(folderFilter, dateRange, showDiscarded)
     // In-session warm cache: skip the fetch entirely (instant paint from the seed).
     if (
       firstMount &&
@@ -378,7 +390,7 @@ export function Conversations(): React.JSX.Element {
             const merged = [...getPendingConversations(), ...cloud, ...localRows].sort(
               (a, b) => b.sortAt - a.sortAt
             )
-            if (isDefaultView(folderFilter, dateRange)) {
+            if (isDefaultView(folderFilter, dateRange, showDiscarded)) {
               publishConversationsCache(merged)
             }
             return merged
@@ -391,7 +403,7 @@ export function Conversations(): React.JSX.Element {
       cancelled = true
       unsubscribe()
     }
-  }, [folderFilter, dateRange, panelIsActive])
+  }, [folderFilter, dateRange, showDiscarded, panelIsActive])
 
   // Legacy local-only recordings eligible for backfill; recomputed only when the
   // local set actually changes.
@@ -668,6 +680,18 @@ export function Conversations(): React.JSX.Element {
         </div>
 
         <DateFilterButton dateRange={dateRange} onChange={setDateRange} />
+
+        <button
+          onClick={() => setShowDiscarded((v) => !v)}
+          aria-pressed={showDiscarded}
+          className={`surface-panel flex items-center gap-2 px-4 py-2.5 text-sm transition-colors duration-200 ${
+            showDiscarded ? 'text-white' : 'text-white/55 hover:text-white/80'
+          }`}
+          title="Show conversations Omi discarded as not meaningful"
+        >
+          <EyeOff className="h-4 w-4" />
+          <span className="hidden sm:inline">Discarded</span>
+        </button>
 
         <button
           onClick={() => {

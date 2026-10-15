@@ -83,6 +83,16 @@ describe('ConversationListRow', () => {
     expect(screen.getByText(/cut the migration/)).toBeTruthy()
   })
 
+  it('badges a conversation the backend discarded', () => {
+    renderRow({ discarded: true })
+    expect(screen.getByText('Discarded')).toBeTruthy()
+  })
+
+  it('shows no discarded badge on a normal cloud row', () => {
+    renderRow({})
+    expect(screen.queryByText('Discarded')).toBeNull()
+  })
+
   it('does not render placeholder previews as a snippet line', () => {
     renderRow({ preview: '(no transcript)' })
     expect(screen.queryByText('(no transcript)')).toBeNull()
