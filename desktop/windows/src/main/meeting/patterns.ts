@@ -92,7 +92,12 @@ export function sanitizePatterns(raw: unknown): MeetingPatterns | null {
     }
   }
   if (apps.length === 0 && titles.length === 0) return null
-  return { version: typeof r.version === 'number' ? r.version : 0, apps, browsers: r.browsers.map(lower), titles }
+  return {
+    version: typeof r.version === 'number' ? r.version : 0,
+    apps,
+    browsers: r.browsers.map(lower),
+    titles
+  }
 }
 
 /** The bundled default — always valid (build-time JSON). */

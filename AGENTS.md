@@ -28,7 +28,7 @@ Read the guide for the area you are changing. `CLAUDE.md` points here.
 
 ## Repository conventions
 
-- Use a task worktree based on current `origin/main`. `make setup` installs the repository hooks, including staged-file formatting. Keep Git identity in the user's configuration; temporary test identities use `git -c`.
+- Use a task worktree based on current `origin/main`. Git hooks come from `lefthook.yml` and install with `npx pnpm@10 install` in `desktop/windows`. Keep Git identity in the user's configuration; temporary test identities use `git -c`.
 - Upstream `main` changes land through PRs with merge commits, never squash or direct pushes.
 - macOS development uses dev or `omi-*` named bundles. Do not stop or replace the production Omi or Omi Beta apps; bundle details and commands live in the macOS guide.
 - Migrate in-tree callers together rather than preserving retired APIs with compatibility wrappers. Released clients follow the compatibility contracts above.

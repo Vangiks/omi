@@ -1,0 +1,46 @@
+# Git-хуки для desktop/windows. Ставятся сами при `npx pnpm@10 install`
+# в desktop/windows (скрипт prepare).
+# Пропустить разово: `git commit --no-verify`, `LEFTHOOK=0 git push`.
+# https://lefthook.dev/configuration/
+
+# lefthook стоит в desktop/windows, а не в корне. Без явного пути хук его не
+# найдет, выйдет с нулем и молча пропустит все проверки.
+lefthook: desktop/windows/node_modules/.bin/lefthook
+
+glob_matcher: doublestar
+
+pre-commit:
+  parallel: true
+  skip:
+    - merge
+    - rebase
+  jobs:
+    - name: desktop-prettier
+      root: desktop/windows/
+      glob: "desktop/windows/**/*.{ts,tsx,js,mjs,cjs,json,css,md,yml,yaml}"
+      run: node_modules/.bin/prettier --write --ignore-unknown {staged_files}
+      stage_fixed: true
+    - name: desktop-eslint
+      root: desktop/windows/
+      glob: "desktop/windows/**/*.{ts,tsx,js,mjs,cjs}"
+      run: node_modules/.bin/eslint --no-warn-ignored {staged_files}
+
+commit-msg:
+  jobs:
+    - name: conventional
+      # Одной строкой и без двойных кавычек: на Windows lefthook отдает run
+      # в sh -c "…" без экранирования.
+      run: >-
+        head -1 {1} | grep -qE '^((feat|fix|chore|docs|refactor|test|perf|build|ci|style|harden)(\([a-z0-9/-]+\))?!?: .+|Merge |Revert |fixup! |squash! )' || { echo 'Заголовок коммита: «тип(область): описание», тип — feat|fix|chore|docs|refactor|test|perf|build|ci|style|harden'; exit 1; }
+
+# Без root: lefthook фильтрует по root и файлы пуша, а у новой ветки без
+# @{push} список файлов может оказаться пустым, и проверки бы не запустились.
+pre-push:
+  parallel: true
+  jobs:
+    - name: desktop-typecheck
+      run: cd desktop/windows && npx pnpm@10 -s typecheck
+    - name: desktop-lint
+      run: cd desktop/windows && npx pnpm@10 -s lint
+    - name: desktop-meeting-tests
+      run: cd desktop/windows && npx pnpm@10 exec vitest run src/main/meeting

@@ -222,7 +222,6 @@ web-report/
 .metro-cache/
 .aider*
 
-lefthook.yml
 omiGlass/.expo
 
 # Logs
