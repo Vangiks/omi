@@ -14,9 +14,8 @@ with the "Network Data Transfer GCP Replication within Northern America" line
 up $46/day week over week. Live metadata was not inspected for this change.
 Verify both production and development before executing; if development
 `syncing-local-development` is already regional, do not recreate it needlessly.
-There are no application storage-bucket resources in `infrastructure/`;
-`infrastructure/opentofu/README.md` limits that foundation's storage ownership
-to state metadata. This runbook owns the temporal bucket location/lifecycle.
+No infrastructure-as-code manages this bucket. This runbook owns the temporal
+bucket location/lifecycle.
 
 `utils/other/storage.py` uploads WAV segments and returns V4 GET signed URLs
 with a 15-minute expiry. `utils/sync/pipeline.py:process_segment` schedules
