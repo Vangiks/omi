@@ -20,7 +20,6 @@ DEFAULT_OUTPUTS = [
     ROOT_DIR / 'desktop' / 'windows' / 'src' / 'renderer' / 'src' / 'lib' / 'omiApi.generated.ts',
     ROOT_DIR / 'web' / 'app' / 'src' / 'lib' / 'omiApi.generated.ts',
     ROOT_DIR / 'web' / 'admin' / 'lib' / 'services' / 'omi-api' / 'omiApi.generated.ts',
-    ROOT_DIR / 'web' / 'personas-open-source' / 'src' / 'lib' / 'omiApi.generated.ts',
 ]
 
 

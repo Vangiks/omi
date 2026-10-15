@@ -5,8 +5,7 @@ These tests validate that every documented integration REST route exists in
 and a modeled (non-anonymous) success response schema. The spec is generated
 from backend authority (`backend/scripts/export_openapi.py --surface
 integration-public`), so this guards against accidental route removal or
-response-shape regression for first-party integration consumers (e.g. the
-personas-open-source store-facts route) and third-party plugins.
+response-shape regression for integration consumers such as third-party plugins.
 
 Out of scope: WebSocket/SSE/binary protocols, app-client routes, public
 Developer API routes, and any non-Omi third-party API.

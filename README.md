@@ -135,7 +135,6 @@ cd app && bash setup.sh ios    # or: bash setup.sh android
 | Firmware | [`omi/`](omi/) | nRF, Zephyr, C |
 | Omi Glass | [`omiGlass/`](omiGlass/) | ESP32-S3, C |
 | SDKs | [`sdks/`](sdks/) | Device (Python/Swift/RN + multi-lang protocol) |
-| AI Personas | [`web/personas-open-source/`](web/personas-open-source/) | Next.js |
 
 </details>
 

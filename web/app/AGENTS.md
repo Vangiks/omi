@@ -1,7 +1,7 @@
 # web/app — Developer Guide
 
 The signed-in Omi web client: React 19 on the `@tschk/moonshine` runtime, served
-by Bun. Siblings: `web/admin`, `web/frontend`, `web/personas-open-source`.
+by Bun. Siblings: `web/admin`, `web/frontend`.
 
 ## Setup
 

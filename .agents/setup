@@ -2,9 +2,8 @@
 # Amp orb setup for the Omi repository (Debian 12).
 # Installs the toolchains and dependencies a fresh orb needs to build and test
 # this repo: backend Python (uv, pylock.toml), Node packages (root firebase
-# emulator tests, web/admin, web/frontend, web/personas-open-source, desktop
-# windows Electron), web/app (Bun), mcp (uv), and the pinned Flutter SDK for
-# app/ tests. Also installs system prerequisites (Redis, Java for the Firebase
+# emulator tests, web/admin, web/frontend, desktop windows Electron), web/app
+# (Bun), mcp (uv), and the pinned Flutter SDK for app/ tests. Also installs system prerequisites (Redis, Java for the Firebase
 # emulator), seeds the offline backend env stage, and installs git hooks.
 #
 # Idempotent and non-interactive. Long-lived services live in .amp/services.yaml
@@ -88,8 +87,8 @@ run_install npm-root package-lock.json -- node_modules \
 # web/app uses Bun (its Dockerfile installs from bun.lock; never npm there).
 run_install web-app web/app/bun.lock -- web/app/node_modules \
   bash -c 'cd web/app && bun install --frozen-lockfile'
-# web/admin, web/frontend, web/personas-open-source are npm-managed.
-for app in admin frontend personas-open-source; do
+# web/admin and web/frontend are npm-managed.
+for app in admin frontend; do
   run_install "web-$app" "web/$app/package-lock.json" -- "web/$app/node_modules" \
     bash -c "cd web/$app && npm ci --no-audit --no-fund"
 done

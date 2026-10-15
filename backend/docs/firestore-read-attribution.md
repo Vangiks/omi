@@ -178,6 +178,5 @@ workflow does not enable DATA_READ. Turning that audit log on requires
 | `acceptInvitation`, `inviteUser`, `declineInvitation`, `manageUser`, `cleanupExpiredInvitations` | not in this repo. `web/admin/lib/services/invitation.ts` calls `inviteUser` | invitation and membership documents | same residual. `inviteUser` is a callable, so its reads are not in the admin page's browser SDK |
 | `ext-firestore-typesense-conversations-indexonwrite`, `ext-firestore-typesense-conversations-backfill` | Firebase Typesense extension, not in this repo. Still installed; see `backend/utils/conversations/typesense_index.py` | conversation documents on write and backfill | residual. Uninstall is a separate change |
 | admin web client | `web/admin/components/auth-provider.tsx` `getDoc` on `adminData/{uid}` | one admin document per signed-in session | Firebase client SDK, not this process. Count it inside the residual, or with a client-side counter that is not in Prometheus today |
-| personas web client | `web/personas-open-source/src/lib/firebase.ts` and the `getDocs` / `getDoc` calls under `web/personas-open-source/src/app/` | `plugins_data` and `users` | same. This tree has no `.onSnapshot(` / `.on_snapshot(` call |
 
 Mobile clients in this repo do not use `cloud_firestore`.
