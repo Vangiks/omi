@@ -27,8 +27,16 @@ import {
   type MeetingPatterns
 } from './patterns'
 import { listProcessNames } from './processSnapshot'
-import { readMicCaptureEntries, watchMicConsentStore, type MicConsentWatcher } from './micConsentStore'
-import { getForegroundExePath, getForegroundWindowTitle, subscribeForegroundChange } from '../usage/nativeForeground'
+import {
+  readMicCaptureEntries,
+  watchMicConsentStore,
+  type MicConsentWatcher
+} from './micConsentStore'
+import {
+  getForegroundExePath,
+  getForegroundWindowTitle,
+  subscribeForegroundChange
+} from '../usage/nativeForeground'
 import { showMeetingToast, hideMeetingToast, getCurrentMeetingToast } from '../insight/toastWindow'
 import { onCaptureEventInMain } from '../ipc/captureBridge'
 import { getAppSettings, setAppSettings } from '../appSettings'
@@ -36,7 +44,9 @@ import type { CaptureCommand, MeetingToastAction } from '../../shared/types'
 
 const DEBOUNCE_MS = 3000
 const COALESCE_MS = 250
-const CAPTURE_START_TIMEOUT_MS = 5000
+// Fork: must exceed transcriptionClient's CONNECT_TIMEOUT_MS (20s, slow TLS to
+// api.omi.me from Russia), or every auto-capture start is reported as failed.
+const CAPTURE_START_TIMEOUT_MS = 25_000
 
 type Deps = { getCaptureWc: () => WebContents | null }
 
@@ -189,7 +199,8 @@ function stopCapture(): void {
 /** Hide the shared toast window ONLY if the meeting card currently on it belongs
  *  to this meeting — never clobber a proactive insight toast that replaced it. */
 function hideOwnMeetingToast(): void {
-  if (currentMeeting && getCurrentMeetingToast()?.meetingId === currentMeeting.id) hideMeetingToast()
+  if (currentMeeting && getCurrentMeetingToast()?.meetingId === currentMeeting.id)
+    hideMeetingToast()
 }
 
 /** Consume the one-time first-run flag (true exactly once). */

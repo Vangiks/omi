@@ -10,10 +10,11 @@ import type {
 /** The session modes this client can drive ('ptt' rides lib/ptt/ instead). */
 export type TranscriptionMode = Extract<ListenMode, 'conversation' | 'transcribe'>
 
-// Conversation (/v4/listen) connects fast; a tight timeout surfaces failures
-// quickly. (Push-to-talk does NOT ride this client — see lib/ptt/, whose stream
-// lane is opportunistic and needs no connect timeout at all.)
-const CONNECT_TIMEOUT_MS = 3000
+// Fork: raised from 3s. From Russia the TLS handshake to api.omi.me alone takes
+// ~10s, so a tight timeout fails every start. (Push-to-talk does NOT ride this
+// client — see lib/ptt/, whose stream lane is opportunistic and needs no
+// connect timeout at all.)
+const CONNECT_TIMEOUT_MS = 20_000
 
 export type TranscriptionCallbacks = {
   /** Fires every time a new finalized line is ready (a v4/listen segment). */
