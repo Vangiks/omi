@@ -97,9 +97,6 @@ done
 # the system pnpm (12) breaks its .npmrc node-linker=hoisted resolution.
 run_install desktop-windows desktop/windows/pnpm-lock.yaml -- desktop/windows/node_modules \
   bash -c 'cd desktop/windows && npx -y pnpm@10 install --frozen-lockfile'
-# mcp/ is a uv project.
-run_install mcp mcp/uv.lock mcp/pyproject.toml -- mcp/.venv/bin/python \
-  bash -c 'cd mcp && uv sync --frozen'
 
 # Flutter is not in the orb base image; install the CI-pinned stable build.
 FLUTTER_VERSION="3.44.5"

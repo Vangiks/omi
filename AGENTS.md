@@ -22,7 +22,6 @@ Read the guide for the area you are changing. `CLAUDE.md` points here.
 | App E2E | `app/e2e/SKILL.md`, `desktop/macos/e2e/SKILL.md` |
 | Cursor Cloud environment | `.cursor/cloud-agent-environment.md` |
 | Contributions / PR requirements | `docs/doc/developer/Contribution.mdx` |
-| Failure-class classification | `product/failure-classes.md`, `scripts/failure-class` |
 | Formatting | `.github/agent-docs/formatting.md` |
 | Agent documentation / new checks | `.github/agent-docs/doc-maintenance.md` |
 
