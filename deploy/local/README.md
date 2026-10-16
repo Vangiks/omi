@@ -35,6 +35,8 @@ docker compose up -d --build --wait
 
 Версия `firebase-tools` в `docker-compose.yaml` должна совпадать с версией в корневом `package.json`.
 
+Флаги функций те же, что в проде Omi: они лежат в `flags/<сервис>.env`. Их генерирует `flags/generate.py` из окружения прода в истории git, руками эти файлы не правят. Свои значения задаются в `docker-compose.yaml`, они важнее флагов. Пересоздать файлы: `python3 deploy/local/flags/generate.py` из корня репо.
+
 Журналы сервиса: `docker compose logs -f backend`.
 
 ## Где хранятся данные

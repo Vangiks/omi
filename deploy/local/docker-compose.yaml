@@ -1,9 +1,11 @@
 name: omi-local
 
-# Environment shared by the Python services. Values mirror
-# _harness_service_extra in scripts/dev-harness/dev_harness/config.py, with
-# container names instead of 127.0.0.1. Secrets and provider keys come from
-# .env (see .env.example and init.sh).
+# Environment of the Python services, in increasing priority:
+# 1. flags/<service>.env: production feature flags (flags/generate.py);
+# 2. .env: secrets and provider keys (.env.example, init.sh);
+# 3. x-python-env below and each service's environment: local wiring. Values
+#    mirror _harness_service_extra in scripts/dev-harness/dev_harness/config.py,
+#    with container names instead of 127.0.0.1.
 x-python-env: &python-env
   PYTHONUNBUFFERED: "1"
   OMI_ENV_STAGE: local
@@ -33,9 +35,6 @@ x-python-env: &python-env
   BUCKET_DESKTOP_UPDATES: desktop-updates
   BUCKET_SCREEN_FRAMES: screen-frames
   MEMORY_MODE: read
-  # Memory intake fence. Off pauses every memory write, and pusher refuses to
-  # start. Production sets on for the API, listen and pusher.
-  MEMORY_ENABLED: "on"
   MEMORY_CANONICAL_CONSOLIDATION_ENABLED: "true"
   REDIS_DB_HOST: redis
   REDIS_DB_PORT: "6379"
@@ -51,9 +50,6 @@ x-python-env: &python-env
   SCREEN_FRAME_EGRESS_ENABLED: "true"
   # The default chain lists soniox, and startup fails without its key.
   STT_SERVICE_MODELS: dg-nova-3
-  # Conversation notes run only on the shaped path; off (the code default)
-  # fails every summary. Production sets on (backend/docs/feature-flag-registry.md).
-  OMI_SHAPED_AGENT_MODE: "on"
 
 x-backend-build: &backend-build
   context: ../..
@@ -155,7 +151,10 @@ services:
     image: omi-local-backend
     build: *backend-build
     command: ["uvicorn", "llm_gateway.main:app", "--host", "0.0.0.0", "--port", "8080"]
-    env_file: .env
+    env_file:
+      # Production feature flags (flags/generate.py), then local secrets.
+      - flags/llm-gateway.env
+      - .env
     environment: *python-env
     depends_on:
       setup:
@@ -167,7 +166,10 @@ services:
   backend:
     image: omi-local-backend
     build: *backend-build
-    env_file: .env
+    env_file:
+      # Production feature flags (flags/generate.py), then local secrets.
+      - flags/backend.env
+      - .env
     environment:
       <<: *python-env
       # Without it conversations are never finalized.
@@ -200,7 +202,10 @@ services:
       dockerfile: backend/pusher/Dockerfile
       args:
         PYTHON_BASE_IMAGE: python:3.11-slim
-    env_file: .env
+    env_file:
+      # Production feature flags (flags/generate.py), then local secrets.
+      - flags/pusher.env
+      - .env
     environment:
       <<: *python-env
     volumes:
@@ -228,7 +233,10 @@ services:
         PYTHON_BASE_IMAGE: python:3.11-slim
     # Same user as the backend so files they share in the volume stay writable.
     user: "10001:10001"
-    env_file: .env
+    env_file:
+      # Production feature flags (flags/generate.py), then local secrets.
+      - flags/desktop-backend.env
+      - .env
     environment:
       <<: *python-env
       USE_VERTEX_AI: "false"
