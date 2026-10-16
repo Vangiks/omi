@@ -381,8 +381,7 @@ def build_stream_error_reply(
     failed mid-stream without producing an answer.
 
     Without this, the SSE stream ends as a clean 200 with no ``done:`` frame and
-    every client renders a blank assistant bubble. Mirrors
-    ``_build_quota_exceeded_reply``: the reply is persisted so the message the
+    every client renders a blank assistant bubble. The reply is persisted so the message the
     client renders from the ``done:`` frame stays consistent with server-side
     history (clients persist what they receive). The user's message is already
     persisted by the caller, so only the AI reply is saved here. The raw

@@ -270,7 +270,6 @@ def _drive_day_summary_endpoint(monkeypatch, memories_learned):
     """Run the real /v1/users/daily-summary-settings/test path and capture the push data."""
     sent = {}
     seen = {}
-    monkeypatch.setattr(users_router, 'enforce_chat_quota', lambda *a, **k: None)
     monkeypatch.setattr(users_router.notification_db, 'get_user_time_zone', lambda uid: 'UTC')
     monkeypatch.setattr(users_router.notification_db, 'get_all_tokens', lambda uid: ['tok1'])
     monkeypatch.setattr(

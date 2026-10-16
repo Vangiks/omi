@@ -125,7 +125,6 @@ from database.memories import migrate_memories
 from utils.llm.persona import generate_persona_intro_message
 from utils.llm.app_generator import generate_description, generate_description_and_emoji
 from utils.llm.app_generation_prompts import app_generation_prompts_from_llm_payload, app_generation_prompts_response
-from utils.subscription import enforce_chat_quota
 from utils.llm.usage_tracker import track_usage, Features
 from utils.notifications import send_notification, send_app_review_reply_notification, send_new_app_review_notification
 from utils.other import endpoints as auth
@@ -1534,8 +1533,6 @@ def generate_description_endpoint(
     uid: str = Depends(auth.get_current_user_uid),
     x_app_platform: Optional[str] = Header(None, alias='X-App-Platform'),
 ):
-    # User-initiated LLM generation — same free-tier gate as chat (402 past cap).
-    enforce_chat_quota(uid, platform=x_app_platform)
     if data.name == '':
         raise HTTPException(status_code=422, detail='App Name is required')
     if data.description == '':
@@ -1557,8 +1554,6 @@ def generate_description_and_emoji_endpoint(
     Generate an app description and representative emoji.
     Used by the quick template creator feature.
     """
-    # User-initiated LLM generation — same free-tier gate as chat (402 past cap).
-    enforce_chat_quota(uid, platform=x_app_platform)
     if not data.name:
         raise HTTPException(status_code=422, detail='App Name is required')
     if not data.prompt:
@@ -1585,9 +1580,6 @@ async def generate_sample_prompts_endpoint(
     """
     from utils.llm.clients import get_llm
     import json
-
-    # User-initiated LLM generation — same free-tier gate as chat (402 past cap).
-    await run_blocking(db_executor, enforce_chat_quota, uid, platform=x_app_platform)
 
     system_prompt = """Generate 5 creative and diverse ideas for apps that are either:
 1. Conversation summary based apps - analyze user's recorded conversations and extract/organize information
@@ -1641,9 +1633,6 @@ async def generate_app_endpoint(
     """
     from utils.llm.app_generator import generate_app_from_prompt
 
-    # User-initiated LLM generation — same free-tier gate as chat (402 past cap).
-    await run_blocking(db_executor, enforce_chat_quota, uid, platform=x_app_platform)
-
     prompt = data.prompt.strip()
     if not prompt:
         raise HTTPException(status_code=422, detail='Prompt is required')
@@ -1689,9 +1678,6 @@ async def generate_app_icon_endpoint(
     """
     from utils.llm.app_generator import generate_app_icon
     import base64
-
-    # User-initiated LLM generation — same free-tier gate as chat (402 past cap).
-    await run_blocking(db_executor, enforce_chat_quota, uid, platform=x_app_platform)
 
     app_name = data.name.strip()
     app_description = data.description.strip()

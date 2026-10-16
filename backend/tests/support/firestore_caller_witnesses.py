@@ -327,7 +327,6 @@ def _run_speaker_browse_recipe(monkeypatch: pytest.MonkeyPatch, capture: HelperC
 
 
 def _run_daily_summary_regenerate(monkeypatch: pytest.MonkeyPatch, capture: HelperCapture) -> None:
-    _stub(monkeypatch, users_router, 'enforce_chat_quota', lambda *a, **k: None)
     _stub(monkeypatch, users_router.notification_db, 'get_user_time_zone', lambda uid: None)
     _stub(
         monkeypatch,
@@ -341,7 +340,6 @@ def _run_daily_summary_regenerate(monkeypatch: pytest.MonkeyPatch, capture: Help
 
 
 def _run_daily_summary_test_route(monkeypatch: pytest.MonkeyPatch, capture: HelperCapture) -> None:
-    _stub(monkeypatch, users_router, 'enforce_chat_quota', lambda *a, **k: None)
     _stub(monkeypatch, users_router.notification_db, 'get_user_time_zone', lambda uid: None)
     _stub(monkeypatch, users_router.notification_db, 'get_all_tokens', lambda uid: ['tok'])
     trial(capture, users_router.test_daily_summary, request=None, uid='u1', x_app_platform=None)

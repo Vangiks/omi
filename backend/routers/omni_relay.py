@@ -275,7 +275,7 @@ async def _relay_entitled(websocket: WebSocket, uid: str, provider: str, validat
     # Monthly free-tier chat quota: realtime turns count as questions, so they
     # must also be blocked past the cap. Exempt only when THIS session will
     # ride the user's own key for the chosen provider AND the user is genuinely
-    # BYOK-enrolled — mirrors enforce_chat_quota's rule; a deepgram-only (or
+    # BYOK-enrolled; a deepgram-only (or
     # forged) BYOK header must not skip the gate while _upstream falls back to
     # Omi's platform key.
     try:

@@ -4,7 +4,6 @@
     the catalog's typed chat allocation.
   - Free, Plus, and Unlimited-v2 are hard-capped; overage is only calculated for
     plans whose catalog policy is ``overage``.
-  - BYOK users bypass everything (handled in ``utils.subscription.enforce_chat_quota``).
 
 True costs are tracked on every chat call via
 ``database.llm_usage.record_llm_usage_bucket`` → ``desktop_chat.cost_usd``.

@@ -113,8 +113,7 @@ class ChatUsageQuota(BaseModel):
     reset_at: Optional[int] = None  # unix seconds — start of next month UTC
     # Catalog exhaustion policy for this plan's chat allocation. True means going
     # past `limit` accrues a charge instead of blocking, so a client must not
-    # gate sends on `allowed` alone (`utils.subscription.enforce_chat_quota`
-    # returns without raising for these plans).
+    # gate sends on `allowed` alone.
     is_overage_plan: bool = False
 
 

@@ -126,7 +126,7 @@ class TestUsersMigrationSanitization:
 
 class TestUsersTimezoneSanitization:
     def test_daily_summary_timezone_exception_sanitized(self):
-        with patch.object(users_router, "enforce_chat_quota"), patch.object(
+        with patch.object(
             users_router.notification_db, "get_all_tokens", return_value=["token_123"]
         ), patch.object(users_router.notification_db, "get_user_time_zone", return_value="Invalid/Timezone"), patch(
             "pytz.timezone",
@@ -141,7 +141,7 @@ class TestUsersTimezoneSanitization:
 
     def test_create_daily_summary_timezone_exception_sanitized(self):
         request = users_router.CreateDailySummaryRequest(date="2026-09-24")
-        with patch.object(users_router, "enforce_chat_quota"), patch.object(
+        with patch.object(
             users_router.notification_db, "get_user_time_zone", return_value="Invalid/Timezone"
         ), patch(
             "pytz.timezone",
@@ -155,7 +155,7 @@ class TestUsersTimezoneSanitization:
             assert SENSITIVE_TRACE not in str(exc_info.value.detail)
 
     def test_regenerate_daily_summary_timezone_exception_sanitized(self):
-        with patch.object(users_router, "enforce_chat_quota"), patch.object(
+        with patch.object(
             users_router.daily_summaries_db, "get_daily_summary", return_value={"date": "2026-09-24"}
         ), patch.object(users_router, "get_generic_cache", return_value=None), patch.object(
             users_router, "set_generic_cache", return_value=None

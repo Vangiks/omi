@@ -158,7 +158,7 @@ def authenticated_anthropic_chat(monkeypatch):
 
 
 @pytest.mark.parametrize('streaming', [False, True])
-def test_authenticated_enrolled_anthropic_uses_customer_key_with_exhausted_managed_quota(
+def test_authenticated_enrolled_anthropic_uses_customer_key(
     authenticated_anthropic_chat, streaming
 ):
     app, headers, calls = authenticated_anthropic_chat
@@ -175,14 +175,8 @@ def test_authenticated_enrolled_anthropic_uses_customer_key_with_exhausted_manag
     assert calls['quota_questions'] == ['desktop-anthropic-byok-fixture']
     assert [entry['cost_exclusion'] for entry in calls['cost_exclusions']] == ['byok_provider_cost']
 
-    without_key = {name: value for name, value in headers.items() if name != 'X-BYOK-Anthropic'}
-    next_response = client.post('/v2/chat/completions', headers=without_key, json=body)
-    assert next_response.status_code == 402
-    assert calls['quota_reads'] == [None]
-    assert len(calls['clients']) == 1
 
-
-def test_missing_desktop_byok_middleware_reproduces_managed_quota_failure(authenticated_anthropic_chat):
+def test_missing_desktop_byok_middleware_never_uses_the_customer_key(authenticated_anthropic_chat):
     app, headers, calls = authenticated_anthropic_chat
     # Reproduce the desktop serving app before #20931 without modifying source.
     app.user_middleware = [item for item in app.user_middleware if item.cls is not byok.BYOKMiddleware]
@@ -192,9 +186,7 @@ def test_missing_desktop_byok_middleware_reproduces_managed_quota_failure(authen
         json={'model': 'omi-sonnet', 'messages': [{'role': 'user', 'content': 'hello'}]},
     )
 
-    assert response.status_code == 402
-    assert response.json()['detail']['error'] == 'quota_exceeded'
-    assert calls['quota_reads'] == [None]
+    assert response.status_code != 200
     assert calls['clients'] == []
     assert calls['messages'] == []
     assert calls['cost_exclusions'] == []

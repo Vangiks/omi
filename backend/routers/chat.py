@@ -3,7 +3,6 @@ from utils.chat_turn import (
     TurnOptions,
     MobileReplySink,
     record_chat_quota_question_best_effort,
-    _required_chat_quota_provider,
 )
 from utils.messaging.contracts import Principal
 import asyncio
@@ -90,7 +89,7 @@ from utils.chat_rating_triage import extract_rating_triage_fields
 from utils.feedback import record_chat_message_feedback
 from utils.rate_limit_config import get_effective_limit, RATE_LIMIT_SHADOW
 from utils.llm.gateway_client import CHAT_AGENT_ROUTE_DIRECT, get_chat_agent_route
-from utils.subscription import enforce_chat_quota, is_trial_paywalled
+from utils.subscription import is_trial_paywalled
 from utils import share_links
 from utils.other import endpoints as auth, storage
 from utils.other.chat_file import FileChatTool, UnsupportedChatFileError, safe_file_chats
@@ -419,8 +418,6 @@ def create_voice_message_stream(
     uid: str = Depends(auth.with_rate_limit(auth.get_current_user_uid, "voice:message")),
     x_app_platform: Optional[str] = Header(None, alias='X-App-Platform'),
 ):
-    enforce_chat_quota(uid, platform=x_app_platform, required_llm_provider=_required_chat_quota_provider())
-
     resolved_language = resolve_voice_message_language(uid, language)
     stt_provider, _, _stt_model = get_prerecorded_service(resolved_language)
     paths: List[str] = []
@@ -567,8 +564,6 @@ async def transcribe_voice_message(
     Returns {"transcript": "...", "language": "..."}.
     """
     # Trial paywall: reject paywalled desktop PTT before hitting Deepgram.
-    # Narrow to trial-only on purpose — full enforce_chat_quota here would
-    # change mobile behavior for users past their existing 30/mo chat cap.
     if await run_blocking(db_executor, is_trial_paywalled, uid, x_app_platform):
         raise HTTPException(status_code=402, detail={'error': 'quota_exceeded', 'plan_type': 'basic'})
 

@@ -10,7 +10,6 @@ import pytest
 
 from config.plan_catalog import FULL_ACCESS_PLAN
 from database import users as users_db
-from database import user_usage as user_usage_db
 from utils import subscription as subscription_utils
 
 
@@ -41,17 +40,6 @@ def test_valid_subscription_is_full_access(firestore_without_user, provision):
     assert subscription is not None
     assert subscription.plan == FULL_ACCESS_PLAN
     firestore_without_user.collection.return_value.document.return_value.set.assert_not_called()
-
-
-def test_chat_quota_does_not_block_heavy_usage(firestore_without_user, monkeypatch):
-    monkeypatch.setattr(users_db, 'is_byok_active', lambda uid, **kwargs: False)
-    monkeypatch.setattr(
-        user_usage_db,
-        'get_monthly_chat_usage',
-        lambda uid, **kwargs: {'questions': 10_000, 'cost_usd': 10_000.0, 'reset_at': 0},
-    )
-
-    subscription_utils.enforce_chat_quota('local-dev-user')
 
 
 def test_transcription_credits_are_unlimited(firestore_without_user, monkeypatch):

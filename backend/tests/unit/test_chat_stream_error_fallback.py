@@ -153,7 +153,7 @@ def test_v2_messages_emits_fallback_done_frame_on_pipeline_error(chat_environmen
         # Raw exception detail must never reach the client.
         assert 'boom' not in response.text
 
-        # The fallback AI reply is persisted (mirrors _build_quota_exceeded_reply).
+        # The fallback AI reply is persisted.
         ai_writes = [call.args[1] for call in chat_db.add_message.call_args_list if call.args[1].get('sender') == 'ai']
         assert len(ai_writes) == 1
         assert ai_writes[0]['text'] == chat_utils.CHAT_STREAM_ERROR_TEXT

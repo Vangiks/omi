@@ -146,15 +146,12 @@ def test_valid_subscription_without_provision_does_not_write_free() -> None:
     user_ref.set.assert_not_called()
 
 
-def test_desktop_chat_quota_reads_customer_firestore_without_provisioning() -> None:
+def test_desktop_trial_paywall_reads_customer_firestore_without_provisioning() -> None:
     import inspect
 
-    from utils.subscription import enforce_desktop_chat_quota, is_desktop_trial_paywalled
+    from utils.subscription import is_desktop_trial_paywalled
 
-    quota_source = inspect.getsource(enforce_desktop_chat_quota)
     paywall_source = inspect.getsource(is_desktop_trial_paywalled)
-    assert "get_customer_firestore_client()" in quota_source
-    assert "provision=False" in quota_source
     assert "get_customer_firestore_client()" in paywall_source
     assert "provision=False" in paywall_source
 

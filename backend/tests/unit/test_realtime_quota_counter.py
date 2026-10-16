@@ -27,7 +27,6 @@ from datetime import datetime, timezone
 from typing import Any
 
 import pytest
-from fastapi import HTTPException
 
 os.environ.setdefault('ENCRYPTION_SECRET', 'omi_ZwB2ZNqB2HHpMK6wStk7sTpavJiPTFg7gXUHnc4tFABPU6pZ2c2DKgehtfgi4RZv')
 
@@ -935,20 +934,13 @@ async def test_a_byok_served_session_is_never_re_checked(monkeypatch) -> None:
     assert writes == []
 
 
-# --- the hub: minting is not a question, and BYOK buys no managed token ------------------
+# --- the hub: minting is not a question ------------------
 
 
 @pytest.mark.asyncio
 async def test_minting_a_session_debits_nothing(monkeypatch) -> None:
     """A rewarm mint (#12331 class) and a turn mint look identical here; neither may consume quota."""
     monkeypatch.setenv('OPENAI_API_KEY', 'platform-key')
-    gates: list[tuple[Any, ...]] = []
-
-    async def run(_executor, function, *args, **kwargs):
-        gates.append((function, args, kwargs))
-        assert function is desktop_realtime.enforce_desktop_chat_quota
-        return None
-
     async def post_json(*_a, **_k):
         return {'value': 'ek_secret', 'expires_at': 1}, None
 
@@ -958,7 +950,6 @@ async def test_minting_a_session_debits_nothing(monkeypatch) -> None:
     def forbidden(*_a, **_k):
         raise AssertionError('a mint must not touch the chat counter')
 
-    monkeypatch.setattr(desktop_realtime, 'run_blocking', run)
     monkeypatch.setattr(desktop_realtime, '_post_json', post_json)
     monkeypatch.setattr(desktop_realtime, '_persist_session', persist)
     monkeypatch.setattr(desktop_realtime.llm_usage_db, 'record_llm_usage_bucket', forbidden)
@@ -966,50 +957,3 @@ async def test_minting_a_session_debits_nothing(monkeypatch) -> None:
 
     response = await desktop_realtime.mint_session(desktop_realtime.MintRequest(provider='openai'), UID)
     assert response.status_code == 200
-    assert [(g[1], g[2]) for g in gates] == [((UID, 'desktop'), {'byok_exempt': False})]
-
-
-@pytest.mark.parametrize('byok_active', [False, True])
-def test_no_mint_at_zero_remaining_on_a_hard_capped_plan_byok_or_not(monkeypatch, byok_active) -> None:
-    """The hub hands out Omi's key; a user's Anthropic BYOK must not buy a managed OpenAI session past the cap."""
-    monkeypatch.setattr(subscription, 'is_trial_paywalled', lambda *_a, **_k: False)
-    monkeypatch.setattr(subscription.users_db, 'is_byok_active', lambda *_a, **_k: byok_active)
-    monkeypatch.setattr(subscription, 'request_has_byok_provider', lambda *_a, **_k: True)
-    monkeypatch.setattr(subscription, 'get_customer_firestore_client', lambda: object())
-    monkeypatch.setattr(
-        subscription,
-        'get_chat_quota_snapshot',
-        lambda *_a, **_k: {
-            'plan': PlanType.basic,
-            'unit': 'questions',
-            'used': 30.0,
-            'limit': 30.0,
-            'allowed': False,
-            'reset_at': 0,
-        },
-    )
-    with pytest.raises(HTTPException) as error:
-        subscription.enforce_desktop_chat_quota(UID, 'desktop', byok_exempt=False)
-    assert error.value.status_code == 402
-    # Positive control: desktop chat (Anthropic-served, BYOK-exempt) still lets that user through.
-    if byok_active:
-        subscription.enforce_desktop_chat_quota(UID, 'desktop')
-
-
-def test_an_overage_plan_still_mints(monkeypatch) -> None:
-    monkeypatch.setattr(subscription, 'is_trial_paywalled', lambda *_a, **_k: False)
-    monkeypatch.setattr(subscription.users_db, 'is_byok_active', lambda *_a, **_k: False)
-    monkeypatch.setattr(subscription, 'get_customer_firestore_client', lambda: object())
-    monkeypatch.setattr(
-        subscription,
-        'get_chat_quota_snapshot',
-        lambda *_a, **_k: {
-            'plan': PlanType.operator,
-            'unit': 'questions',
-            'used': 501.0,
-            'limit': 500.0,
-            'allowed': False,
-            'reset_at': 0,
-        },
-    )
-    subscription.enforce_desktop_chat_quota(UID, 'desktop', byok_exempt=False)

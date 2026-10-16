@@ -169,8 +169,7 @@ def test_only_proactive_counts_zero(mock_db):
 
 
 def test_month_read_is_bounded_to_the_current_month(mock_db, monkeypatch):
-    # `enforce_chat_quota` calls this on every chat request. Reading the whole
-    # llm_usage collection made the cost of asking a question grow with how long
+    # Reading the whole llm_usage collection made the cost of asking a question grow with how long
     # the account had existed.
     _setup_docs(
         mock_db,

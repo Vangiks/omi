@@ -91,19 +91,18 @@ from models.users import (
 )
 from utils.phone_calls import get_quota_snapshot as get_phone_call_quota_snapshot
 from utils.apps import get_available_app_by_id
+from config.plan_catalog import plan_uses_overage
 from utils.subscription import (
     DESKTOP_CHAT_BYOK_PROVIDER,
     resolve_transcription_allowance,
     request_has_llm_byok_key,
     request_has_byok_provider,
-    enforce_chat_quota,
     get_chat_quota_snapshot,
     get_basic_plan_limits,
     get_default_basic_subscription,
     get_paid_plan_definitions,
     get_plan_display_name,
     get_plan_limits,
-    plan_uses_overage,
     get_plan_features,
     get_monthly_usage_for_subscription,
     is_trial_paywalled,
@@ -1243,7 +1242,7 @@ def _user_subscription_response(
 ) -> UserSubscriptionResponse:
     """Read subscription/usage once, reusing those reads for the allowance."""
     # BYOK free plan: unlimited chat/insights only for a validated LLM-capability
-    # key (same predicate as enforce_chat_quota). Deepgram-only does not unlock this.
+    # key. Deepgram-only does not unlock this.
     # Synthetic paid-tier quota for BYOK / marketplace-reviewer overrides so
     # these users aren't surprised by a disabled phone-call feature.
     unlimited_phone_quota = PhoneCallQuota(has_access=True, is_paid=True)
@@ -1495,7 +1494,7 @@ def get_user_chat_usage_quota(
 
     Used by the desktop app. Mobile uses the subscription endpoint instead.
     """
-    # Match enforce_desktop_chat_quota: only the provider actually used by
+    # Only the provider actually used by
     # desktop chat can exempt it. Other enrolled keys still use managed chat.
     customer_client = get_customer_firestore_client()
     if users_db.is_byok_active(uid, firestore_client=customer_client) and request_has_byok_provider(
@@ -1514,7 +1513,7 @@ def get_user_chat_usage_quota(
         )
 
     # This is the desktop-only quota display (see docstring), so it must read the
-    # same customer Firestore project that enforce_desktop_chat_quota() enforces
+    # same customer Firestore project that desktop chat accounts
     # against — otherwise a named dev/named bundle shows the dev project's plan
     # here while /v2/chat/completions gates on the customer project's, and the
     # two disagree for the same uid (#11199).
@@ -1692,8 +1691,6 @@ def test_daily_summary(
     This bypasses the time check and sends a summary immediately.
     Optionally accepts a date parameter (YYYY-MM-DD) to generate summary for a specific date.
     """
-    # User-initiated LLM generation — same free-tier gate as chat (402 past cap).
-    enforce_chat_quota(uid, platform=x_app_platform)
     time_zone_name = notification_db.get_user_time_zone(uid)
     tokens = notification_db.get_all_tokens(uid)
 
@@ -1935,7 +1932,6 @@ def create_user_daily_summary(
     screen. A record already stored for that date is returned without spending
     LLM tokens.
     """
-    enforce_chat_quota(uid, platform=x_app_platform)
     try:
         target_date = datetime.strptime(request.date, '%Y-%m-%d').date()
     except ValueError:
@@ -2062,8 +2058,6 @@ def regenerate_daily_summary(
     overwrite the same doc in place. No push notification — the user is
     already looking at the page.
     """
-    # User-initiated LLM generation — same free-tier gate as chat (402 past cap).
-    enforce_chat_quota(uid, platform=x_app_platform)
     summary = daily_summaries_db.get_daily_summary(uid, summary_id)
     if not summary:
         raise HTTPException(status_code=404, detail='Daily summary not found')

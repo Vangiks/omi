@@ -207,7 +207,6 @@ def test_existing_day_is_one_firestore_read_and_no_llm(monkeypatch):
 
 def _route_patches(users_router, **overrides):
     defaults = {
-        'enforce_chat_quota': MagicMock(),
         'notification_db': MagicMock(),
         'daily_summaries_db': MagicMock(),
         'get_generic_cache': MagicMock(return_value=None),
@@ -231,7 +230,6 @@ def test_create_route_happy_path():
     with patch.multiple(users_router, **patches):
         result = users_router.create_user_daily_summary(request, uid='u1', x_app_platform='macos')
     assert result['id'] == 'new-1'
-    patches['enforce_chat_quota'].assert_called_once_with('u1', platform='macos')
     patches['generate_daily_summary_on_demand'].assert_called_once()
     patches['set_generic_cache'].assert_called_once()
 

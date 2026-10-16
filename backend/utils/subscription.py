@@ -4,7 +4,6 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple, cast
 
-from fastapi import HTTPException
 from firebase_admin import auth as firebase_auth
 import stripe
 
@@ -24,7 +23,6 @@ from config.plan_catalog import (
     allocation_limit,
     full_access_subscription,
     get_plan_allocation,
-    plan_uses_overage,
     resolve_stripe_price_plan,
 )
 from models.users import PlanType, SubscriptionStatus, Subscription, PlanLimits, TrialMetadata
@@ -1144,124 +1142,6 @@ def get_chat_quota_snapshot(
         'allowed': allowed,
         'reset_at': usage['reset_at'],
     }
-
-
-def enforce_chat_quota(
-    uid: str,
-    platform: Optional[str] = None,
-    *,
-    firestore_client: Any | None = None,
-    provision: bool = True,
-    required_llm_provider: str | None = None,
-    byok_exempt: bool = True,
-) -> None:
-    """Block or allow a chat request based on the user's plan + usage.
-
-    - BYOK users with an LLM key attached: always allowed, no Omi-side cost —
-      unless ``byok_exempt`` is False, for surfaces that only ever spend Omi's
-      own key regardless of the user's (the realtime hub mints platform tokens).
-    - Plans whose catalog exhaustion policy is overage: ALLOWED — the call is
-      served and the excess accrues a charge. See ``utils.overage``.
-    - Hard-capped plans: blocked → 402, which the chat endpoint converts into
-      a canned AI reply for mobile UX. Plus and Unlimited-v2 are explicitly
-      hard-capped by the catalog.
-    """
-    # Release-probe traffic is the deploy gate proving the candidate can chat at
-    # all — never paywall it, or the gate hard-blocks its own deploys once the
-    # probe's turns exhaust the Free cap.
-    if uid == RELEASE_PROBE_UID:
-        return
-
-    # Paywall test override — bypass BYOK + plan checks so the same 402
-    # surfaces that a free user past 30 questions would hit. Desktop only;
-    # mobile callers continue down the normal plan path.
-    if is_trial_paywalled(
-        uid,
-        platform,
-        firestore_client=firestore_client,
-        provision=provision,
-        required_byok_provider=required_llm_provider,
-    ):
-        snapshot = get_chat_quota_snapshot(
-            uid,
-            platform=platform,
-            firestore_client=firestore_client,
-            provision=provision,
-            required_llm_provider=required_llm_provider,
-        )
-        raise HTTPException(
-            status_code=402,
-            detail={
-                'error': 'quota_exceeded',
-                'plan': get_plan_display_name(PlanType.basic),
-                'plan_type': PlanType.basic.value,
-                'unit': snapshot['unit'],
-                'used': round(snapshot['used'], 4),
-                'limit': snapshot['limit'],
-                'reset_at': snapshot['reset_at'],
-            },
-        )
-
-    # BYOK users pay their own LLM provider — no Omi-side cost to cap.
-    # Require an LLM provider key on this request (not just any BYOK header)
-    # so a user can't activate with fake fingerprints or send only x-byok-deepgram
-    # to bypass chat quota while chat falls back to Omi's OpenAI/Anthropic keys.
-    has_exempt_llm = (
-        request_has_byok_provider(required_llm_provider) if required_llm_provider else _request_has_llm_byok_key()
-    )
-    if byok_exempt and users_db.is_byok_active(uid, firestore_client=firestore_client) and has_exempt_llm:
-        return
-
-    snapshot = get_chat_quota_snapshot(
-        uid,
-        platform=platform,
-        firestore_client=firestore_client,
-        provision=provision,
-        required_llm_provider=required_llm_provider,
-    )
-    if snapshot['allowed']:
-        return
-
-    plan = snapshot['plan']
-
-    # Reporting and enforcement share the catalog's one exhaustion predicate.
-    if plan_uses_overage(plan):
-        return
-
-    raise HTTPException(
-        status_code=402,
-        detail={
-            'error': 'quota_exceeded',
-            'plan': get_plan_display_name(plan),
-            'plan_type': plan.value,
-            'unit': snapshot['unit'],
-            'used': round(snapshot['used'], 4),
-            'limit': snapshot['limit'],
-            'reset_at': snapshot['reset_at'],
-        },
-    )
-
-
-def enforce_desktop_chat_quota(uid: str, platform: Optional[str] = None, *, byok_exempt: bool = True) -> None:
-    """Quota for the desktop serving plane: production customer data, no Free provision.
-
-    Development desktop-backend ADC stays on the compute project for ``agentVm``.
-    Entitlements read the customer SA (``SERVICE_ACCOUNT_JSON`` or the Auth file).
-    ``byok_exempt=False`` is for surfaces that hand out Omi's own credential no
-    matter what key the user holds (the realtime hub); a user's Anthropic key
-    must not buy them a managed OpenAI or Gemini session past the cap.
-    """
-    # Desktop agent chat only consumes Anthropic. An OpenRouter/Gemini/OpenAI
-    # key must not exempt this path while the request still uses Omi's managed
-    # Anthropic credential.
-    enforce_chat_quota(
-        uid,
-        platform,
-        firestore_client=get_customer_firestore_client(),
-        provision=False,
-        required_llm_provider=DESKTOP_CHAT_BYOK_PROVIDER,
-        byok_exempt=byok_exempt,
-    )
 
 
 def is_desktop_trial_paywalled(

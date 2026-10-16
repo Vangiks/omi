@@ -80,7 +80,7 @@ def _regenerate(users_router, day):
         seen['ids'] = [c.id for c in conversations]
         return {'id': 'fresh', 'date': date_str, 'headline': 'h', 'overview': 'o'}
 
-    with patch.object(users_router, 'enforce_chat_quota'), patch.object(
+    with patch.object(
         users_router, 'daily_summaries_db'
     ) as summaries_db, patch.object(users_router, 'notification_db') as notif_db, patch.object(
         users_router, 'conversations_db'
@@ -132,7 +132,7 @@ def test_web_generate_recap_bounds_a_heavy_day():
         seen['ids'] = [c.id for c in conversations]
         raise _Stop()
 
-    with patch.object(users_router, 'enforce_chat_quota'), patch.object(
+    with patch.object(
         users_router, 'notification_db'
     ) as notif_db, patch.object(users_router, 'conversations_db') as convs_db, patch.object(
         users_router, 'deserialize_conversations', return_value=day

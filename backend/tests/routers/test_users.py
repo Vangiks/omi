@@ -555,11 +555,8 @@ def test_subscription_endpoint_falls_back_to_basic_when_no_valid_subscription():
 def test_usage_quota_endpoint_reads_customer_firestore_like_desktop_enforcement():
     # GET /v1/users/me/usage-quota (routers/users.py:1386) is the desktop app's own
     # quota display and called get_chat_quota_snapshot() with no firestore_client,
-    # which defaults to the compute-local project. enforce_desktop_chat_quota() --
-    # the function that actually gates POST /v2/chat/completions -- always forces
-    # get_customer_firestore_client(). On a named dev/desktop bundle those are two
-    # different Firestore projects, so this endpoint could report `allowed: true`
-    # for the same uid that the chat endpoint 402s (#11199).
+    # which defaults to the compute-local project. Desktop chat accounts usage in
+    # the customer project, so the display must read it there too (#11199).
     sentinel_customer_client = object()
     snapshot_mock = MagicMock(
         return_value={
@@ -623,7 +620,7 @@ def _mock_desktop_quota_storage(monkeypatch, *, enrolled, questions):
     ],
 )
 @pytest.mark.parametrize('questions', [29, 30])
-def test_desktop_usage_quota_matches_enforcement_for_enrolled_provider(
+def test_desktop_usage_quota_for_enrolled_provider(
     monkeypatch, provider, enrolled, validated, questions
 ):
     """#19331: an enrolled Gemini key cannot fund desktop's Anthropic chat."""
@@ -637,21 +634,16 @@ def test_desktop_usage_quota_matches_enforcement_for_enrolled_provider(
             byok.set_byok_keys(keys)
         quota = users_router.get_user_chat_usage_quota(uid='uid1', x_app_platform='macos')
         if provider == 'anthropic' and enrolled and validated:
-            subscription_utils.enforce_desktop_chat_quota('uid1', platform='macos')
             assert quota.allowed is True
             assert quota.limit is None
             assert quota.plan == 'Free (BYOK)'
         elif questions == 30:
-            with pytest.raises(HTTPException) as exc:
-                subscription_utils.enforce_desktop_chat_quota('uid1', platform='macos')
-            assert exc.value.status_code == 402
             assert quota.allowed is False
-            assert quota.used == exc.value.detail['used'] == 30
-            assert quota.limit == exc.value.detail['limit'] == 30
-            assert quota.reset_at == exc.value.detail['reset_at']
+            assert quota.used == 30
+            assert quota.limit == 30
+            assert quota.reset_at == 1_790_812_800
             assert quota.plan_type == users_router.PlanType.basic.value
         else:
-            subscription_utils.enforce_desktop_chat_quota('uid1', platform='macos')
             assert quota.allowed is True
             assert quota.used == questions
             assert quota.limit == 30
@@ -708,8 +700,7 @@ def test_usage_quota_http_uses_the_validated_request_provider(monkeypatch, provi
 )
 def test_usage_quota_endpoint_reports_catalog_exhaustion_policy(plan, expected_overage):
     # Desktop gates sends on this payload. Going past `limit` on an overage plan
-    # accrues a charge rather than blocking (enforce_chat_quota returns without
-    # raising), so `allowed: false` alone is not a block signal and the client
+    # accrues a charge rather than blocking, so `allowed: false` alone is not a block signal and the client
     # needs the catalog's own predicate to tell the two apart.
     snapshot_mock = MagicMock(
         return_value={
