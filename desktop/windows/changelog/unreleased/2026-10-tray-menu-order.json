@@ -1,0 +1,5 @@
+{
+  "changes": [
+    "Reordered the tray menu: Open Omi comes first, Screen Analysis and Pause/Resume listening sit together, and Check for Updates moved out of the tray (it stays in Settings → About)."
+  ]
+}
