@@ -6,9 +6,8 @@
 // Why this exists: this account hits recurring api.omi.me 429 "storms" (see
 // rateLimitDegraded.ts). Before this, a typed send that got a single 429 surfaced
 // an error immediately, so the user had to manually re-send several times before
-// one landed. A 429 is transient by definition (a rate limit, not a monthly cap —
-// the monthly cap is a separate PRE-send gate, chatQuotaGate.ts, that never sends
-// and so never 429s here), so the correct behavior is a short backoff-retry, the
+// one landed. A 429 is transient by definition (a rate limit), so the correct
+// behavior is a short backoff-retry, the
 // same posture apiClient already takes for its 429/503 responses. Only when the
 // retries are exhausted does the friendly "servers are busy" copy show.
 

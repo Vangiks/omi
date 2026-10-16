@@ -40,7 +40,6 @@ import { ChatBridgeHost } from './components/chat/ChatBridgeHost'
 import { VoiceHubDriverHost } from './components/chat/VoiceHubDriverHost'
 import { UsageLimitPopup } from './components/settings/billing/UsageLimitPopup'
 import { ClaudeAuthSheet } from './components/settings/billing/ClaudeAuthSheet'
-import { UsageLimitTriggerHost } from './components/settings/billing/UsageLimitTriggerHost'
 import { RecordHotkeyHost } from './components/hotkeys/RecordHotkeyHost'
 import { BackgroundConsentInterstitial } from './components/consent/BackgroundConsentInterstitial'
 import { isSecondaryWindow } from './lib/windowRole'
@@ -176,7 +175,6 @@ function AppShellInner(): React.JSX.Element {
       {/* Usage-limit popup + its chat-quota trigger. The popup deep-links into
           the Plan & Usage settings tab; the trigger watches the shared chat
           engine and raises it once when a send lands on an exhausted quota. */}
-      <UsageLimitTriggerHost />
       <UsageLimitPopup />
       {/* App-wide transient toasts (bottom-right). The toast() pub/sub had no host
           mounted, so every toast() call across the app (~28 sites: connect/copy/

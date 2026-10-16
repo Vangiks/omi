@@ -457,15 +457,6 @@ export type BarChatState = {
  *  in main/bar/window.ts). */
 export type BarShowPayload = { mode: BarMode; reveal: BarReveal; token: number }
 
-/** A bar send blocked by the chat usage limit, relayed to the main window (which
- *  owns the shared usage-limit modal and the TTS voice). `spoken` = the blocked
- *  turn came from PTT, so the limit line is answered aloud (Mac speaks it).
- *  `popup` (default true) = raise the shared modal. The blocked-voice send path
- *  sets it false because the pre-capture PTT veto already owns the modal for
- *  voice — mirrors macOS, whose post-transcription voice path speaks without
- *  re-showing the popup. */
-export type BarUsageLimitPayload = { message: string; spoken: boolean; popup?: boolean }
-
 /** Low-rate orb-driving projection pushed MAIN → bar during a warm-hub PTT turn
  *  (A5 PR-6b). The main window owns the turn (capture, hub, playback); the bar is
  *  a pure viewport whose orb needs the phase + loudness to animate. NO per-frame
@@ -523,12 +514,6 @@ export type OmiBarApi = {
    *  The reply plays in the MAIN window (useChat → voiceController), so this hops
    *  over the bar→main bridge; ChatBridgeHost calls interruptCurrentResponse. */
   interruptTts: () => void
-  /** A bar send was refused by the chat usage limit. The shared UsageLimitPopup
-   *  and TTS playback both live in the MAIN window, so the bar hops over the
-   *  bridge; ChatBridgeHost raises the popup (and speaks `message` for a voice
-   *  turn). Mac parity: the modal always shows on the main window, even when the
-   *  block came from the floating bar. */
-  notifyUsageLimit: (payload: BarUsageLimitPayload) => void
   /** Ask the main window to (re)broadcast the current chat state — called on
    *  mount / each reveal so the bar shows the ongoing thread. */
   requestChatState: () => void
@@ -1126,10 +1111,6 @@ export type OmiBridgeApi = {
   /** A bar PTT hold started — the main window barge-in: ChatBridgeHost calls
    *  voiceController.interruptCurrentResponse(). Main-window renderer only. */
   onBarChatInterrupt: (cb: () => void) => () => void
-  /** A bar send was refused by the chat usage limit — ChatBridgeHost raises the
-   *  shared UsageLimitPopup here (and speaks the line for a voice turn).
-   *  Main-window renderer only. */
-  onBarUsageLimit: (cb: (payload: BarUsageLimitPayload) => void) => () => void
   /** The bar (re)requested current chat state — ChatBridgeHost publishes now. */
   onBarRequestChatState: (cb: () => void) => () => void
   /** Broadcast the projected chat state to the bar (history + streaming + status). */

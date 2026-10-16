@@ -197,7 +197,6 @@ describe('useChat — pi_mono engine', () => {
     expect('sessionId' in aiReq).toBe(false)
     expect(JSON.parse(String(aiReq.metadata))).toEqual({ evidence })
     expect(persisted.at(-1)?.at(-1)?.evidence).toEqual(evidence)
-    expect(result.current.quotaCheckSeq).toBe(1)
   })
 
   it('surfaces FRIENDLY copy on a failed turn (never the raw error) and does NOT write an error line to the shared thread', async () => {
@@ -507,7 +506,6 @@ describe('useChat — first-chat not ready (retry once)', () => {
         expect(saveSpy).toHaveBeenCalledTimes(2)
         expect(saveSpy.mock.calls[0][0]).toMatchObject({ sender: 'human', text: 'hello' })
         expect(saveSpy.mock.calls[1][0]).toMatchObject({ sender: 'ai', text: 'Hi there' })
-        expect(result.current.quotaCheckSeq).toBe(1)
       } finally {
         vi.useRealTimers()
       }
@@ -557,7 +555,6 @@ describe('useChat — first-chat not ready (retry once)', () => {
         expect(saveSpy).toHaveBeenCalledTimes(1)
         expect(saveSpy.mock.calls[0][0]).toMatchObject({ sender: 'human' })
         expect(speakSpy).not.toHaveBeenCalled()
-        expect(result.current.quotaCheckSeq).toBe(0)
       } finally {
         vi.useRealTimers()
       }
@@ -595,7 +592,6 @@ describe('useChat — first-chat not ready (retry once)', () => {
       expect(lastAssistant(result.current.history)?.content).not.toContain('the model exploded')
       expect(saveSpy).toHaveBeenCalledTimes(1)
       expect(saveSpy.mock.calls[0][0]).toMatchObject({ sender: 'human' })
-      expect(result.current.quotaCheckSeq).toBe(0)
     } finally {
       vi.useRealTimers()
     }
@@ -956,7 +952,6 @@ describe('useChat — pi_mono per-turn watchdog', () => {
       expect(saveSpy).toHaveBeenCalledTimes(1)
       expect(saveSpy.mock.calls[0][0]).toMatchObject({ sender: 'human' })
       expect(speakSpy).not.toHaveBeenCalled()
-      expect(result.current.quotaCheckSeq).toBe(1)
     } finally {
       vi.useRealTimers()
     }
@@ -1007,7 +1002,6 @@ describe('useChat — pi_mono per-turn watchdog', () => {
       const anyZombie = persisted.some((t) => t.some((m) => /late reply/.test(m.content)))
       expect(anyZombie).toBe(false)
       expect(speakSpy).not.toHaveBeenCalled()
-      expect(result.current.quotaCheckSeq).toBe(1)
     } finally {
       vi.useRealTimers()
     }
@@ -1037,7 +1031,6 @@ describe('useChat — pi_mono per-turn watchdog', () => {
       expect(lastAssistant(result.current.history)?.content).toBe('Hi there')
       expect(result.current.sending).toBe(false)
       expect(saveSpy).toHaveBeenCalledTimes(2)
-      expect(result.current.quotaCheckSeq).toBe(1)
       const savesBefore = saveSpy.mock.calls.length
 
       // The watchdog was cleared on completion — crossing the deadline is a no-op:

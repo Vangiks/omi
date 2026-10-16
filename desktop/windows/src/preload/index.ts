@@ -10,7 +10,6 @@ import type {
   BarMode,
   BarShowPayload,
   BarChatState,
-  BarUsageLimitPayload,
   VoiceHubBarState,
   LocalConversation,
   ConversationFolder,
@@ -594,12 +593,6 @@ const omi: OmiBridgeApi = {
     ipcRenderer.on('chat:barInterrupt', listener)
     return () => ipcRenderer.removeListener('chat:barInterrupt', listener)
   },
-  onBarUsageLimit: (cb: (payload: BarUsageLimitPayload) => void) => {
-    const listener = (_e: Electron.IpcRendererEvent, payload: BarUsageLimitPayload): void =>
-      cb(payload)
-    ipcRenderer.on('chat:barUsageLimit', listener)
-    return () => ipcRenderer.removeListener('chat:barUsageLimit', listener)
-  },
   onBarRequestChatState: (cb: () => void) => {
     const listener = (): void => cb()
     ipcRenderer.on('chat:barRequestState', listener)
@@ -753,7 +746,6 @@ const omiBar: OmiBarApi = {
   sendChat: (text: string, fromVoice: boolean) =>
     ipcRenderer.send('bar:sendChat', { text, fromVoice }),
   interruptTts: () => ipcRenderer.send('bar:interruptTts'),
-  notifyUsageLimit: (payload: BarUsageLimitPayload) => ipcRenderer.send('bar:usageLimit', payload),
   requestChatState: () => ipcRenderer.send('bar:requestChatState'),
   onChatState: (cb: (state: BarChatState) => void) => {
     const listener = (_e: Electron.IpcRendererEvent, state: BarChatState): void => cb(state)

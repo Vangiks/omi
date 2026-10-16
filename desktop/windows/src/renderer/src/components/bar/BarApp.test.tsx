@@ -40,11 +40,7 @@ vi.mock('../../hooks/useAuth', () => ({
   useAuth: () => ({ user: { uid: 'u1' }, loading: false })
 }))
 vi.mock('./barSend', () => ({
-  createBarSender: () => ({
-    send: vi.fn(async () => null),
-    sync: vi.fn(async () => {}),
-    checkSync: vi.fn(() => null)
-  })
+  sendFromBar: vi.fn()
 }))
 // The message list is markdown-heavy and tested elsewhere.
 vi.mock('../chat/ChatMessages', () => ({
@@ -106,7 +102,6 @@ beforeEach(() => {
     expand: vi.fn(),
     keepAlive: vi.fn(),
     setInteractive: vi.fn(),
-    notifyUsageLimit: vi.fn(),
     interruptTts: vi.fn(),
     voiceHubBegin: vi.fn(),
     voiceHubEnd: vi.fn(),
