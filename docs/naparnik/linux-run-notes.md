@@ -1,6 +1,6 @@
 # Заметки по запуску Omi на Linux
 
-Этап 1 (`linux-run`) из `SPEC-meeting-detection-linux.md`. Машина: Ubuntu 24.04, X11, PipeWire, Node 22.23.2, pnpm 10 через `npx pnpm@10`.
+Этап 1 (`linux-run`) задачи #8 «Определение созвона на Linux». Машина: Ubuntu 24.04, X11, PipeWire, Node 22.23.2, pnpm 10 через `npx pnpm@10`.
 
 ## Установка (2026-10-15)
 

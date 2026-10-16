@@ -16,7 +16,7 @@ omiGlass and device SDKs were removed. `CLAUDE.md` points here.
 | Product behavior | `PRODUCT.md`, `product/invariants/` |
 | Behavior shared with the macOS app | `contracts/parity/README.md` |
 | Tasks, stages, which skill to start with | «Задачи: GitHub Issues» below, `.claude/skills/` |
-| Capability map; specs and plans from before the issues process | `CAPABILITY-MAP.md`, `SPEC-*.md`, `tasks/` |
+| Capability map | `CAPABILITY-MAP.md` |
 
 ## Repository conventions
 
@@ -79,7 +79,7 @@ omiGlass and device SDKs were removed. `CLAUDE.md` points here.
 - Родительский issue переходит в `stage:ready`, только когда все подзадачи в `stage:ready`. Иначе `/build` остановится на неясной подзадаче.
 - Если задача в `stage:ready` оказалась больше одного захода, остановитесь и смените стадию на `stage:spec`.
 - `SPEC.md` и `tasks/` для задачи живут только в ее рабочей ветке. Удалите их последним коммитом перед мержем. Решение, которое нужно сохранить надолго, запишите в ADR в `adr/` или в комментарий к issue.
-- `SPEC-*.md` и `tasks/` в main остались от прежнего порядка работы, новые туда не добавляйте. `CAPABILITY-MAP.md` остается в main.
+- В main нет `SPEC-*.md` и `tasks/`: спеки и планы прежнего порядка работы перенесены в issues. `CAPABILITY-MAP.md` остается в main.
 - Перед мержем проверьте код через `/agent-skills:review`. В Claude Code `/review` занят встроенной командой, поэтому команду плагина вызывайте с префиксом.
 - Issue закрывает PR со строкой `Closes #N` в описании. Вручную issues не закрывайте. Исключение — задача, которую решили не делать: ее закрывает человек как not planned и пишет причину в комментарии.
 

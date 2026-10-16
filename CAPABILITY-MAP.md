@@ -18,7 +18,7 @@
 
 Порядок: `linux-run` → `meeting-detection-linux` → `commitments` → `ru-backend` → `ru-integrations` → `sales-profile`. `local-backend` — параллельно с `meeting-detection-linux`, до `ru-backend`. `linux-automation` — параллельно, когда понадобится.
 
-Спецификации модулей лежат рядом и называются по id модуля: `SPEC-<id>.md`. `linux-run` описан как первый этап в `SPEC-meeting-detection-linux.md`.
+Работа по модулям ведется в GitHub Issues `Vangiks/omi`. `meeting-detection-linux` и `linux-run` как его первый этап — issue #8. `local-backend` сделан, стек и его ограничения описаны в `deploy/local/README.md`.
 
 ## Работа с оригиналом
 
