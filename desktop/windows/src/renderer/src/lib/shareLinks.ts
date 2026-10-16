@@ -18,6 +18,19 @@ export function shareBaseUrl(
   return value.replace(/\/+$/, '')
 }
 
+/** False in the local-backend profile (Auth emulator) unless a share host is set
+ *  explicitly: the default h.omi.me would publish a link to Omi's web viewer for
+ *  a conversation that lives only on this machine. */
+export function shareLinksAvailable(
+  env: { VITE_FIREBASE_AUTH_EMULATOR_HOST?: string; VITE_OMI_SHARE_BASE_URL?: string } = {
+    VITE_FIREBASE_AUTH_EMULATOR_HOST: import.meta.env.VITE_FIREBASE_AUTH_EMULATOR_HOST,
+    VITE_OMI_SHARE_BASE_URL: import.meta.env.VITE_OMI_SHARE_BASE_URL
+  }
+): boolean {
+  if (!env.VITE_FIREBASE_AUTH_EMULATOR_HOST?.trim()) return true
+  return Boolean(env.VITE_OMI_SHARE_BASE_URL?.trim())
+}
+
 export function conversationShareUrl(
   id: string,
   raw?: string | undefined,

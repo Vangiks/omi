@@ -168,9 +168,9 @@
 **Что сделать:** `analytics.ts` без зашитого ключа: пустой ключ — аналитика выключена. `shareLinks.ts` в режиме `local-backend` не строит ссылки на `h.omi.me`. Расширение pi-mono получает `OMI_API_BASE_URL` из профиля.
 
 **Готово, когда:**
-- [ ] тесты: без ключа `trackEvent` ничего не отправляет; с ключом — как раньше
-- [ ] в режиме `local-backend` запросов к `posthog.com` и `h.omi.me` нет
-- [ ] pi-mono в режиме `local-backend` ходит на `127.0.0.1:8000`
+- [x] тесты: без ключа `trackEvent` ничего не отправляет; с ключом — как раньше
+- [x] в режиме `local-backend` запросов к `posthog.com` и `h.omi.me` нет (ключа PostHog нет в сборке, ссылка на разговор не строится; журнал за 4 часа — в T10)
+- [x] pi-mono в режиме `local-backend` ходит на локальный бэкенд. Код не менялся: `OMI_API_BASE_URL` уже строится из `VITE_OMI_DESKTOP_API_BASE` (`piMonoManagedApiBaseUrl`), то есть `http://127.0.0.1:10201/v2`, а не 8000; чат отвечал через `desktop-backend`
 
 **Проверка:** `vitest:src/renderer/src/lib`, `checks`
 

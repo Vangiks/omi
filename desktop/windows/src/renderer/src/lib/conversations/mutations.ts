@@ -8,7 +8,7 @@ import { omiApi } from '../apiClient'
 import { cloudConversationDeletePath } from './cloudConversationDelete'
 import { trackEvent } from '../analytics'
 import type { MergeConversationsResponse } from '../omiApi.generated'
-import { conversationShareUrl, newShareId } from '../shareLinks'
+import { conversationShareUrl, newShareId, shareLinksAvailable } from '../shareLinks'
 
 /** Toggle a conversation's starred flag. Backend contract: starred is a QUERY
  *  param on a bodyless PATCH (not a JSON body). */
@@ -42,6 +42,11 @@ export async function deleteCloudConversation(id: string): Promise<void> {
  *  sends a redundant `visibility=` param that the backend never binds — not
  *  ported. */
 export async function getConversationShareLink(id: string): Promise<string> {
+  // Refuse before flipping visibility, so a local conversation never turns
+  // "shared" without a link anyone could open.
+  if (!shareLinksAvailable()) {
+    throw new Error('Sharing needs a public share host (VITE_OMI_SHARE_BASE_URL)')
+  }
   await omiApi.patch(`/v1/conversations/${id}/visibility`, null, {
     params: { value: 'shared' }
   })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { conversationShareUrl, shareBaseUrl } from './shareLinks'
+import { conversationShareUrl, shareBaseUrl, shareLinksAvailable } from './shareLinks'
 
 describe('shareLinks (#4339)', () => {
   it('defaults to production h.omi.me', () => {
@@ -28,5 +28,26 @@ describe('shareLinks (#4339)', () => {
     const second = new URL(conversationShareUrl('abc')).searchParams.get('sid')
     expect(first).toMatch(/^[0-9a-f]{32}$/)
     expect(first).not.toBe(second)
+  })
+})
+
+// Local-backend profile (Auth emulator): there is no public share host, so links
+// would point at Omi's h.omi.me for a conversation that lives only on this machine.
+describe('shareLinksAvailable', () => {
+  it('is on for the stock profile', () => {
+    expect(shareLinksAvailable({})).toBe(true)
+  })
+
+  it('is off for the local-backend profile without an explicit share host', () => {
+    expect(shareLinksAvailable({ VITE_FIREBASE_AUTH_EMULATOR_HOST: '127.0.0.1:9099' })).toBe(false)
+  })
+
+  it('is on for the local-backend profile with an explicit share host', () => {
+    expect(
+      shareLinksAvailable({
+        VITE_FIREBASE_AUTH_EMULATOR_HOST: '127.0.0.1:9099',
+        VITE_OMI_SHARE_BASE_URL: 'https://share.example.com'
+      })
+    ).toBe(true)
   })
 })
