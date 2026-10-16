@@ -157,10 +157,6 @@ cd app && bash setup.sh ios    # or: bash setup.sh android
 
 ### API & SDKs
 - [API Reference](https://docs.omi.me/api-reference/introduction) — REST endpoints for memories, conversations, action items
-- [Device multi-lang protocol SDKs](sdks/device/) — shared BLE UUIDs/packet framing for TS/Go/Rust/C++/Dart
-- [Python device SDK](sdks/python/) — full BLE + Opus + Deepgram
-- [Swift device SDK](sdks/swift/)
-- [React Native device SDK](sdks/react-native/)
 
 ### Architecture
 - [Backend Deep Dive](https://docs.omi.me/doc/developer/backend/backend_deepdive)
