@@ -131,10 +131,6 @@ async function waitForSend(): Promise<void> {
 }
 
 const emit = (e: MainChatEvent): void => eventCb?.(e)
-const acceptHosted = (requestId: string, runId: string): void => {
-  emit({ type: 'accepted', requestId, runId })
-  emit({ type: 'hosted_request_started', requestId, runId })
-}
 const lastAssistant = (
   msgs: { role: string; content: string }[]
 ): { content: string } | undefined => [...msgs].reverse().find((m) => m.role === 'assistant')
@@ -159,7 +155,7 @@ describe('useChat — pi_mono engine', () => {
       p = result.current.send('hello')
       await waitForSend()
       const rid = sendArgs!.requestId
-      acceptHosted(rid, 'run-1')
+      emit({ type: 'accepted', requestId: rid, runId: 'run-1' })
       emit({ type: 'text_delta', requestId: rid, runId: 'run-1', text: 'Hi ' })
       emit({ type: 'text_delta', requestId: rid, runId: 'run-1', text: 'there' })
       await flush()
@@ -205,7 +201,7 @@ describe('useChat — pi_mono engine', () => {
       const p = result.current.send('boom')
       await waitForSend()
       const rid = sendArgs!.requestId
-      acceptHosted(rid, 'run-2')
+      emit({ type: 'accepted', requestId: rid, runId: 'run-2' })
       emit({
         type: 'run_finished',
         requestId: rid,
@@ -242,7 +238,7 @@ describe('useChat — pi_mono engine', () => {
       p = result.current.send('question')
       await waitForSend()
       const rid = sendArgs!.requestId
-      acceptHosted(rid, 'run-x')
+      emit({ type: 'accepted', requestId: rid, runId: 'run-x' })
       emit({ type: 'text_delta', requestId: rid, runId: 'run-x', text: 'partial' })
       await flush()
     })
@@ -288,7 +284,7 @@ describe('useChat — pi_mono tool-activity line', () => {
       p = result.current.send('do a thing')
       await waitForSend()
       const rid = sendArgs!.requestId
-      acceptHosted(rid, 'run-t1')
+      emit({ type: 'accepted', requestId: rid, runId: 'run-t1' })
       // A tool starts before any reply text → the transient line fills the gap.
       emit({
         type: 'tool_activity',
@@ -344,7 +340,7 @@ describe('useChat — pi_mono tool-activity line', () => {
       p = result.current.send('multi')
       await waitForSend()
       const rid = sendArgs!.requestId
-      acceptHosted(rid, 'run-t2')
+      emit({ type: 'accepted', requestId: rid, runId: 'run-t2' })
       emit({
         type: 'tool_activity',
         requestId: rid,
@@ -469,7 +465,7 @@ describe('useChat — first-chat not ready (retry once)', () => {
               error: marker
             }
           }
-          acceptHosted(args.requestId, 'run-ok')
+          emit({ type: 'accepted', requestId: args.requestId, runId: 'run-ok' })
           return {
             runId: 'run-ok',
             requestId: args.requestId,
@@ -934,7 +930,7 @@ describe('useChat — pi_mono per-turn watchdog', () => {
         void result.current.send('hello')
         await pumpToSend()
         // Run WAS accepted (server ack'd) then the terminal event never comes.
-        acceptHosted(sendArgs!.requestId, 'run-hang')
+        emit({ type: 'accepted', requestId: sendArgs!.requestId, runId: 'run-hang' })
         await vi.advanceTimersByTimeAsync(1)
       })
       // Pre-deadline: spinner latched, no reply.
@@ -965,7 +961,7 @@ describe('useChat — pi_mono per-turn watchdog', () => {
       await act(async () => {
         p = result.current.send('hello')
         await pumpToSend()
-        acceptHosted(sendArgs!.requestId, 'run-late')
+        emit({ type: 'accepted', requestId: sendArgs!.requestId, runId: 'run-late' })
         await vi.advanceTimersByTimeAsync(1)
       })
       await act(async () => {
@@ -1016,7 +1012,7 @@ describe('useChat — pi_mono per-turn watchdog', () => {
         p = result.current.send('hello')
         await pumpToSend()
         const rid = sendArgs!.requestId
-        acceptHosted(rid, 'run-fast')
+        emit({ type: 'accepted', requestId: rid, runId: 'run-fast' })
         emit({ type: 'text_delta', requestId: rid, runId: 'run-fast', text: 'Hi there' })
         sendResolve!({
           runId: 'run-fast',
@@ -1065,7 +1061,7 @@ describe('useChat — pi_mono per-turn watchdog', () => {
       await act(async () => {
         void result.current.send('hello')
         await pumpToSend()
-        acceptHosted(sendArgs!.requestId, 'run-inf')
+        emit({ type: 'accepted', requestId: sendArgs!.requestId, runId: 'run-inf' })
         await vi.advanceTimersByTimeAsync(1)
       })
       // Cross the deadline → watchdog recovers the bubble, invalidates the turn, and
