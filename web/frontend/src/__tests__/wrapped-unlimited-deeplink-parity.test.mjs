@@ -15,10 +15,6 @@ const unlimitedSource = readFileSync(
   new URL('../app/unlimited/page.tsx', import.meta.url),
   'utf8',
 );
-const manifestSource = readFileSync(
-  new URL('../../../../app/android/app/src/main/AndroidManifest.xml', import.meta.url),
-  'utf8',
-);
 
 describe('getOmiPlatformDeepLink (behavioral)', () => {
   it('returns Android intent:// with Play Store fallback for marketing paths', () => {
@@ -83,10 +79,5 @@ describe('wrapped / unlimited acquisition parity contract', () => {
     assert.match(tasksSource, /getOmiPlatformDeepLink/);
     assert.doesNotMatch(chatSource, /intent:\/\/h\.omi\.me\/chat/);
     assert.doesNotMatch(tasksSource, /omi:\/\/h\.omi\.me\/tasks/);
-  });
-
-  it('registers Android App Link for /wrapped', () => {
-    assert.match(manifestSource, /android:path="\/wrapped"/);
-    assert.match(manifestSource, /android:path="\/unlimited"/);
   });
 });

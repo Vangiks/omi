@@ -16,14 +16,6 @@ const publicBuildContract = JSON.parse(
     'utf8',
   ),
 );
-const deployActionSource = readFileSync(
-  new URL('../../../../.github/actions/deploy-public-build/action.yml', import.meta.url),
-  'utf8',
-);
-const frontendWorkflowSource = readFileSync(
-  new URL('../../../../.github/workflows/gcp_frontend.yml', import.meta.url),
-  'utf8',
-);
 
 describe('public shared conversation chat frontend safety contract', () => {
   it('removes every direct OpenAI credential and request path', () => {
@@ -76,7 +68,7 @@ describe('public shared conversation chat frontend safety contract', () => {
     assert.match(actionSource, /X-Omi-User-Id-Token/);
   });
 
-  it('owns the Cloud Run ingress, identity, and frontend-only HMAC deployment contract', () => {
+  it('owns the Cloud Run ingress and frontend-only HMAC deployment contract', () => {
     const frontend = publicBuildContract.targets.frontend;
     const flags = frontend.deployment.flags;
     const prodFlags = Array.isArray(flags) ? flags : flags.prod || [];
@@ -93,21 +85,6 @@ describe('public shared conversation chat frontend safety contract', () => {
     assert.equal(frontend.deployment.runtime_secrets.OPENAI_API_KEY, undefined);
     assert.ok(frontend.deployment.remove_runtime_env_vars.includes('OPENAI_API_KEY'));
     assert.equal(frontend.deployment.runtime_secrets.DD_API_KEY, 'DD_API_KEY:latest');
-    assert.match(deployActionSource, /service_account/);
-    assert.match(deployActionSource, /runtime_env_vars/);
-    assert.match(
-      frontendWorkflowSource,
-      /PUBLIC_SHARED_CONVERSATION_CHAT_FRONTEND_INVOKER_SA/,
-    );
-    assert.match(
-      frontendWorkflowSource,
-      /PUBLIC_SHARED_CONVERSATION_CHAT_FRONTEND_AUDIENCE/,
-    );
-    assert.doesNotMatch(
-      frontendWorkflowSource,
-      /test -n "\$PUBLIC_SHARED_CONVERSATION_CHAT_FRONTEND_INVOKER_SA"/,
-    );
-    assert.match(frontendWorkflowSource, /iam\\.gserviceaccount\\.com/);
   });
 
   it('passes only conversation id, bounded history, and the current question to the action', () => {

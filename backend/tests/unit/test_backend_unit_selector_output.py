@@ -4,7 +4,7 @@ import sys
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 SELECTOR = BACKEND_DIR / 'scripts' / 'select_backend_unit_tests.py'
-SELECTED_TEST = 'tests/unit/test_workflow_contracts.py'
+SELECTED_TEST = 'tests/unit/test_changed_files_script.py'
 
 
 def test_selector_artifacts_use_lf_on_every_platform(tmp_path: Path) -> None:
