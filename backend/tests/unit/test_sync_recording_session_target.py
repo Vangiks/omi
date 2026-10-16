@@ -204,7 +204,7 @@ async def test_pipeline_uses_unique_recording_match_over_local_stamp(
     monkeypatch.setattr(pipeline, 'run_blocking', run_inline)
     assert (
         await pipeline._resolve_safety_wal_target(
-            'u', stamped_target, SESSION, pipeline.ConversationSource.omi, 'pendant', False, 1001.0, 1008.0
+            'u', stamped_target, SESSION, pipeline.ConversationSource.omi, 'pendant', 1001.0, 1008.0
         )
         == expected_target
     )
@@ -215,7 +215,7 @@ async def test_pipeline_keeps_legacy_stamp_without_recording_proof(dependencies)
     pipeline = dependencies
     assert (
         await pipeline._resolve_safety_wal_target(
-            'u', 'legacy-target', None, pipeline.ConversationSource.omi, 'pendant', False, None, None
+            'u', 'legacy-target', None, pipeline.ConversationSource.omi, 'pendant', None, None
         )
         == 'legacy-target'
     )

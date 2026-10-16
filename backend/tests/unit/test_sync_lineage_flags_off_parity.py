@@ -322,7 +322,6 @@ async def test_audio_consumer_off_preserves_inputs_without_lookup_or_log(monkeyp
         result = await coverage.apply_sync_wal_audio_coverage(
             'u',
             'omi',
-            False,
             'pendant',
             ORIGIN,
             {'synthetic.bin': {}},

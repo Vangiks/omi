@@ -1166,13 +1166,13 @@ class TestAsyncCoordinatorScenarios:
     def test_dg_budget_exhausted_cleans_up_segments(self):
         """DG budget exhaustion must clean up segmented_paths before returning."""
         body = self._get_bg_func_body()
-        dg_section = body[body.index('is_dg_budget_exhausted') : body.index('is_locked = should_lock')]
+        dg_section = body[body.index('is_dg_budget_exhausted') : body.index('is_locked = False')]
         assert '_cleanup_files, list(segmented_paths)' in dg_section
 
     def test_dg_budget_not_exhausted_continues(self):
         """When DG budget is NOT exhausted, pipeline continues to segment processing."""
         body = self._get_bg_func_body()
-        dg_section_end = body.index('is_locked = should_lock')
+        dg_section_end = body.index('is_locked = False')
         after_dg = body[dg_section_end:]
         assert 'Phase 4: Fetch prefs' in after_dg
         assert '_process_one_segment' in after_dg
@@ -1826,7 +1826,6 @@ class TestAsyncCoordinatorBehavioral:
             'uid',
             [],
             'omi',
-            False,
             '/tmp/job-durable-metric',
             task_mode=True,
             content_id='content-durable-metric',
@@ -1858,7 +1857,6 @@ class TestAsyncCoordinatorBehavioral:
                 'uid',
                 ['/tmp/input.opus'],
                 'omi',
-                False,
                 '/tmp/job-old',
                 task_mode=True,
                 content_id='content-old',
@@ -1892,7 +1890,6 @@ class TestAsyncCoordinatorBehavioral:
                     'uid',
                     ['/tmp/input.opus'],
                     'omi',
-                    False,
                     '/tmp/job-old',
                     task_mode=True,
                     content_id='content-old',
@@ -1924,7 +1921,6 @@ class TestAsyncCoordinatorBehavioral:
                     'uid',
                     ['/tmp/input.opus'],
                     'omi',
-                    False,
                     '/tmp/job-old',
                     task_mode=True,
                     content_id='content-old',
@@ -2079,7 +2075,6 @@ class TestAsyncCoordinatorBehavioral:
                     'uid',
                     ['/tmp/file.opus'],
                     'omi',
-                    False,
                     '/tmp/job-wait',
                     content_id='content-wait',
                     inline_run_lock_token='token-wait',
@@ -2142,7 +2137,6 @@ class TestAsyncCoordinatorBehavioral:
                     'uid',
                     ['/tmp/file.opus'],
                     'omi',
-                    False,
                     '/tmp/job-renew-error',
                     content_id='content-renew-error',
                     inline_run_lock_token='token-renew-error',
@@ -2200,7 +2194,6 @@ class TestAsyncCoordinatorBehavioral:
                     'uid',
                     ['/tmp/file.opus'],
                     'omi',
-                    False,
                     '/tmp/job-teardown',
                     content_id='content-teardown',
                     inline_run_lock_token='token-teardown',
@@ -2238,7 +2231,6 @@ class TestAsyncCoordinatorBehavioral:
                     'uid',
                     ['/tmp/raw-retry.opus'],
                     'omi',
-                    False,
                     '/tmp/job-decode-cancel',
                     content_id='content-decode-cancel',
                 )
@@ -2299,7 +2291,6 @@ class TestAsyncCoordinatorBehavioral:
                         'uid',
                         [raw_path],
                         'omi',
-                        False,
                         '/tmp/job-vad-cancel',
                         content_id='content-vad-cancel',
                     )
@@ -2340,7 +2331,7 @@ class TestAsyncCoordinatorBehavioral:
             )
             stubs['pipeline']._cleanup_files = MagicMock()
 
-            await module._run_full_pipeline_background_async('j1', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job1')
+            await module._run_full_pipeline_background_async('j1', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job1')
 
             stubs['sync_jobs'].mark_job_failed.assert_called()
             args = stubs['sync_jobs'].mark_job_failed.call_args[0]
@@ -2357,7 +2348,7 @@ class TestAsyncCoordinatorBehavioral:
             stubs['pipeline'].decode_files_to_wav = MagicMock(side_effect=RuntimeError('corrupt file'))
             stubs['pipeline']._cleanup_files = MagicMock()
 
-            await module._run_full_pipeline_background_async('j2', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job2')
+            await module._run_full_pipeline_background_async('j2', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job2')
 
             stubs['sync_jobs'].mark_job_failed.assert_called()
             args = stubs['sync_jobs'].mark_job_failed.call_args[0]
@@ -2375,7 +2366,7 @@ class TestAsyncCoordinatorBehavioral:
             stubs['pipeline'].get_sync_job = MagicMock(return_value={'status': 'failed'})
 
             await module._run_full_pipeline_background_async(
-                'j3', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job3', content_id='content-3'
+                'j3', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job3', content_id='content-3'
             )
 
             stubs['sync_jobs'].mark_job_failed.assert_called_once()
@@ -2402,7 +2393,7 @@ class TestAsyncCoordinatorBehavioral:
 
             stubs['pipeline'].retrieve_vad_segments = _bad_vad
 
-            await module._run_full_pipeline_background_async('j4', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job4')
+            await module._run_full_pipeline_background_async('j4', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job4')
 
             stubs['sync_jobs'].mark_job_failed.assert_called()
             args = stubs['sync_jobs'].mark_job_failed.call_args[0]
@@ -2430,7 +2421,7 @@ class TestAsyncCoordinatorBehavioral:
 
             pipeline.retrieve_vad_segments = _bad_vad
 
-            await module._run_full_pipeline_background_async('jv', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/jobv')
+            await module._run_full_pipeline_background_async('jv', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/jobv')
 
             kwargs = pipeline.finalize_sync_job_failure_now.call_args.kwargs
             assert kwargs['error_code'] == 'sync_vad_failed'
@@ -2481,7 +2472,6 @@ class TestAsyncCoordinatorBehavioral:
                 'uid',
                 ['/tmp/f.opus'],
                 'omi',
-                False,
                 '/tmp/job-sil',
                 content_id='content-sil',
                 task_mode=True,
@@ -2506,7 +2496,6 @@ class TestAsyncCoordinatorBehavioral:
                 'uid',
                 ['/tmp/f.opus'],
                 'omi',
-                False,
                 '/tmp/job-sil',
                 content_id='content-sil',
                 task_mode=True,
@@ -2535,7 +2524,7 @@ class TestAsyncCoordinatorBehavioral:
             stubs['pipeline'].get_wav_duration = MagicMock(return_value=0.0)
 
             await module._run_full_pipeline_background_async(
-                'j5', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job5', content_id='content-5'
+                'j5', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job5', content_id='content-5'
             )
 
             stubs['sync_jobs'].finalize_sync_job.assert_called_once()
@@ -2601,7 +2590,6 @@ class TestAsyncCoordinatorBehavioral:
                 'uid',
                 ['/tmp/f.opus'],
                 'omi',
-                False,
                 '/tmp/job-empty',
                 content_id='content-empty',
                 task_mode=task_mode,
@@ -2666,7 +2654,6 @@ class TestAsyncCoordinatorBehavioral:
                 'uid',
                 ['/tmp/f.opus'],
                 'omi',
-                False,
                 '/tmp/job-tokenized',
                 task_mode=True,
                 content_id='content-tokenized',
@@ -2709,7 +2696,6 @@ class TestAsyncCoordinatorBehavioral:
                 'uid',
                 ['/tmp/f.opus'],
                 'omi',
-                False,
                 '/tmp/checkpoint-job',
                 content_id='content-checkpoint',
             )
@@ -2742,7 +2728,6 @@ class TestAsyncCoordinatorBehavioral:
                     'uid',
                     ['/tmp/f.opus'],
                     'omi',
-                    False,
                     '/tmp/job-ledger',
                     task_mode=True,
                     content_id='content-ledger',
@@ -2773,7 +2758,7 @@ class TestAsyncCoordinatorBehavioral:
             module.get_rolling_speech_ms = MagicMock(return_value={})
             module.check_soft_caps = MagicMock(return_value=[])
 
-            await module._run_full_pipeline_background_async('j6', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job6')
+            await module._run_full_pipeline_background_async('j6', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job6')
 
             stubs['sync_jobs'].mark_job_failed.assert_called()
             args = stubs['sync_jobs'].mark_job_failed.call_args[0]
@@ -2808,7 +2793,7 @@ class TestAsyncCoordinatorBehavioral:
             stubs['pipeline'].record_dg_usage_ms = MagicMock()
             stubs['pipeline'].record_usage = MagicMock()
 
-            await module._run_full_pipeline_background_async('j7', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job7')
+            await module._run_full_pipeline_background_async('j7', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job7')
 
             stubs['sync_jobs'].finalize_sync_job.assert_called_once()
             stubs['pipeline'].process_segment.assert_called_once()
@@ -2857,7 +2842,7 @@ class TestAsyncCoordinatorBehavioral:
             pipeline.record_dg_usage_ms = MagicMock()
             pipeline.record_usage = MagicMock()
 
-            await module._run_full_pipeline_background_async('j-plan', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job')
+            await module._run_full_pipeline_background_async('j-plan', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job')
 
             pipeline.users_db.get_existing_user_subscription.assert_called_once_with('uid')
             pipeline.check_soft_caps.assert_called_once_with('uid', speech_totals=speech_totals, plan=expected_plan)
@@ -2911,7 +2896,7 @@ class TestAsyncCoordinatorBehavioral:
 
             stubs['pipeline'].process_segment = _process_seg_fails_once
 
-            await module._run_full_pipeline_background_async('j8', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job8')
+            await module._run_full_pipeline_background_async('j8', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job8')
 
             stubs['sync_jobs'].finalize_sync_job.assert_called_once()
             result = stubs['sync_jobs'].finalize_sync_job.call_args[0][1]
@@ -2946,7 +2931,7 @@ class TestAsyncCoordinatorBehavioral:
             stubs['pipeline'].process_segment = MagicMock(side_effect=RuntimeError('executor exploded'))
 
             await module._run_full_pipeline_background_async(
-                'j-generic-segment-error', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job-generic'
+                'j-generic-segment-error', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job-generic'
             )
 
             stubs['sync_jobs'].finalize_sync_job.assert_called_once()
@@ -2984,7 +2969,6 @@ class TestAsyncCoordinatorBehavioral:
                 'uid',
                 ['/tmp/f.opus'],
                 'omi',
-                False,
                 '/tmp/job-retry',
                 task_mode=True,
             )
@@ -3033,7 +3017,6 @@ class TestAsyncCoordinatorBehavioral:
                 'uid',
                 ['/tmp/f.opus'],
                 'omi',
-                False,
                 '/tmp/job-retry-fenced',
                 task_mode=True,
                 content_id='content-retry-fenced',
@@ -3107,7 +3090,6 @@ class TestAsyncCoordinatorBehavioral:
                 'uid',
                 ['/tmp/f.opus'],
                 'omi',
-                False,
                 '/tmp/job-fence-checkpoint',
                 task_mode=True,
                 content_id='content-fence-checkpoint',
@@ -3167,7 +3149,6 @@ class TestAsyncCoordinatorBehavioral:
                     'uid',
                     ['/tmp/f.opus'],
                     'omi',
-                    False,
                     '/tmp/job-fence-lease-lost',
                     task_mode=True,
                     content_id='content-fence-lease-lost',
@@ -3204,7 +3185,7 @@ class TestAsyncCoordinatorBehavioral:
             stubs['pipeline'].process_segment = _capture_process
             stubs['pipeline'].record_usage = MagicMock()
 
-            await module._run_full_pipeline_background_async('j9', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job9')
+            await module._run_full_pipeline_background_async('j9', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job9')
 
             assert captured_cache['value'] == {}
             stubs['sync_jobs'].finalize_sync_job.assert_called_once()
@@ -3239,7 +3220,7 @@ class TestAsyncCoordinatorBehavioral:
             stubs['pipeline'].process_segment = _capture_target
 
             await module._run_full_pipeline_background_async(
-                'j10', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job10', target_conversation_id='conv-123'
+                'j10', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job10', target_conversation_id='conv-123'
             )
 
             assert captured_target['value'] == 'conv-123'
@@ -3273,7 +3254,7 @@ class TestAsyncCoordinatorBehavioral:
             stubs['pipeline'].process_segment = _capture_private_sync
 
             await module._run_full_pipeline_background_async(
-                'j-private', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job-private'
+                'j-private', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job-private'
             )
 
             assert captured['value'] is True
@@ -3300,7 +3281,7 @@ class TestAsyncCoordinatorBehavioral:
             stubs['pipeline'].process_segment = MagicMock()
             stubs['pipeline'].record_usage = MagicMock()
 
-            await module._run_full_pipeline_background_async('j11', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job11')
+            await module._run_full_pipeline_background_async('j11', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job11')
 
             stubs['byok'].set_byok_keys.assert_called_with({})
             assert len(cleanup_calls) >= 3
@@ -3322,7 +3303,7 @@ class TestAsyncCoordinatorBehavioral:
             stubs['pipeline'].retrieve_vad_segments = _vad_one_seg
             stubs['pipeline'].get_wav_duration = MagicMock(side_effect=RuntimeError('unexpected crash'))
 
-            await module._run_full_pipeline_background_async('j12', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job12')
+            await module._run_full_pipeline_background_async('j12', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job12')
 
             stubs['byok'].set_byok_keys.assert_called_with({})
             stubs['sync_jobs'].mark_job_failed.assert_called()

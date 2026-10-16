@@ -605,7 +605,7 @@ async def test_coordinator_forwards_stamp_fallback_to_assignment(coordinator, mo
         audio_end_seconds=chunks[-1]['finished_at'].timestamp(),
     )
     await module._run_full_pipeline_background_async(
-        'job-lineage', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job-lineage', **vars(kwargs)
+        'job-lineage', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job-lineage', **vars(kwargs)
     )
     assert captured[chunks[0]['id']] == ('STAMP', 'stamp_fallback')
 
@@ -647,6 +647,6 @@ async def test_coordinator_lineage_off_passes_no_binding_kwarg(coordinator, monk
         audio_end_seconds=chunks[-1]['finished_at'].timestamp(),
     )
     await module._run_full_pipeline_background_async(
-        'job-lineage', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job-lineage', **vars(kwargs)
+        'job-lineage', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job-lineage', **vars(kwargs)
     )
     assert captured[chunks[0]['id']] == (None, False)

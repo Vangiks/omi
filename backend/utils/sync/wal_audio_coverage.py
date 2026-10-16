@@ -481,7 +481,6 @@ def _submit_orphan_cleanup(storage_executor: Any, cleanup_files: Any, coverage: 
 async def apply_sync_wal_audio_coverage(
     uid: str,
     source: Any,
-    should_lock: bool,
     client_device_id: Optional[str],
     recording_session_id: Optional[str],
     capture_evidence_claims: Optional[Mapping[str, dict]],
@@ -520,7 +519,7 @@ async def apply_sync_wal_audio_coverage(
             recording_session_id,
             source=source,
             client_device_id=client_device_id,
-            is_locked=bool(should_lock),
+            is_locked=False,
             wav_paths=wav_paths,
             source_frame_maps=source_frame_maps,
             decoded_frames=decoded_frames,

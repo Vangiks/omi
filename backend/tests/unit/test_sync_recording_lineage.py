@@ -394,7 +394,7 @@ async def test_kill_switch_off_reproduces_the_whole_batch_outcome(monkeypatch, d
     start, end = chunks[0]['started_at'].timestamp() - 1, chunks[-1]['finished_at'].timestamp()
     assert not lineage_resolution_requested('u', ORIGIN, start, end)
     target = await pipeline._resolve_safety_wal_target(
-        'u', gen_id(L), ORIGIN, pipeline.ConversationSource.omi, 'pendant', False, start, end
+        'u', gen_id(L), ORIGIN, pipeline.ConversationSource.omi, 'pendant', start, end
     )
     assert target is None
     before = {row['id'] for row in conversations(store)}
@@ -1186,7 +1186,7 @@ def _drive(module, stubs, chunks, monkeypatch, *, stamp, s1_claims=None):
     if s1_claims:
         mapping = {'claim': next(iter(s1_claims.values())), 'offsets': [0, 16000], 'incomplete': False}
 
-        async def observed_maps(_uid, _source, _lock, _device, _session, _claims, wav_paths, _frames, **_kwargs):
+        async def observed_maps(_uid, _source, _device, _session, _claims, wav_paths, _frames, **_kwargs):
             return wav_paths, {path: dict(mapping) for path in wav_paths}, False
 
         monkeypatch.setattr(pipeline, 'apply_sync_wal_audio_coverage', observed_maps)
@@ -1209,7 +1209,7 @@ async def test_coordinator_forwards_each_segment_its_generation(coordinator, mon
     chunks = upload_straddling_next_two()
     captured, kwargs = _drive(module, stubs, chunks, monkeypatch, stamp=gen_id(L))
     await module._run_full_pipeline_background_async(
-        'job-lineage', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job-lineage', **vars(kwargs)
+        'job-lineage', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job-lineage', **vars(kwargs)
     )
     expected = [gen_id(L + 1)] * 2 + [gen_id(L + 2)] * 2 if flag == '' else [None] * 4
     assert [captured[chunk['id']] for chunk in chunks] == expected
@@ -1231,7 +1231,7 @@ async def test_coordinator_lineage_exception_keeps_stamp_and_processes_siblings(
     monkeypatch.setattr(lineage_module, 'OMI_SYNC_LINEAGE_RESOLVE_TOTAL', metrics)
     caplog.set_level(logging.INFO, logger=lineage_module.__name__)
     await module._run_full_pipeline_background_async(
-        'job-lineage', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job-lineage', **vars(kwargs)
+        'job-lineage', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job-lineage', **vars(kwargs)
     )
     assert captured == {chunk['id']: 'STAMP' for chunk in chunks}
     metrics.labels.assert_called_once_with(outcome='lookup_failed')
@@ -1263,7 +1263,7 @@ async def test_retry_after_append_before_enrichment_reprocesses_the_landed_row(c
 
     pipeline._reprocess_merged_conversations = reprocess
     await module._run_full_pipeline_background_async(
-        'job-lineage', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job-lineage', task_mode=True, **vars(kwargs)
+        'job-lineage', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job-lineage', task_mode=True, **vars(kwargs)
     )
     assert captured == {}  # landed audio never returns to STT or assignment
     assert enriched == ([{gen_id(L + 1): pipeline._LINEAGE_RETRY_LANGUAGE}] if flag == '' else [{}])

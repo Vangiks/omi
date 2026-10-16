@@ -296,7 +296,6 @@ async def _run_incident(pipeline, tmp_path, *, claims='default', target=None):
         'u',
         [f'/tmp/{INCIDENT_BIN}'],
         'omi',
-        False,
         str(tmp_path / 'job'),
         target_conversation_id=target,
         client_device_id='pendant',

@@ -68,7 +68,6 @@ def _validate_task(payload: dict[str, Any]) -> None:
         "uid",
         "raw_blob_paths",
         "source",
-        "should_lock",
         "conversation_id",
         "client_device_id",
     }

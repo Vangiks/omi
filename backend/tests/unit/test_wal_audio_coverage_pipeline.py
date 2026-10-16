@@ -165,7 +165,7 @@ async def _run_batch(module, stubs, tmp_path, *, claims=True, session=ORIGIN, ra
         capture_evidence_claims={BIN_NAME: _claim()} if claims is True else claims,
     )
     await module._run_full_pipeline_background_async(
-        'job-coverage', 'uid', [f'/tmp/{raw_name}'], 'omi', False, str(tmp_path / 'job'), **kwargs
+        'job-coverage', 'uid', [f'/tmp/{raw_name}'], 'omi', str(tmp_path / 'job'), **kwargs
     )
 
 
@@ -367,7 +367,6 @@ async def _run_real(pipeline, tmp_path, *, target_conversation_id=None, session=
         'u',
         [f'/tmp/{BIN_NAME}'],
         'omi',
-        False,
         str(tmp_path / 'job'),
         target_conversation_id=target_conversation_id,
         client_device_id='pendant',
@@ -725,7 +724,7 @@ async def test_clock_skewed_filename_still_preserves_receipt_only_audio(coordina
         capture_evidence_claims=claims,
     )
     await module._run_full_pipeline_background_async(
-        'job-coverage-skew', 'uid', [f'/tmp/{skewed}.bin'], 'omi', False, str(wav_dir / 'job'), **kwargs
+        'job-coverage-skew', 'uid', [f'/tmp/{skewed}.bin'], 'omi', str(wav_dir / 'job'), **kwargs
     )
     assert len(state.vad_seen) == 1
     assert _read_payload(state.vad_seen[0]) == b''.join(_frame_bytes(v, FRAME_SAMPLES) for v in range(10))
@@ -934,7 +933,6 @@ async def test_cancelled_coverage_preserves_inputs_and_adopts_nothing(tmp_path, 
             coverage_mod.apply_sync_wal_audio_coverage(
                 'uid',
                 'omi',
-                False,
                 'pendant',
                 ORIGIN,
                 {BIN_NAME: claim},
@@ -1011,7 +1009,6 @@ async def test_cleanup_and_logging_exceptions_never_lose_inputs(tmp_path, monkey
         paths, maps, suppressed = await coverage_mod.apply_sync_wal_audio_coverage(
             'uid',
             'omi',
-            False,
             'pendant',
             ORIGIN,
             {BIN_NAME: claim},

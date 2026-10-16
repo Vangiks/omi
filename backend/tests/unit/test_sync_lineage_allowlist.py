@@ -235,7 +235,7 @@ async def _coordinate(module, stubs, monkeypatch, config, *, processed=(), parti
         dict(response.pop('_merged', {}))
     )
     await module._run_full_pipeline_background_async(
-        'job-lineage', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job-lineage', task_mode=True, **vars(kwargs)
+        'job-lineage', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job-lineage', task_mode=True, **vars(kwargs)
     )
     return [captured.get(chunk['id'], 'SKIPPED') for chunk in chunks], enriched
 
@@ -501,7 +501,7 @@ async def test_coordinator_checkpoints_admitted_refresh_debt_before_marking_audi
     pipeline._add_processed_segment_for_run = lambda *_args: events.append(('processed', None))
     pipeline._reprocess_merged_conversations = lambda *_a, **_k: None
     await module._run_full_pipeline_background_async(
-        'job-lineage', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job-lineage', task_mode=True, **vars(kwargs)
+        'job-lineage', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job-lineage', task_mode=True, **vars(kwargs)
     )
     assert len(captured) == 4
     assert [event[0] for event in events] == ['receipt', 'processed'] * 4

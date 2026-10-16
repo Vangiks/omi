@@ -1998,7 +1998,6 @@ async def _resolve_safety_wal_target(
     recording_session_id: Optional[str],
     source: ConversationSource,
     client_device_id: Optional[str],
-    should_lock: bool,
     audio_start_seconds: Optional[float],
     audio_end_seconds: Optional[float],
 ) -> Optional[str]:
@@ -2012,7 +2011,7 @@ async def _resolve_safety_wal_target(
         recording_session_id,
         source,
         client_device_id,
-        bool(should_lock),
+        False,
         audio_start_seconds,
         audio_end_seconds,
     )
@@ -2024,7 +2023,6 @@ async def _run_full_pipeline_background_async(  # pyright: ignore[reportGeneralT
     uid: str,
     raw_paths: list,
     source: ConversationSource,
-    should_lock: bool,
     job_dir: str,
     target_conversation_id: str = None,
     geolocation: Optional[Geolocation] = None,
@@ -2093,7 +2091,6 @@ async def _run_full_pipeline_background_async(  # pyright: ignore[reportGeneralT
             recording_session_id,
             source,
             client_device_id,
-            should_lock,
             audio_start_seconds,
             audio_end_seconds,
         )
@@ -2269,7 +2266,6 @@ async def _run_full_pipeline_background_async(  # pyright: ignore[reportGeneralT
                 wav_paths, source_frame_maps, coverage_suppressed_all = await apply_sync_wal_audio_coverage(
                     uid,
                     source,
-                    should_lock,
                     client_device_id,
                     recording_session_id,
                     capture_evidence_claims,
@@ -2293,7 +2289,6 @@ async def _run_full_pipeline_background_async(  # pyright: ignore[reportGeneralT
                         recording_session_id,
                         source,
                         client_device_id,
-                        should_lock,
                         audio_start_seconds,
                         audio_end_seconds,
                     )
@@ -2312,7 +2307,7 @@ async def _run_full_pipeline_background_async(  # pyright: ignore[reportGeneralT
                     capture_partition={
                         'source': source,
                         'client_device_id': client_device_id,
-                        'is_locked': should_lock,
+                        'is_locked': False,
                     },
                 )
                 safety_coverage_paths.update(safety_generated)
@@ -2584,7 +2579,7 @@ async def _run_full_pipeline_background_async(  # pyright: ignore[reportGeneralT
                         _bounded_exception_type(e),
                     )
 
-            is_locked = should_lock
+            is_locked = False
 
             # --- Phase 4: Fetch prefs & embeddings ---
             job_phase = 'provider_select'

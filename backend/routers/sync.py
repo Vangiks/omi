@@ -598,9 +598,6 @@ async def sync_local_files(
             base_headers=_V1_DEPRECATION_HEADERS,
         )
 
-    # No plans in the fork (#3): synced conversations are never locked.
-    should_lock = False
-
     # Detect source from filenames
     source = detect_source_from_filenames([f.filename for f in files])
 
@@ -713,7 +710,7 @@ async def sync_local_files(
                         trigger_classifier_if_needed(uid, triggered_caps), name=f'sync_fair_use_classifier:{uid}'
                     )
 
-        is_locked = should_lock
+        is_locked = False
 
         response = {'updated_memories': set(), 'new_memories': set()}
         segment_errors = []
@@ -748,7 +745,6 @@ async def sync_local_files(
                 extra_content={
                     'new_memories': [],
                     'updated_memories': [],
-                    'credits_exhausted': should_lock,
                     'dg_budget_exhausted': True,
                     'skipped_segments': total_segments,
                 },
@@ -1052,9 +1048,6 @@ async def sync_local_files_v2(
             cloud_trace_context=x_cloud_trace_context if isinstance(x_cloud_trace_context, str) else None,
         )
 
-    # No plans in the fork (#3): synced conversations are never locked.
-    should_lock = False
-
     # Detect source
     source = detect_source_from_filenames([f.filename for f in files])
 
@@ -1289,7 +1282,6 @@ async def sync_local_files_v2(
                 **({'raw_capture_paths': archive_paths} if archive_paths else {}),
                 **({'capture_evidence_claims': capture_claims} if capture_claims else {}),
                 'source': source.value,
-                'should_lock': should_lock,
                 'conversation_id': conversation_id,
                 'recording_session_id': recording_session_id,
                 'audio_start_seconds': audio_start_seconds,
@@ -1528,7 +1520,6 @@ async def sync_local_files_v2(
                             uid,
                             owned_paths,
                             source,
-                            should_lock,
                             job_dir,
                             conversation_id,
                             geolocation=geolocation,
@@ -1962,7 +1953,6 @@ async def _run_sync_job_body(request: Request, task_retry_count: int):
         uid = payload['uid']
         blob_paths = list(payload['raw_blob_paths'])
         source = ConversationSource(payload.get('source') or 'omi')
-        should_lock = bool(payload.get('should_lock', False))
         conversation_id = payload.get('conversation_id')
         recording_session_id = payload.get('recording_session_id')
         if isinstance(recording_session_id, str):
@@ -2149,7 +2139,6 @@ async def _run_sync_job_body(request: Request, task_retry_count: int):
                 uid,
                 blob_paths,
                 source,
-                should_lock,
                 job_dir,
                 conversation_id,
                 geolocation=geolocation,

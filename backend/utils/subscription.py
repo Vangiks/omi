@@ -1514,7 +1514,7 @@ def _closed(reason: str, *, limit_seconds: Optional[int] = 0) -> TranscriptionAl
 # trusted", as opposed to "the plan's minutes are actually exhausted". Failing
 # closed on these is right for a live listen socket (refusing one costs
 # nothing) but wrong for a decision written durably to storage, since nothing
-# routinely re-checks it later (#15232 — see should_lock in routers/sync.py).
+# routinely re-checks it later (#15232).
 TRANSCRIPTION_ALLOWANCE_TRANSIENT_REASONS = frozenset({'allowance_unavailable', 'usage_invalid'})
 
 

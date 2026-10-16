@@ -530,7 +530,7 @@ def _assert_task_contract(stack: Stack, job_id: str, uid: str, conversation_id: 
         or body.get('lane') != 'fresh'
         or body.get('capture_time_trust') != 'device_bound'
         or body.get('ledger_fence_mode') != 'active'
-        or body.get('should_lock') is not False
+        or 'should_lock' in body
         or not isinstance(raw_paths, list)
         or len(raw_paths) != 1
         or not isinstance(raw_paths[0], str)

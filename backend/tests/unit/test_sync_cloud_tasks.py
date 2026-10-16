@@ -759,7 +759,6 @@ def _valid_sync_task_payload(**overrides):
             'uid': 'uid-1',
             'raw_blob_paths': ['gs://bucket/job-1.opus'],
             'source': 'omi',
-            'should_lock': False,
             'lane': 'fresh',
         }
     )
@@ -1802,6 +1801,44 @@ def test_polling_active_terminal_retries_claim_cleanup_before_exposing_result():
 
 
 @pytest.mark.asyncio
+async def test_queued_task_with_legacy_should_lock_field_runs_and_ignores_it():
+    """Tasks enqueued before #31 still carry should_lock; the worker runs them unlocked."""
+
+    module, saved_modules, _, _, _, _ = _load_sync_router_for_fast_path()
+    request = _configure_task_handler(
+        module,
+        pipeline_error=None,
+        latest_job={'job_id': 'job-1', 'status': 'completed'},
+    )
+    legacy_payload = {**request.json.return_value, 'should_lock': True}
+    request.json = AsyncMock(return_value=legacy_payload)
+
+    try:
+        response = await module.run_sync_job(request, task_retry_count=0)
+
+        assert response.status_code == 200
+        module._run_full_pipeline_background_async.assert_awaited_once()
+        call = module._run_full_pipeline_background_async.await_args
+        assert call.args[:5] == (
+            'job-1',
+            'test-uid',
+            ['staged/audio.opus'],
+            module.ConversationSource('omi'),
+            'syncing/test-uid/job-1',
+        )
+        assert True not in call.args
+        assert 'should_lock' not in call.kwargs
+    finally:
+        sys.modules.pop('routers.sync', None)
+        sys.modules.pop('utils.sync.pipeline', None)
+        for mod_name, original in saved_modules.items():
+            if original is None:
+                sys.modules.pop(mod_name, None)
+            else:
+                sys.modules[mod_name] = original
+
+
+@pytest.mark.asyncio
 async def test_sync_task_retry_retains_staged_audio_and_safe_failure_code():
     """A non-final provider failure must remain queued without a terminal outcome."""
 
@@ -2723,7 +2760,7 @@ async def test_sync_dispatch_never_locks_when_transcription_minutes_run_out():
         response = await module.sync_local_files_v2(files=[upload], uid='test-uid')
 
         assert response.status_code == 202
-        assert module.enqueue_sync_job.call_args.args[0]['should_lock'] is False
+        assert 'should_lock' not in module.enqueue_sync_job.call_args.args[0]
         has_credits.assert_not_called()
         resolve_allowance.assert_not_called()
     finally:
