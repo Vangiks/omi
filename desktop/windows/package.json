@@ -17,6 +17,7 @@
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "start": "electron-vite preview",
     "dev": "node scripts/dev.mjs",
+    "dev:local": "node scripts/dev-local.mjs",
     "bootstrap": "powershell -ExecutionPolicy Bypass -File scripts/bootstrap-worktree.ps1",
     "dev:instance": "node scripts/print-instance.mjs --human",
     "seed:auth": "node scripts/seed-auth.mjs",
