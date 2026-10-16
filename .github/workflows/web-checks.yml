@@ -109,6 +109,10 @@ jobs:
           bun install --frozen-lockfile
           bun run build
 
+      - name: Run admin node tests
+        if: needs.changes.outputs.has_admin == 'true'
+        run: bash scripts/run-web-admin-tests.sh
+
       - name: Build Admin Dashboard
         if: needs.changes.outputs.has_admin == 'true'
         working-directory: ./web/admin
