@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('./firebase', () => ({ auth: { currentUser: { uid: 'user-123' } } }))
 
@@ -9,6 +9,22 @@ import { trackEvent, trackPaywallOpened, trackUpgradePlanSelected } from './anal
 describe('analytics capture contract', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
+    vi.stubEnv('VITE_POSTHOG_KEY', 'phc_z3qUFhGUgYIOMYnfxVSrLmYISQvbgph8iREQv3sez3Y')
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  // No key baked into the code: a profile without VITE_POSTHOG_KEY (the
+  // local-backend one) sends nothing to PostHog.
+  it('sends nothing when VITE_POSTHOG_KEY is empty', () => {
+    vi.stubEnv('VITE_POSTHOG_KEY', '')
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response())
+
+    trackEvent('App Launched')
+
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('sends PostHog identity and Windows enrichment inside properties', async () => {

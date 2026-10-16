@@ -16,13 +16,14 @@ omiGlass and device SDKs were removed. `CLAUDE.md` points here.
 | Product behavior | `PRODUCT.md`, `product/invariants/` |
 | Behavior shared with the macOS app | `contracts/parity/README.md` |
 | Tasks, stages, which skill to start with | «Задачи: GitHub Issues» below, `.claude/skills/` |
-| Capability map; specs and plans from before the issues process | `CAPABILITY-MAP.md`, `SPEC-*.md`, `tasks/` |
 
 ## Repository conventions
 
 - Git hooks come from `lefthook.yml` and install with `npx pnpm@10 install` in `desktop/windows`.
   Pre-push runs desktop typecheck, lint and the meeting tests. Keep Git identity in the user's
   configuration; temporary test identities use `git -c`.
+- A new worktree gets the ignored files matched by `.worktreeinclude` (`.env*`) from the main
+  checkout: the `post-checkout` hook runs `scripts/worktree-setup.sh`.
 - `desktop/windows/package.json` pins pnpm 10 through `packageManager`, so corepack's `pnpm`
   picks the right version; without corepack use `npx pnpm@10`. pnpm 11 ignores
   `node-linker=hoisted`. Never run `npm install` there.
@@ -31,6 +32,9 @@ omiGlass and device SDKs were removed. `CLAUDE.md` points here.
 - Upstream release and PR tooling is gone from this fork (most of `.github/`, Codemagic,
   `make preflight`, `scripts/pr-preflight`). Do not rely on it or restore it.
 - Migrate in-tree callers together rather than preserving retired APIs with compatibility wrappers.
+- Take upstream updates by merging `upstream/main` while the backend has not diverged; once it
+  has (own server backend), cherry-pick selectively. Keep changes useful to everyone (e.g. Linux
+  meeting detection) separable so they can go to `upstream` as their own PR.
 
 ## Задачи: GitHub Issues
 
@@ -77,7 +81,7 @@ omiGlass and device SDKs were removed. `CLAUDE.md` points here.
 - Родительский issue переходит в `stage:ready`, только когда все подзадачи в `stage:ready`. Иначе `/build` остановится на неясной подзадаче.
 - Если задача в `stage:ready` оказалась больше одного захода, остановитесь и смените стадию на `stage:spec`.
 - `SPEC.md` и `tasks/` для задачи живут только в ее рабочей ветке. Удалите их последним коммитом перед мержем. Решение, которое нужно сохранить надолго, запишите в ADR в `adr/` или в комментарий к issue.
-- `SPEC-*.md` и `tasks/` в main остались от прежнего порядка работы, новые туда не добавляйте. `CAPABILITY-MAP.md` остается в main.
+- В main нет `SPEC-*.md`, `tasks/` и карты модулей: планы прежнего порядка работы перенесены в issues.
 - Перед мержем проверьте код через `/agent-skills:review`. В Claude Code `/review` занят встроенной командой, поэтому команду плагина вызывайте с префиксом.
 - Issue закрывает PR со строкой `Closes #N` в описании. Вручную issues не закрывайте. Исключение — задача, которую решили не делать: ее закрывает человек как not planned и пишет причину в комментарии.
 
