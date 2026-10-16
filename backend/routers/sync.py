@@ -110,11 +110,6 @@ from utils.sync.poll_limit import SYNC_POLL_WINDOW_SECONDS, admit_sync_job_poll
 from utils.product_metrics import record_product_event, sanitize_app_build
 from utils.journey_metrics_contract import resolve_client_kind
 from utils.client_device import resolve_client_device, resolve_client_device_from_request
-from utils.subscription import (
-    TRANSCRIPTION_ALLOWANCE_TRANSIENT_REASONS,
-    has_transcription_credits,
-    resolve_transcription_allowance,
-)
 from utils.sync import playback as sync_playback
 from config.capture_evidence import capture_evidence_dark_write_enabled
 from utils.capture_evidence import parse_sync_file_claims
@@ -603,14 +598,8 @@ async def sync_local_files(
             base_headers=_V1_DEPRECATION_HEADERS,
         )
 
-    # Check credits: if exhausted, still process but lock the conversation so user can pay to unlock.
-    # A lookup failure must not durably lock: unlike gating the live listen socket, nothing
-    # routinely re-checks is_locked later, so a transient blip would paywall it forever (#15232).
-    has_credits = await run_blocking(critical_executor, has_transcription_credits, uid)
+    # No plans in the fork (#3): synced conversations are never locked.
     should_lock = False
-    if not has_credits:
-        allowance = await run_blocking(critical_executor, resolve_transcription_allowance, uid)
-        should_lock = allowance.reason not in TRANSCRIPTION_ALLOWANCE_TRANSIENT_REASONS
 
     # Detect source from filenames
     source = detect_source_from_filenames([f.filename for f in files])
@@ -1063,13 +1052,8 @@ async def sync_local_files_v2(
             cloud_trace_context=x_cloud_trace_context if isinstance(x_cloud_trace_context, str) else None,
         )
 
-    # A lookup failure must not durably lock: unlike gating the live listen socket, nothing
-    # routinely re-checks is_locked later, so a transient blip would paywall it forever (#15232).
-    has_credits = await run_blocking(critical_executor, has_transcription_credits, uid)
+    # No plans in the fork (#3): synced conversations are never locked.
     should_lock = False
-    if not has_credits:
-        allowance = await run_blocking(critical_executor, resolve_transcription_allowance, uid)
-        should_lock = allowance.reason not in TRANSCRIPTION_ALLOWANCE_TRANSIENT_REASONS
 
     # Detect source
     source = detect_source_from_filenames([f.filename for f in files])

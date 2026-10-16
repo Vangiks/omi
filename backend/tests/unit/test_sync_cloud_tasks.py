@@ -2599,7 +2599,6 @@ async def test_fresh_admission_daily_ceiling_prevents_staging_or_dispatch():
         module.claim_sync_content.assert_not_called()
         module.enqueue_sync_job.assert_not_called()
         module.start_background_task.assert_not_called()
-        module.has_transcription_credits.assert_not_called()
     finally:
         sys.modules.pop('routers.sync', None)
         sys.modules.pop('utils.sync.pipeline', None)
@@ -2698,6 +2697,35 @@ async def test_sync_dispatch_carries_device_provenance_into_cloud_task(monkeypat
         payload = module.enqueue_sync_job.call_args.args[0]
         assert payload['client_device_id'] == 'ios_a1b2c3d4'
         assert payload['client_platform'] == 'ios'
+    finally:
+        sys.modules.pop('routers.sync', None)
+        for mod_name, orig in saved_modules.items():
+            if orig is None:
+                sys.modules.pop(mod_name, None)
+            else:
+                sys.modules[mod_name] = orig
+
+
+@pytest.mark.asyncio
+async def test_sync_dispatch_never_locks_when_transcription_minutes_run_out():
+    from starlette.datastructures import UploadFile
+
+    module, saved_modules, _, BytesIO, _, _ = _load_sync_router_for_fast_path()
+    module.start_background_task = MagicMock()
+    has_credits = MagicMock(return_value=False)
+    resolve_allowance = MagicMock(return_value=types.SimpleNamespace(reason='minutes_exhausted'))
+    module.has_transcription_credits = has_credits
+    module.resolve_transcription_allowance = resolve_allowance
+    module.TRANSCRIPTION_ALLOWANCE_TRANSIENT_REASONS = frozenset()
+
+    try:
+        upload = UploadFile(filename='test.opus', file=BytesIO(b'\x00' * 10))
+        response = await module.sync_local_files_v2(files=[upload], uid='test-uid')
+
+        assert response.status_code == 202
+        assert module.enqueue_sync_job.call_args.args[0]['should_lock'] is False
+        has_credits.assert_not_called()
+        resolve_allowance.assert_not_called()
     finally:
         sys.modules.pop('routers.sync', None)
         for mod_name, orig in saved_modules.items():

@@ -36,7 +36,6 @@ _BLOCKING_GATES = frozenset(
     {
         "get_hard_restriction_status",
         "is_daily_audio_ceiling_exceeded",
-        "has_transcription_credits",
         "get_enforcement_stage",
         "is_dg_budget_exhausted",
         "record_usage",
@@ -110,7 +109,6 @@ class TestSyncLocalFilesOffload:
     def test_gates_use_the_same_executors_the_rest_of_the_repo_uses(self):
         offloaded = _offloaded_via_awaited_run_blocking(_handler_node())
         assert offloaded["get_hard_restriction_status"] == "critical_executor"
-        assert offloaded["has_transcription_credits"] == "critical_executor"
         assert offloaded["is_daily_audio_ceiling_exceeded"] == "db_executor"
         assert offloaded["get_enforcement_stage"] == "db_executor"
         assert offloaded["is_dg_budget_exhausted"] == "db_executor"
@@ -124,3 +122,15 @@ class TestSyncLocalFilesOffload:
         assert offloaded["retrieve_file_paths"] == "sync_executor"
         assert offloaded["decode_files_to_wav"] == "sync_executor"
         assert offloaded["_cleanup_files"] == "sync_executor"
+
+
+class TestSyncHandlersDoNotReadTranscriptionMinutes:
+    """The fork has no plans (#3): neither sync handler checks minutes or locks conversations."""
+
+    def test_no_handler_reads_transcription_minutes(self):
+        tree = ast.parse(SYNC_ROUTER.read_text(encoding="utf-8"))
+        for name in ("sync_local_files", "sync_local_files_v2"):
+            node = next(n for n in ast.walk(tree) if isinstance(n, ast.AsyncFunctionDef) and n.name == name)
+            names = {sub.id for sub in ast.walk(node) if isinstance(sub, ast.Name)}
+            assert "has_transcription_credits" not in names, f"{name} still checks transcription minutes"
+            assert "resolve_transcription_allowance" not in names, f"{name} still resolves an allowance"
