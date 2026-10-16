@@ -26,10 +26,11 @@ export type TranscriptionCallbacks = {
   /** Fires once when the session connects. Always 'omi' (the only backend). */
   onBackend: (backend: 'omi') => void
   /** Fires when transcription can't start or can't continue: connect failure,
-   *  quota exhausted, or the socket dropped. The session is over when this fires. */
+   *  the server refused the session, or the socket dropped. The session is over
+   *  when this fires. */
   onError: (err: Error) => void
   /** Fires for every non-segment backend event (e.g. `memory_creating`). Optional;
-   *  quota events are still handled internally regardless. */
+   *  server refusal events are still handled internally regardless. */
   onEvent?: (event: { type: string; raw: Record<string, unknown> }) => void
   /** Fires with each RAW segment batch before line mapping. Screen sessions use
    *  this to retain the from-segments fields (start/end/is_user/speaker_id/…)
@@ -55,37 +56,36 @@ function segmentToLine(seg: BackendSegment): TranscriptLine {
 }
 
 /**
- * Omi cloud signals an exhausted free quota two ways: a typed
- * `freemium_threshold_reached` event sent right after connect, and/or a
- * `1008 trial_expired` WebSocket close. Either way the cloud STT will never emit
- * transcripts, so the session has effectively ended.
+ * The Omi server refuses a session two ways: a typed `freemium_threshold_reached`
+ * event sent right after connect, and/or a `1008` WebSocket close (reason such as
+ * `trial_expired`). Either way the cloud STT will never emit transcripts, so the
+ * session has effectively ended. The fork's server has no plans (#3) and should
+ * not send either; the handling stays so a refusal is not reported as a drop.
  */
-function isQuotaExhaustedEvent(ev: { type: string; raw: Record<string, unknown> }): boolean {
+function isServerRefusalEvent(ev: { type: string; raw: Record<string, unknown> }): boolean {
   if (ev.type !== 'freemium_threshold_reached') return false
-  // Only treat the quota as gone when it's actually depleted, not on an
-  // early-warning variant of the same event. Missing field = exhausted (fail safe).
+  // Only end the session when the event says no time is left, not on an
+  // early-warning variant of the same event. Missing field = refused (fail safe).
   const remaining = ev.raw.remaining_seconds
   return typeof remaining !== 'number' || remaining <= 0
 }
-/** Whether a message indicates the account's cloud STT entitlement is exhausted
- *  (quota used up / trial expired / policy-violation 1008). Exported so callers
- *  outside this module (e.g. capture/liveRescue.ts's reconnect-worthiness check)
- *  don't re-derive this classification with their own regex. */
-export function isQuotaExhaustedMessage(message: string): boolean {
+/** Whether a message says the server refused cloud STT for this account
+ *  (policy-violation 1008, trial_expired, or a legacy quota message). Exported so
+ *  callers outside this module (e.g. capture/liveRescue.ts's reconnect-worthiness
+ *  check) don't re-derive this classification with their own regex. */
+export function isServerRefusalMessage(message: string): boolean {
   return /quota|1008|trial_expired/i.test(message)
 }
 function isTrialExpiredError(err: Error): boolean {
   return /\(1008\)/.test(err.message) || /trial_expired/i.test(err.message)
 }
-// A connected-then-closed event that means the account isn't entitled to cloud
-// STT (free trial/quota used up): WS policy-violation 1008, or a backend reason
-// naming the quota. Distinguishes this from a generic network drop so the user
-// gets an actionable message instead of a bare "closed (1008)".
-function isQuotaClose(code: number, reason: string): boolean {
+// A connected-then-closed event that means the server refused cloud STT for this
+// account: WS policy-violation 1008, or a backend reason naming the refusal.
+// Distinguishes this from a generic network drop, which is worth reconnecting for.
+function isServerRefusalClose(code: number, reason: string): boolean {
   return code === 1008 || /trial_expired|freemium|quota/i.test(reason)
 }
-const QUOTA_MESSAGE =
-  'free Omi transcription quota is used up (1008) — add an Omi subscription or sign in with an entitled account to keep transcribing'
+const SERVER_REFUSAL_MESSAGE = 'the Omi server refused transcription for this account (1008)'
 
 type OmiStartOutcome = {
   handle: OmiListenHandle | null
@@ -172,14 +172,14 @@ async function startWithOmi(
         },
         onEvent: (ev) => {
           cb.onEvent?.(ev)
-          if (!isQuotaExhaustedEvent(ev)) return
-          // Free quota is used up — the cloud STT will never emit transcripts.
+          if (!isServerRefusalEvent(ev)) return
+          // The server refused the session — the cloud STT will never emit transcripts.
           if (outcome === 'pending') {
             // Never connected as the winner yet: treat as an initial failure.
-            fail(new Error(QUOTA_MESSAGE))
+            fail(new Error(SERVER_REFUSAL_MESSAGE))
           } else if (outcome === 'omi') {
             // Already connected and committed: tell the caller the session is over.
-            onLost('Omi free quota exhausted')
+            onLost(SERVER_REFUSAL_MESSAGE)
           }
         },
         onClosed: (code, reason) => {
@@ -188,8 +188,8 @@ async function startWithOmi(
           // (Pre-connect closes arrive via onError and drive the initial failure.)
           if (outcome !== 'omi') return
           onLost(
-            isQuotaClose(code, reason)
-              ? QUOTA_MESSAGE
+            isServerRefusalClose(code, reason)
+              ? SERVER_REFUSAL_MESSAGE
               : `Omi /v4/listen closed (${code})${reason ? ` ${reason}` : ''}`
           )
         },
@@ -201,10 +201,10 @@ async function startWithOmi(
           }
           // Only surface post-connect errors when Omi actually connected.
           if (outcome === 'omi') {
-            // Quota backstop: a 1008 'trial_expired' close (in case the typed
+            // Refusal backstop: a 1008 'trial_expired' close (in case the typed
             // event didn't arrive first). End the session rather than erroring twice.
             if (isTrialExpiredError(err)) {
-              onLost(QUOTA_MESSAGE)
+              onLost(SERVER_REFUSAL_MESSAGE)
               return
             }
             cb.onError(err)
@@ -250,7 +250,7 @@ async function startWithOmi(
  *   the client posts from-segments on stop (see lib/sync/).
  *
  * Push-to-talk does NOT ride this client; it lives in `lib/ptt/`. Omi is the
- * only transcription backend: if it can't connect, runs out of free quota, or
+ * only transcription backend: if it can't connect, the server refuses it, or
  * its socket drops mid-session, the session ends and `onError` fires. (There is
  * no Deepgram fallback.)
  */

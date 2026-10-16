@@ -1,5 +1,5 @@
 import type { LiveStatus } from './liveConversation'
-import { isQuotaExhaustedMessage } from './transcriptionClient'
+import { isServerRefusalMessage } from './transcriptionClient'
 import { hasTranscriptionByokCached } from './byokKeys'
 import { createSignal } from './signal'
 
@@ -55,7 +55,7 @@ export function maybeTriggerTranscriptionQuotaPopup(status: LiveStatus, error?: 
     transcriptionQuotaPopupShown = false
     return false
   }
-  if (!error || !isQuotaExhaustedMessage(error)) return false
+  if (!error || !isServerRefusalMessage(error)) return false
   // BYOK users must never be paywalled — they pay the provider directly. The
   // backend exempts them, but a heartbeat lag can briefly emit the exhaustion
   // event locally after BYOK activation, so ignore it here (macOS

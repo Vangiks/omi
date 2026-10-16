@@ -15,7 +15,7 @@ const stop = vi.fn()
 const finalizeHandle = vi.fn()
 
 // Preserve the module's real exports (liveRescue's isRetryableDropError now
-// calls the real isQuotaExhaustedMessage from this module) and mock only
+// calls the real isServerRefusalMessage from this module) and mock only
 // startTranscription.
 vi.mock('../lib/transcriptionClient', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/transcriptionClient')>()
@@ -172,7 +172,9 @@ describe('startLiveMicSession', () => {
     const ctrl = startLiveMicSession()
     await vi.advanceTimersByTimeAsync(0)
     latest().cb.onError(
-      new Error('Omi transcription stopped: free Omi transcription quota is used up (1008)')
+      new Error(
+        'Omi transcription stopped: the Omi server refused transcription for this account (1008)'
+      )
     )
     // Give any (wrongly-scheduled) reconnect ample time to fire — none should.
     await vi.advanceTimersByTimeAsync(60_000)

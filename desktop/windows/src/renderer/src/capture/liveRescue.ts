@@ -1,7 +1,7 @@
 // Pure helpers for the always-on mic session's reconnect + from-segments rescue
 // (see liveMicSession). Kept side-effect-free so the backoff schedule and the
 // segment mapping are exhaustively unit-testable in node.
-import { isQuotaExhaustedMessage } from '../lib/transcriptionClient'
+import { isServerRefusalMessage } from '../lib/transcriptionClient'
 import type { BackendSegment, SyncSegment } from '../../../shared/types'
 
 // Reconnect budget. A dropped /v4/listen resumes the SAME conversation (via
@@ -56,8 +56,8 @@ const PERMANENT_SOURCE_ERROR_NAMES = new Set([
   'OverconstrainedError'
 ])
 
-/** Whether a transcription error is worth reconnecting for. Quota/entitlement
- *  exhaustion (1008 / trial_expired), a missing sign-in, and a permanent
+/** Whether a transcription error is worth reconnecting for. A server refusal
+ *  (1008 / trial_expired), a missing sign-in, and a permanent
  *  mic/loopback source failure are terminal — reconnecting just re-hits the
  *  same wall, so surface them at once instead of burning the whole backoff
  *  budget (~55s) first. Everything else (network drops, timeouts, transient
@@ -65,7 +65,7 @@ const PERMANENT_SOURCE_ERROR_NAMES = new Set([
  *  when available (omitted for backend/network drops, which have none). */
 export function isRetryableDropError(message: string, name?: string): boolean {
   if (name && PERMANENT_SOURCE_ERROR_NAMES.has(name)) return false
-  return !isQuotaExhaustedMessage(message) && !/not signed in|requires sign-in/i.test(message)
+  return !isServerRefusalMessage(message) && !/not signed in|requires sign-in/i.test(message)
 }
 
 /** Whether a retryable drop was a backend rate-limit. The ws handshake surfaces a

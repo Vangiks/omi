@@ -14,10 +14,10 @@ export type OmiListenCallbacks = {
   onError: (err: Error, fatal: boolean) => void
   /**
    * Fires when the WS closes AFTER it had connected (any code — clean 1000,
-   * quota 1008, or abnormal 1005/1006). The Omi socket is dead, so no more
+   * server refusal 1008, or abnormal 1005/1006). The Omi socket is dead, so no more
    * transcripts will arrive; the caller should fall back to keep recording.
    * `reason` is the backend's close text (e.g. `trial_expired`) — needed to tell
-   * a quota/entitlement close apart from a generic drop. Pre-connect closes come
+   * a server refusal apart from a generic drop. Pre-connect closes come
    * through `onError(_, fatal=true)` instead.
    */
   onClosed: (code: number, reason: string) => void
@@ -81,9 +81,9 @@ export async function startOmiListen(
     } else if (msg.kind === 'closed') {
       if (stopped) return
       if (readyNotified) {
-        // Connected then dropped (clean, quota, or abnormal) → let the caller
+        // Connected then dropped (clean, refusal, or abnormal) → let the caller
         // end the session and surface an error. Pass the reason so a 1008
-        // entitlement/quota close can be reported as such, not a bare code.
+        // refusal can be reported as such, not a bare code.
         cb.onClosed(msg.code, msg.reason)
       } else {
         // The full source + transport lane never became usable. Surface this as

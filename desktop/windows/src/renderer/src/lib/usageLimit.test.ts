@@ -32,9 +32,8 @@ describe('usage-limit pub/sub', () => {
 })
 
 describe('maybeTriggerTranscriptionQuotaPopup', () => {
-  // The message the capture window surfaces on a 1008 free-quota close.
-  const QUOTA_ERR =
-    'free Omi transcription quota is used up (1008) — add an Omi subscription or sign in with an entitled account to keep transcribing'
+  // The message the capture window surfaces on a 1008 server refusal.
+  const QUOTA_ERR = 'the Omi server refused transcription for this account (1008)'
 
   it('raises the transcription popup once when a quota-exhausted error status arrives', () => {
     const seen: (UsageLimitReason | null)[] = []
