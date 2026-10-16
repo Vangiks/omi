@@ -59,7 +59,7 @@ if [ "$VENV_PREEXISTED" -eq 1 ]; then
   if ! dev_harness_venv_python_is_pinned_311 "$VENV_PY_BIN"; then
     echo "dev-init: the existing backend/.venv is not the pinned Python 3.11 runtime the backend requires; refusing to install requirements into it." >&2
     echo "Recover with: rm -rf backend/.venv && make dev-init (re-runs the pinned" >&2
-    echo "3.11 discovery), or: make lane-bootstrap (requires uv)." >&2
+    echo "3.11 discovery), or: make lane-backend (requires uv)." >&2
     exit 1
   fi
 fi
@@ -72,7 +72,7 @@ elif [ -x "$PWD/backend/.venv/Scripts/python.exe" ]; then
   PYTHON_BIN="$PWD/backend/.venv/Scripts/python.exe"
 else
   echo "dev-init: backend/.venv exists but has no interpreter; recreate it with the pinned runtime:" >&2
-  echo "  python3.11 -m venv backend/.venv   (or: make lane-bootstrap)" >&2
+  echo "  python3.11 -m venv backend/.venv   (or: make lane-backend)" >&2
   exit 1
 fi
 # Bind the install to THIS repo's venv python directly: re-running the resolver
@@ -84,7 +84,7 @@ fi
 CANONICAL_PREFIX="$(cd "$PWD/backend/.venv" 2>/dev/null && pwd -P)" || CANONICAL_PREFIX=""
 if [ -z "$CANONICAL_PREFIX" ]; then
   echo "dev-init: backend/.venv is missing; refusing to install requirements outside the venv." >&2
-  echo "Run: make lane-bootstrap (Python 3.11 venv), or install Python 3.11 and re-run dev-init." >&2
+  echo "Run: make lane-backend (Python 3.11 venv), or install Python 3.11 and re-run dev-init." >&2
   exit 1
 fi
 INTERPRETER_PREFIX="$("$PYTHON_BIN" -c 'import sys; print(sys.prefix)' 2>/dev/null)" || INTERPRETER_PREFIX=""
@@ -101,7 +101,7 @@ fi
 if [ "$INTERPRETER_PREFIX_PHYS" != "$CANONICAL_PREFIX" ]; then
   echo "dev-init: '$PYTHON_BIN' does not belong to this repo's backend/.venv (sys.prefix '$INTERPRETER_PREFIX'); refusing to install requirements outside the venv." >&2
   echo "The venv is missing or points at another checkout. Recreate it pinned:" >&2
-  echo "  rm -rf backend/.venv && python3.11 -m venv backend/.venv, or run: make lane-bootstrap." >&2
+  echo "  rm -rf backend/.venv && python3.11 -m venv backend/.venv, or run: make lane-backend." >&2
   exit 1
 fi
 if ! "$PYTHON_BIN" -m pip --version >/dev/null; then

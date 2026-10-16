@@ -304,7 +304,7 @@ def test_resolver_prefers_import_capable_python_over_newer_import_bare_one(
 ) -> None:
     """A newer interpreter without PyYAML/python-dotenv must not shadow one that has them.
 
-    The resolver is shared by mobile-session.sh, dev-up.sh and the cheap
+    The resolver is shared by dev-up.sh and the cheap
     pre-push gates, so among floor-qualified candidates the import-capable one
     wins even when a version-newer candidate exists.
     """
@@ -602,12 +602,11 @@ def test_make_harness_targets_run_resolved_python_from_checkout_with_unicode_and
     _write_logged_python(python)
 
     # Exercise the resolver's backend/.venv fallback, so clear any inherited
-    # PYTHON (e.g. `make preflight` exports it) exactly like the sibling tests.
+    # PYTHON exactly like the sibling tests.
     env = _shell_env()
     env.pop("PYTHON", None)
     env["HARNESS_PYTHON_CALLS"] = _as_bash_path(calls)
     targets = (
-        ("preflight", []),
         ("list-memory-scenarios", []),
         ("seed-memory-scenario", ["SCENARIO=sample"]),
         ("reset-memory-scenario", ["SCENARIO=sample"]),
@@ -626,7 +625,6 @@ def test_make_harness_targets_run_resolved_python_from_checkout_with_unicode_and
         assert result.returncode == 0, result.stderr
 
     assert calls.read_text(encoding="utf-8").splitlines() == [
-        ".github/scripts/pr_preflight.py --lane local --base origin/main",
         "scripts/dev-harness/list-memory-scenarios.py",
         "scripts/dev-harness/seed-memory-scenario.py sample",
         "scripts/dev-harness/reset-memory-scenario.py sample",

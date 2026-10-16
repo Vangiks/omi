@@ -4,7 +4,6 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 LANE_BACKEND = REPO_ROOT / "scripts" / "dev-harness" / "lane-backend.sh"
-BOOTSTRAP = REPO_ROOT / "scripts" / "dev-harness" / "bootstrap-lane-worktree.sh"
 MAKEFILE = REPO_ROOT / "Makefile"
 
 
@@ -56,14 +55,3 @@ def test_makefile_setup_backend_stays_the_locked_sync() -> None:
 def test_makefile_lane_backend_runs_the_fast_script() -> None:
     recipe = _makefile_target("lane-backend")
     assert "scripts/dev-harness/lane-backend.sh" in recipe
-
-
-def test_lane_bootstrap_closing_message_names_typecheck_and_pub_get() -> None:
-    text = BOOTSTRAP.read_text(encoding="utf-8")
-    assert "make lane-backend" in text
-    assert "check_backend_typecheck_if_needed" in text
-    assert "flutter pub get" in text
-    assert "generated-output" in text
-    assert "generate-app-env.sh" in text
-    assert "--delete-conflicting-outputs" not in text
-    assert "--build-filter" not in text

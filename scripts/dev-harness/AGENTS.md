@@ -1,15 +1,7 @@
-# Dev harness contracts
+# Dev harness
 
-Inherits [repository rules](../../AGENTS.md). Before changing mobile sessions,
-read [MOBILE_SESSIONS.md](MOBILE_SESSIONS.md), [LIVE_SESSIONS.md](LIVE_SESSIONS.md)
-and [PENDING_CONTRACTS.md](PENDING_CONTRACTS.md). Receipt freeze policy lives in
-[contracts/session](../../contracts/session/README.md).
+Inherits [repository rules](../../AGENTS.md). The harness runs the local backend stack
+(`make dev-up` / `dev-down`) and the memory scenarios in [MEMORY_SCENARIOS.md](MEMORY_SCENARIOS.md).
 
-Run `bash scripts/dev-harness/run-tests.sh`, the relevant `make mobile-verify`
-selection, and `make preflight`. Tests use injected processes/clock/device
-adapters and must never boot hardware or contact production. Do not weaken
-spine tests: builder edits are limited to removing pending-marker lines.
-
-V1 has a CLI skeleton. Keep ordinary session and hermetic-fast
-behavior unchanged while implementing explicit live operations. Missing live
-support exits 2; never silently fall back. C10: [released replay](CLIENT_COMPAT.md).
+Run `bash scripts/dev-harness/run-tests.sh`. Tests use injected processes and clock and must
+never contact production.

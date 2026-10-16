@@ -13,10 +13,6 @@ cd "$(dirname "$0")/../.."
 
 TEST_PATHS=(
   scripts/dev-harness/tests
-  scripts/dev-harness/physical_capture_test.py
-  scripts/dev-harness/physical_capture_collect_test.py
-  scripts/dev-harness/physical_capture_fixtures/test_server.py
-  app/ios/test/audio_interruption_driver/test_driver.py
 )
 
 run_pytest() {

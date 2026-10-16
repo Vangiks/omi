@@ -218,7 +218,7 @@ npm run test:listen-lifecycle:emulator  # Real Firestore transaction contention 
 
 **OpenAPI contract runner** — OpenAPI contract checks use `backend/scripts/openapi_runner.sh`, which syncs the pinned `backend/openapi-requirements.txt` runner env and prewarms `tiktoken`; CI and `scripts/pre-push` must use this same path.
 
-**Released app-client compatibility** — `scripts/check_app_client_openapi_compatibility.py` compares the exported app-client schema directionally: old requests stay accepted, new responses stay decodable. Optional request fields and additive response fields are allowed. Retain deprecated boundaries or version endpoints; never allowlist breaks. [C10](../scripts/dev-harness/CLIENT_COMPAT.md) defines actual released-consumer fixtures; capture/replay remains pending.
+**Released app-client compatibility** — `scripts/check_app_client_openapi_compatibility.py` compares the exported app-client schema directionally: old requests stay accepted, new responses stay decodable. Optional request fields and additive response fields are allowed. Retain deprecated boundaries or version endpoints; never allowlist breaks.
 
 **Test isolation / import purity** — never mutate `sys.modules` at module scope in tests; production modules must not construct clients or do IO at import time. Sanctioned seams: `monkeypatch.setattr` on a lazy-held singleton, FastAPI `app.dependency_overrides`. Enforced by `python scripts/check_module_stub_pollution.py` and `python scripts/scan_import_time_side_effects.py`. Full prescription: `backend/docs/test_isolation.md`.
 

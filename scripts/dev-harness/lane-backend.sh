@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Opt-in wheel install for mobile-session start and the pre-push typecheck gate.
+# Opt-in wheel install for the dev harness backend venv and the backend typecheck.
 #
 # Not lock-hash identical. `make setup` / `make setup-backend` remain the
 # contributor entrypoint and run `uv pip sync` of pylock.macos.toml.
@@ -16,7 +16,7 @@ cd "$ROOT"
 
 VENV_PY="$ROOT/backend/.venv/bin/python"
 REQUIREMENTS="$ROOT/backend/requirements.txt"
-# mobile-session start (uvicorn + google.*) and pre-push typecheck (pyright),
+# dev harness backend start (uvicorn + google.*) and typecheck (pyright),
 # plus the cheap-gate imports (yaml, dotenv).
 PROBE='import dotenv, google.auth, pyright, uvicorn, yaml'
 

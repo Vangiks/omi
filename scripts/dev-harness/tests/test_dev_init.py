@@ -285,7 +285,7 @@ def test_dev_init_refuses_to_install_outside_the_venv(tmp_path: Path) -> None:
 
     dev-init binds the install to this repo's venv python; if that interpreter
     has been replaced by (or symlinked to) a foreign one, the sys.prefix
-    membership check must refuse with lane-bootstrap guidance instead of
+    membership check must refuse with lane-backend guidance instead of
     pip-installing elsewhere (Oracle follow-up on the Codex P1).
     """
     repo = _fixture_repo(tmp_path)
@@ -319,7 +319,7 @@ def test_dev_init_refuses_to_install_outside_the_venv(tmp_path: Path) -> None:
 
     assert result.returncode == 1, result.stdout
     assert "does not belong to this repo's backend/.venv" in result.stdout, result.stdout
-    assert "make lane-bootstrap" in result.stdout, result.stdout
+    assert "make lane-backend" in result.stdout, result.stdout
     calls = log.read_text(encoding="utf-8").splitlines() if log.exists() else []
     assert not any(line.startswith("FOREIGN -m pip") for line in calls), calls
 
@@ -418,7 +418,7 @@ def test_dev_init_refuses_an_existing_below_floor_venv(tmp_path: Path) -> None:
     checkout that already had backend/.venv, so dev-init ran the full install
     under 3.9 and reported success while the resolver (and the pre-push gate)
     ignores that same venv (Codex P1). dev-init must refuse with
-    lane-bootstrap guidance instead.
+    lane-backend guidance instead.
     """
     repo = _fixture_repo(tmp_path)
     # The fixture venv python exits 0 for everything; script it into a
@@ -449,7 +449,7 @@ def test_dev_init_refuses_an_existing_below_floor_venv(tmp_path: Path) -> None:
 
     assert result.returncode == 1, result.stdout
     assert "not the pinned Python 3.11 runtime" in result.stdout, result.stdout
-    assert "make lane-bootstrap" in result.stdout, result.stdout
+    assert "make lane-backend" in result.stdout, result.stdout
     assert "refusing to install requirements into it" in result.stdout, result.stdout
 
 

@@ -25,8 +25,8 @@ dev_harness_python_floor_ok() {
 # `>=3.11,<3.12` and mobile_doctor rejects a non-3.11 backend venv, so
 # provisioning (dev-init) prefers this interpreter when one is discoverable
 # without installing anything: the PATH name first, then the uv-managed
-# toolchain — the same runtime `make lane-backend` / `make lane-bootstrap`
-# provision.
+# toolchain — the same runtime `make lane-backend`
+# provisions.
 # Strict pinned-range probe for the backend runtime: the backend pylock
 # declares `>=3.11,<3.12` and mobile_doctor rejects any other version, so a
 # 3.10 or 3.12+ interpreter is as unusable for the backend venv as a 3.9 one.
@@ -95,11 +95,11 @@ dev_harness_canonical_python() {
     "$repo_root/backend/.venv/Scripts/python.exe"; do
     if [ -x "$candidate" ]; then
       if ! dev_harness_venv_covers_cheap_gates "$candidate"; then
-        echo "dev-harness: $candidate exists but cannot import yaml and dotenv (incomplete venv); ignoring it. Run: make lane-bootstrap" >&2
+        echo "dev-harness: $candidate exists but cannot import yaml and dotenv (incomplete venv); ignoring it. Run: make lane-backend" >&2
         continue
       fi
       if ! dev_harness_python_floor_ok "$candidate"; then
-        echo "dev-harness: $candidate is below the 3.10 floor the pre-push check scripts require; ignoring it. Run: make lane-bootstrap" >&2
+        echo "dev-harness: $candidate is below the 3.10 floor the pre-push check scripts require; ignoring it. Run: make lane-backend" >&2
         continue
       fi
       printf '%s\n' "$candidate"
@@ -130,11 +130,11 @@ dev_harness_python() {
     "$repo_root/backend/venv/Scripts/python.exe"; do
     if [ -x "$candidate" ]; then
       if ! dev_harness_venv_covers_cheap_gates "$candidate"; then
-        echo "dev-harness: $candidate exists but cannot import yaml and dotenv (incomplete venv); ignoring it. Run: make lane-bootstrap" >&2
+        echo "dev-harness: $candidate exists but cannot import yaml and dotenv (incomplete venv); ignoring it. Run: make lane-backend" >&2
         continue
       fi
       if ! dev_harness_python_floor_ok "$candidate"; then
-        echo "dev-harness: $candidate is below the 3.10 floor the pre-push check scripts require; ignoring it. Run: make lane-bootstrap" >&2
+        echo "dev-harness: $candidate is below the 3.10 floor the pre-push check scripts require; ignoring it. Run: make lane-backend" >&2
         continue
       fi
       printf '%s\n' "$candidate"
@@ -148,7 +148,7 @@ dev_harness_python() {
   # only when it actually satisfies the floor.
   # Among floor-qualified candidates prefer one that can also import the
   # cheap-gate deps (yaml + python-dotenv): this resolver is shared by
-  # mobile-session.sh, dev-up.sh and the pre-push gates, so a version-newer
+  # dev-up.sh and the pre-push gates, so a version-newer
   # interpreter without those packages must not shadow an import-capable one.
   # When no candidate has the imports, keep the documented floor-only outcome
   # so the gate reports the missing module instead of a version crash.
@@ -209,7 +209,7 @@ dev_harness_python_floor_advisory() {
 The dev harness selected bare `python3`, but it reports a version below the
 3.10 floor the pre-push check scripts require (PEP 604 unions at module scope).
 On macOS the PATH `python3` is often Xcode CLT Python 3.9.
-Fix: run `make lane-bootstrap` to create backend/.venv (the canonical
+Fix: run `make lane-backend` to create backend/.venv (the canonical
 interpreter), or install Python >= 3.10 (e.g. `brew install python@3.12`) and
 put it on PATH, or select one explicitly with `PYTHON=/path/to/python3.12`.
 ADVISORY
@@ -277,7 +277,7 @@ dev_harness_require_cli() {
   {
     echo "Omi dev harness is not provisioned: $python_bin cannot import dev_harness.cli"
     printf '%s\n' "$probe" | tail -n 1 | sed 's/^/  /'
-    echo "Run \`make lane-bootstrap\` first (Python 3.11 venv + cheap-gate packages). Uvicorn/pyright: \`make lane-backend\`. Locked pylock sync remains \`make setup-backend\`."
+    echo "Run \`make lane-backend\` first (Python 3.11 venv + backend requirements). Locked pylock sync remains \`make setup-backend\`."
   } >&2
   return 1
 }
