@@ -168,7 +168,7 @@ two documents are what made the pieces fit.
 ```
 scripts/build.sh            # build, bundle, sign, install to /Applications/Context for Claude.app
 scripts/build.sh --run      # …and launch it
-swift test --package-path desktop/context-for-claude
+swift test --package-path desktop/macos-context-app
 ```
 
 Windows validation is documented in `windows/README.md` and must run on Windows; configuring that

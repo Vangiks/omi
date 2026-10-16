@@ -385,7 +385,7 @@ justification for having no such step is no longer "there is no hotkey".
 
 ## Verification
 
-- `swift test --package-path desktop/context-for-claude` — 1123 tests today (was 146 when this plan
+- `swift test --package-path desktop/macos-context-app` — 1123 tests today (was 146 when this plan
   was written); new behaviour adds tests (pid exclusion, sound gating, step machine).
 - `scripts/build.sh` then a genuinely cold run. A local build is signed with a developer
   certificate, so it carries the **developer** identifiers and those are the ones to reset —

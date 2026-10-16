@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     const platform = searchParams.get("platform") || "";
 
     // Context for Claude is a *second product* reporting into this same PostHog project. Its events
-    // are namespaced `cfc_*` (see `desktop/context-for-claude/docs/analytics.md`) and set no `$os`,
+    // are namespaced `cfc_*` (see `desktop/macos-context-app/docs/analytics.md`) and set no `$os`,
     // so the `macos` branch below already excludes them — but this route's default branch applies no
     // event filter at all and would otherwise cohort every actor in the project, quietly counting
     // Context installs as new Omi users and folding them into this curve.

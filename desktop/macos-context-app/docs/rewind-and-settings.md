@@ -22,7 +22,7 @@ Two corrections to `first-run-experience.md` that this spec supersedes:
 **Port, don't reinvent.** The Omi desktop app at `/Users/architlal/Documents/omi/desktop/macos/`
 already implements Rewind. Capture in this package was already ported from there rather than
 rewritten (see `README.md`), so Rewind follows the same precedent: copy and adapt into
-`desktop/context-for-claude`, keeping this package standalone — it shares no code or data with the
+`desktop/macos-context-app`, keeping this package standalone — it shares no code or data with the
 Omi desktop app, so a port means a real copy, not a dependency.
 
 ### Window chrome

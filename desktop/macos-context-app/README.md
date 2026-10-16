@@ -25,7 +25,7 @@ The point: you stop explaining context to Claude. It asks Context for Claude ins
 ## Build and run
 
 ```bash
-cd desktop/context-for-claude
+cd desktop/macos-context-app
 ./scripts/build.sh --run
 ```
 

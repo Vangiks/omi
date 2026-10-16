@@ -33,7 +33,7 @@ Run configuration from a **Visual Studio Developer PowerShell** so `WindowsSdkDi
 
 ```powershell
 # Configure native core host + the pinned upstream Swift/WinRT generator.
-cmake -S desktop/context-for-claude/windows -B out/context-for-claude-windows `
+cmake -S desktop/macos-context-app/windows -B out/context-for-claude-windows `
   -G "Visual Studio 17 2022" -A x64
 
 # Portable-core host checks.
@@ -57,7 +57,7 @@ For ARM64, configure with `-A ARM64`. The projection command must run on Windows
 macOS can validate the portable C++ boundary:
 
 ```bash
-cmake -S desktop/context-for-claude/core -B /tmp/context-core
+cmake -S desktop/macos-context-app/core -B /tmp/context-core
 cmake --build /tmp/context-core
 ctest --test-dir /tmp/context-core --output-on-failure
 ```

@@ -119,7 +119,7 @@ The scripts assume nothing about the CI provider: a plain macOS runner with Xcod
 | `CONTEXT_RELEASE_REPO` | optional; defaults to `BasedHardware/omi` |
 
 The job is: check out the tag, `xcrun swift package resolve`, import the certificate, then
-`./scripts/release-context.sh --tag "$TAG" --publish` from `desktop/context-for-claude`.
+`./scripts/release-context.sh --tag "$TAG" --publish` from `desktop/macos-context-app`.
 
 ## Release flow
 
@@ -142,7 +142,7 @@ versions.
 Before creating a tag, run the no-secret local validation:
 
 ```sh
-cd desktop/context-for-claude
+cd desktop/macos-context-app
 ./scripts/test-release-path.sh
 ./scripts/release-context.sh --tag context-for-claude-v1.1.0 --dry-run
 ```

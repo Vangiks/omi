@@ -323,7 +323,7 @@ fi
 # actual credential is the OAuth code they get in the browser. It is injected at build time rather
 # than committed to this package so there is exactly one copy of it on disk, in the Omi checkout
 # that already ships it.
-# Found relative to this checkout: Context for Claude lives at desktop/context-for-claude inside the Omi repo, and the
+# Found relative to this checkout: Context for Claude lives at desktop/macos-context-app inside the Omi repo, and the
 # plist ships at desktop/macos. `OMI_GOOGLE_SERVICE_PLIST` overrides it for a checkout laid out
 # differently. An absolute path to somebody's home directory would build only on their machine.
 GS_PLIST="${OMI_GOOGLE_SERVICE_PLIST:-$PKG_DIR/../macos/Desktop/Sources/GoogleService-Info.plist}"

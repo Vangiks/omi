@@ -39,7 +39,7 @@ membership only, and every buffer is owned by the caller.
 Standalone, on macOS or Windows:
 
 ```bash
-cmake -S desktop/context-for-claude/core -B /tmp/context-core-build
+cmake -S desktop/macos-context-app/core -B /tmp/context-core-build
 cmake --build /tmp/context-core-build
 ctest --test-dir /tmp/context-core-build --output-on-failure
 ```
@@ -50,6 +50,6 @@ stops running the first time a machine is offline, and this library exists preci
 machines nobody has configured yet.
 
 On macOS the same sources are also compiled by SwiftPM as the `ContextCoreCxx` target and covered a
-second time, through `ContextCore`, by `swift test --package-path desktop/context-for-claude`. The
+second time, through `ContextCore`, by `swift test --package-path desktop/macos-context-app`. The
 two builds must agree; if they ever do not, the CMake build is the one that is honest, because it is
 the one Windows uses.
