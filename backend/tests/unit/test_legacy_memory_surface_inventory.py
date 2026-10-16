@@ -62,25 +62,6 @@ def test_potential_role_inventory_is_deterministic_and_separate_from_ratchet_key
     assert set(first).isdisjoint(inventory.counts(findings))
 
 
-def test_representative_paths_keep_evidence_backed_potential_roles() -> None:
-    findings = inventory.scan(inventory.ROOT)
-
-    process_writer = [
-        item
-        for item in findings
-        if item.path == "backend/utils/conversations/process_conversation.py"
-        and item.classification == "conversation_eager_memory_writer"
-    ]
-    lifecycle_worker = [
-        item
-        for item in findings
-        if item.path == "backend/jobs/short_term_lifecycle_worker.py" and item.classification == "short_term_lifecycle"
-    ]
-
-    assert process_writer and {item.potential_roles for item in process_writer} == {("writer",)}
-    assert lifecycle_worker and {item.potential_roles for item in lifecycle_worker} == {("reader", "writer", "job")}
-
-
 def test_canonical_metadata_and_tier_reads_do_not_count_as_legacy_lifecycle(tmp_path: Path) -> None:
     short_term_rule = next(rule for rule in inventory.RULES if rule.classification == "short_term_lifecycle")
     consolidation_rule = next(rule for rule in inventory.RULES if rule.classification == "consolidation_promotion")

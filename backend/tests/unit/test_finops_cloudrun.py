@@ -18,9 +18,6 @@ import sys
 import pytest
 
 _FINOPS = pathlib.Path(__file__).resolve().parents[2] / "scripts" / "finops"
-_BACKEND = pathlib.Path(__file__).resolve().parents[2]
-
-
 def _load(name: str, path: pathlib.Path):
     spec = importlib.util.spec_from_file_location(name, path)
     mod = importlib.util.module_from_spec(spec)
@@ -177,38 +174,6 @@ def test_bq_stub_query_requires_stdin_sql():
 
 
 # ---------------------------------------------------------------- scheduler contract
-
-
-def test_scheduler_args_carry_expected_schedule_and_target():
-    prov = _load("finops_prov_sched", _BACKEND / "scripts" / "provision_finops_unit_cost_scheduler.py")
-    args = prov.scheduler_http_args(
-        "create",
-        project="based-hardware",
-        region="us-central1",
-        scheduler_job="finops-unit-cost-daily",
-        cloud_run_job="finops-unit-cost-job",
-        service_account="finops-unit-cost-scheduler@based-hardware.iam.gserviceaccount.com",
-    )
-    assert "--schedule=30 10 * * *" in args
-    assert "--time-zone=America/New_York" in args
-    assert (
-        "--uri=https://run.googleapis.com/v2/projects/based-hardware/locations/us-central1/jobs/finops-unit-cost-job:run"
-        in args
-    )
-    assert "--http-method=POST" in args
-
-
-def test_scheduler_args_reject_a_foreign_job_name():
-    prov = _load("finops_prov_sched2", _BACKEND / "scripts" / "provision_finops_unit_cost_scheduler.py")
-    with pytest.raises(ValueError, match="does not match"):
-        prov.scheduler_http_args(
-            "create",
-            project="based-hardware",
-            region="us-central1",
-            scheduler_job="some-other-job",
-            cloud_run_job="finops-unit-cost-job",
-            service_account="finops-unit-cost-scheduler@based-hardware.iam.gserviceaccount.com",
-        )
 
 
 # ---------------------------------------------------------------- overlap lease

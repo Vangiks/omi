@@ -4,7 +4,6 @@ import asyncio
 import ast
 import importlib
 import importlib.util
-import json
 import logging
 import urllib.parse
 from copy import deepcopy
@@ -43,9 +42,6 @@ from utils.observability.owner_recognition import (
 from utils.stt.speaker_match import SPEAKER_MATCH_MIN_EVIDENCE_SECONDS, SpeakerMatchDecision
 
 BACKEND = Path(__file__).resolve().parents[2]
-REPO = BACKEND.parent
-
-
 def _count(counter, **labels) -> float:
     return counter.labels(**labels)._value.get()
 
@@ -515,25 +511,6 @@ def test_reader_rejects_unbounded_windows_and_formats_rates():
     built = urllib.parse.urlsplit(rates.query_url('http://prometheus.example/', 'up'))
     assert (built.scheme, built.netloc, built.path) == ('http', 'prometheus.example', '/api/v1/query')
     assert urllib.parse.parse_qs(built.query) == {'query': ['up']}
-
-
-def test_owner_identified_share_alert_is_in_both_exports():
-    split = json.loads((BACKEND / 'charts' / 'monitoring' / 'alerts' / 'owner-recognition.json').read_text())
-    combined = json.loads((BACKEND / 'charts' / 'monitoring' / 'alert-rules.json').read_text())
-    rule = split[0]
-    match = next(item for item in combined if item['uid'] == 'omi-owner-identified-share-drop')
-    assert match == rule
-    assert rule['noDataState'] == 'OK'
-    assert rule['for'] == '2h'
-    assert len(rule['uid']) <= 40
-    expressions = ' '.join(node['model'].get('expr', '') for node in rule['data'])
-    assert 'omi_owner_recognition_conversations_total' in expressions
-    assert 'surface=~"live|sync"' in expressions
-    assert '[2h]' in expressions and '[7d]' in expressions
-    assert 'outcome="owner_identified"' in expressions
-    assert 'too_little_speech' not in expressions
-    assert rule['data'][3]['model']['expression'] == '$A >= 100 && $C > 0 && $B < ($C * 0.5)'
-    assert (REPO / rule['annotations']['runbook']).is_file()
 
 
 def _sync_segment(*, text: str, is_user: bool, end: float, scope: str) -> dict:

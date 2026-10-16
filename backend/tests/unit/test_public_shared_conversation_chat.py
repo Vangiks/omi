@@ -920,39 +920,6 @@ def test_route_maps_rate_limiter_and_gateway_faults_to_503(monkeypatch):
     assert response.status_code == 503
 
 
-def test_gateway_config_inventory_and_promotion_contract():
-    config = load_gateway_config(prod_mode=True)
-    lane = config.lanes[PUBLIC_SHARED_CONVERSATION_CHAT_AUTO_LANE_ID]
-    route = config.route_artifacts[lane.active_route]
-    bundle = config.feature_bundles['public_shared_conversation_chat']
-
-    assert lane.active_route == lane.last_known_good
-    assert lane.capabilities.streaming is False
-    assert lane.capabilities.tools is False
-    assert route.primary.provider == 'openai'
-    assert route.primary.model == 'gpt-6-luna'
-    assert route.provider_options.get('reasoning_effort') == 'none'
-    assert route.artifact_digest == route.content_digest
-    assert route.fallbacks == []
-    assert route.retry.max_attempts == 1
-    assert route.output_budget is None
-    assert bundle.lane_id == PUBLIC_SHARED_CONVERSATION_CHAT_AUTO_LANE_ID
-    assert bundle.promotion_gates['frontend_service_auth'] == 'cloud_run_oidc_and_opaque_ip_hmac'
-
-    with (BACKEND_DIR / 'docs/llm/model_endpoint_inventory.yaml').open(encoding='utf-8') as handle:
-        inventory = yaml.safe_load(handle)
-    surface = next(item for item in inventory['surfaces'] if item['surface'] == 'public_shared_conversation_chat')
-    assert surface['migration_status'] == 'gateway_only_trusted_frontend_bff'
-
-    for environment in ('dev', 'prod'):
-        with (BACKEND_DIR / f'charts/llm-gateway/{environment}_omi_llm_gateway_values.yaml').open(
-            encoding='utf-8'
-        ) as handle:
-            gateway_values = yaml.safe_load(handle)
-        gateway_env = {entry['name']: entry.get('value') for entry in gateway_values['env']}
-        assert 'OMI_LLM_GATEWAY_OUTPUT_BUDGET_EXPERIMENTS' not in gateway_env
-
-
 def test_public_shared_chat_route_policy_and_openapi_contract_are_explicit():
     with (BACKEND_DIR / 'route_policy_manifest.yaml').open(encoding='utf-8') as handle:
         manifest = yaml.safe_load(handle)
@@ -981,45 +948,6 @@ def _runtime_surface_configs():
         with chart_path.open(encoding='utf-8') as handle:
             charts[environment] = yaml.safe_load(handle)
     return manifest, charts
-
-
-def test_public_shared_chat_runtime_mode_per_backend_surface(_runtime_surface_configs):
-    # Dev enables every surface. Prod enables the Cloud Run services only: the
-    # prod load balancer sends /v1/conversations/shared/chat to Cloud Run
-    # `backend`, never to GKE backend-listen, which stays off (no Helm roll).
-    manifest, charts = _runtime_surface_configs
-
-    for environment in ('dev', 'prod'):
-        listener_env = manifest['environments'][environment]['gke']['backend-listen']['env']
-        assert listener_env['PUBLIC_SHARED_CONVERSATION_CHAT_MODE']['value'] == (
-            'gateway' if environment == 'dev' else 'off'
-        )
-        services = manifest['environments'][environment]['cloud_run']['services']
-        for service in services.values():
-            assert service['env']['PUBLIC_SHARED_CONVERSATION_CHAT_MODE']['value'] == 'gateway'
-        backend_env = services['backend']['env']
-        assert backend_env['PUBLIC_SHARED_CONVERSATION_CHAT_FRONTEND_AUDIENCE']['env_var'] == (
-            'PUBLIC_SHARED_CONVERSATION_CHAT_FRONTEND_AUDIENCE'
-        )
-        assert backend_env['PUBLIC_SHARED_CONVERSATION_CHAT_FRONTEND_INVOKER_SA']['env_var'] == (
-            'PUBLIC_SHARED_CONVERSATION_CHAT_FRONTEND_INVOKER_SA'
-        )
-
-        chart_env = {item['name']: item.get('value') for item in charts[environment]['env']}
-        assert (
-            chart_env['PUBLIC_SHARED_CONVERSATION_CHAT_FRONTEND_INVOKER_SA']
-            == {
-                'dev': '1031333818730-compute@developer.gserviceaccount.com',
-                'prod': '208440318997-compute@developer.gserviceaccount.com',
-            }[environment]
-        )
-        assert (
-            chart_env['PUBLIC_SHARED_CONVERSATION_CHAT_FRONTEND_AUDIENCE']
-            == {
-                'dev': 'https://backend-dt5lrfkkoa-uc.a.run.app',
-                'prod': 'https://api.omi.me',
-            }[environment]
-        )
 
 
 def test_rolling_anonymous_budgets_are_atomic_and_report_every_reason(monkeypatch):

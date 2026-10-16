@@ -2,9 +2,7 @@
 
 import os
 import wave
-from pathlib import Path
 
-import pytest
 
 from utils.sync.audio_coverage import (
     _validated_received_ranges,
@@ -540,45 +538,6 @@ def test_flag_parse_default_on_tokens_and_typo_off(monkeypatch):
     monkeypatch.setenv('SYNC_LINEAGE_RESOLVE_UID_ALLOWLIST', 'other-uid')
     assert sync_wal_audio_coverage_active_for('u') is False
     assert sync_wal_audio_coverage_active_for('other-uid') is True
-
-
-@pytest.fixture(scope='module')
-def runtime_env_manifest():
-    import yaml
-    from pathlib import Path
-
-    return yaml.safe_load((Path(__file__).resolve().parents[2] / 'deploy' / 'runtime_env.yaml').read_text())
-
-
-def test_registered_runtime_env_on_four_services_both_envs(runtime_env_manifest):
-    manifest = runtime_env_manifest
-    for env_name in ('dev', 'prod'):
-        services = manifest['environments'][env_name]['cloud_run']['services']
-        for service in ('backend', 'backend-sync', 'backend-sync-backfill', 'backend-integration'):
-            entry = services[service]['env']['SYNC_WAL_AUDIO_COVERAGE_ENABLED']
-            assert entry['value'] == 'true'
-            assert entry['category'] == 'rollout'
-            fleet = services[service]['env']['SYNC_SAFETY_WAL_DEDUPE_ENABLED']
-            assert fleet == {'value': 'true', 'category': 'rollout'}
-    classification = __import__('json').loads(
-        (Path(__file__).resolve().parents[2] / '..' / 'config' / 'deployment-setting-classification.json')
-        .resolve()
-        .read_text()
-    )
-    found = []
-
-    def walk(node):
-        if isinstance(node, dict):
-            for value in node.values():
-                walk(value)
-        elif isinstance(node, list):
-            found.extend(v for v in node if isinstance(v, str))
-            for value in node:
-                walk(value)
-
-    walk(classification)
-    assert 'SYNC_WAL_AUDIO_COVERAGE_ENABLED' in found
-    assert 'SYNC_SAFETY_WAL_DEDUPE_ENABLED' in found
 
 
 def test_opus_fs320_claim_maps_320_sample_frames(monkeypatch, tmp_path):

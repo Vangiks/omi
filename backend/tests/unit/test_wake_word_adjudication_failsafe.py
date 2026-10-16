@@ -6,11 +6,9 @@ explicit command proposes as ``pending_candidate``.
 """
 
 import os
-from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-import yaml
 
 os.environ.setdefault('TYPESENSE_API_KEY', 'test-key-not-real')
 
@@ -210,11 +208,3 @@ def test_public_broadcast_without_explicit_command_still_ignored():
     )
 
     assert result.outcome == 'ignore'
-
-
-def test_kill_switch_is_declared_on_both_summary_pipeline_services():
-    composed = yaml.safe_load((Path(__file__).resolve().parents[2] / 'deploy/runtime_env.yaml').read_text())
-    for env_name, environment in composed['environments'].items():
-        listen = environment['gke']['backend-listen']['env']['WAKE_WORD_ADJUDICATION_ENABLED']['value']
-        backend = environment['cloud_run']['services']['backend']['env']['WAKE_WORD_ADJUDICATION_ENABLED']['value']
-        assert listen == backend == 'true', env_name

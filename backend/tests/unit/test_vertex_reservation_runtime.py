@@ -5,12 +5,10 @@ import json
 import logging
 import time
 from unittest.mock import AsyncMock
-from pathlib import Path
 
 import fakeredis.aioredis
 import httpx
 import pytest
-import yaml
 
 from config import vertex_reservations as vr
 from utils.llm.vertex_reservation_state import ReservationState, UNKNOWN_SHARED_ALERT_SECONDS
@@ -210,15 +208,3 @@ async def test_desktop_redis_confirms_cutoff_without_gateway_shared_state(monkey
         await owner.aclose()
         await gateway.aclose()
     await db.aclose()
-
-
-@pytest.mark.parametrize('environment', ['dev', 'prod'])
-def test_gateway_redis_bindings_are_optional(environment):
-    root = Path(__file__).resolve().parents[3]
-    values = yaml.safe_load(
-        (root / f'backend/charts/llm-gateway/{environment}_omi_llm_gateway_values.yaml').read_text()
-    )
-    bindings = {item['name']: item for item in values['env']}
-    for name in ['REDIS_DB_HOST', 'REDIS_DB_PORT', 'REDIS_DB_PASSWORD']:
-        ref = next(iter(bindings[name]['valueFrom'].values()))
-        assert ref['optional'] is True

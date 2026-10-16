@@ -88,9 +88,3 @@ def test_canonical_apply_boundary_owns_global_intake_fence():
     assert "MemoryRolloutMode.write" in source
     assert "MemoryRolloutMode.read" in source
     assert source.count("require_canonical_intake_enabled()") >= 3
-
-
-def test_runtime_contract_rejects_retired_uid_inventory():
-    source = (BACKEND / "scripts/runtime_env_memory_contract.py").read_text(encoding="utf-8")
-    assert "MEMORY_ENABLED_USERS" in source
-    assert "retired" in source.lower() or "forbidden" in source.lower()

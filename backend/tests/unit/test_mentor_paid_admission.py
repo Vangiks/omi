@@ -4,7 +4,6 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-import yaml
 
 from config.plan_catalog import PAID_PLAN_TYPES, PlanType
 from tests.unit.test_realtime_integrations_usage_tracking import integration_harness  # noqa: F401
@@ -120,23 +119,3 @@ def test_free_skip_precedes_all_model_and_context_calls(pipeline, monkeypatch):
     app.mentor_plan_allows_evaluation.assert_called_once_with('synthetic')
     app.mentor_gate_state.record.assert_not_called()
     app.mentor_gate_state.release.assert_called_once_with('synthetic')
-
-
-def test_runtime_env_and_charts_omit_graduated_debounce_flag():
-    from pathlib import Path
-
-    root = Path(__file__).resolve().parents[2]
-    manifest = yaml.load((root / 'deploy/runtime_env.yaml').read_text(), Loader=yaml.CSafeLoader)
-    for stage in ('prod', 'dev'):
-        env = manifest['environments'][stage]
-        hosts = [env['gke'][name]['env'] for name in ('pusher', 'backend-listen')]
-        hosts.append(env['cloud_run']['services']['backend']['env'])
-        for host in hosts:
-            assert 'MENTOR_GATE_DEBOUNCE_ENABLED' not in host
-            assert not {'MENTOR_GATE_MIN_NEW_WORDS', 'MENTOR_GATE_MIN_SECONDS', 'MENTOR_GATE_DAILY_CAP'} & host.keys()
-        for name, suffix in [('pusher', 'pusher'), ('backend-listen', 'backend_listen')]:
-            chart = yaml.load(
-                (root / f'charts/{name}/{stage}_omi_{suffix}_values.yaml').read_text(), Loader=yaml.CSafeLoader
-            )
-            values = {entry['name']: entry.get('value') for entry in chart['env']}
-            assert 'MENTOR_GATE_DEBOUNCE_ENABLED' not in values

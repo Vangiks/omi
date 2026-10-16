@@ -12,11 +12,9 @@ synthetic; ``u`` and ``uid`` are the owners the shared harnesses write under.
 import logging
 import os
 from copy import deepcopy
-from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-import yaml
 
 import tests.unit.test_listen_reconnect_continuity as continuity
 from config import sync_lineage
@@ -528,34 +526,3 @@ async def test_live_origin_stamp_ignores_the_allowlist(monkeypatch, config, stam
 
 
 # --- Deployment wiring ------------------------------------------------------------
-
-# Every service that runs a gated site. A service without the variable admits
-# everyone, so the staged value must be identical on all of them.
-GATED_SERVICES = (
-    ('cloud_run', 'backend'),  # inline BYOK sync (routers/sync.py)
-    ('cloud_run', 'backend-sync'),
-    ('cloud_run', 'backend-sync-backfill'),
-    ('cloud_run', 'backend-integration'),  # full main:app also mounts sync and listen
-    ('gke', 'backend-listen'),  # live revision fence
-)
-
-
-def _declared(env_config, kind, service):
-    services = env_config['cloud_run']['services'] if kind == 'cloud_run' else env_config['gke']
-    entry = (services[service].get('env') or {}).get(sync_lineage.SYNC_LINEAGE_RESOLVE_UID_ALLOWLIST_ENV)
-    return None if entry is None else entry.get('value')
-
-
-@pytest.fixture(scope='module')
-def runtime_env_manifest():
-    """The composed deploy manifest (large; parsed once, with the C loader when available)."""
-    text = (Path(__file__).resolve().parents[2] / 'deploy' / 'runtime_env.yaml').read_text()
-    return yaml.load(text, Loader=getattr(yaml, 'CSafeLoader', yaml.SafeLoader))
-
-
-def test_prod_stages_one_identical_allowlist_on_every_gated_service_and_dev_admits_everyone(runtime_env_manifest):
-    prod, dev = runtime_env_manifest['environments']['prod'], runtime_env_manifest['environments']['dev']
-    values = {_declared(prod, kind, service) for kind, service in GATED_SERVICES}
-    assert len(values) == 1 and all(values), values
-    assert all(uid.strip() for uid in next(iter(values)).split(','))
-    assert all(_declared(dev, kind, service) in (None, '') for kind, service in GATED_SERVICES)

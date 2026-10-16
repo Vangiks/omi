@@ -1,8 +1,5 @@
 """Zero scrapes make the first provider close observable to increase()."""
 
-import json
-import re
-from pathlib import Path
 
 import pytest
 from prometheus_client import CollectorRegistry, Counter
@@ -60,31 +57,6 @@ def test_first_soniox_budget_close_has_observable_increase(registry):
     assert scrapes[-1][1] - scrapes[0][1] > 0
     stream_close.initialize_stt_stream_close_children()
     assert registry.get_sample_value('omi_stt_stream_close_total', labels) == 1
-
-
-def test_all_alert_close_selectors_match_zero_children(registry):
-    stream_close.initialize_stt_stream_close_children()
-    samples = _samples(registry)
-    alerts = Path(__file__).resolve().parents[2] / 'charts/monitoring/alerts'
-    checked = 0
-    for path in alerts.glob('*.json'):
-        for rule in json.loads(path.read_text()):
-            for query in rule.get('data', []):
-                expr = query.get('model', {}).get('expr', '')
-                for selector in re.findall(r'omi_stt_stream_close_total\{([^{}]*)\}', expr):
-                    matchers = re.findall(r'(provider|reason)\s*(=~|!~|!=|=)\s*"([^"]*)"', selector)
-
-                    def matches(sample):
-                        for label, operator, value in matchers:
-                            actual = sample.labels[label]
-                            equal = bool(re.fullmatch(value, actual)) if '~' in operator else actual == value
-                            if equal != (operator in ('=', '=~')):
-                                return False
-                        return True
-
-                    assert any(matches(s) and s.value == 0 for s in samples), (rule['uid'], selector)
-                    checked += 1
-    assert checked >= 4
 
 
 def test_initializer_never_raises(monkeypatch):

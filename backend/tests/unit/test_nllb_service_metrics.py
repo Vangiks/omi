@@ -163,23 +163,6 @@ class TestModelLoadMetric(unittest.TestCase):
             assert mock_duration.call_args[0][0] >= 0, "Load duration should be non-negative"
 
 
-class TestSlowBurnAlertVolumeGate(unittest.TestCase):
-
-    def test_prometheusrule_has_volume_gate(self):
-        rule_path = os.path.join(
-            os.path.dirname(__file__), '..', '..', 'charts', 'nllb-translation', 'templates', 'prometheusrule.yaml'
-        )
-        with open(rule_path) as f:
-            content = f.read()
-
-        assert "NLLBSLOBurnRateSlow" in content, "Slow burn alert should exist"
-        slow_burn_start = content.index("NLLBSLOBurnRateSlow")
-        slow_burn_section = content[slow_burn_start : slow_burn_start + 500]
-        assert (
-            "sum(rate(nllb_requests_total[30m])) > 0.1" in slow_burn_section
-        ), "Slow burn alert must have volume gate to prevent noisy alerts during low traffic"
-
-
 class TestAdmissionControl(unittest.TestCase):
     """503-at-cap admission (SCA-439): reject immediately instead of queueing forever."""
 

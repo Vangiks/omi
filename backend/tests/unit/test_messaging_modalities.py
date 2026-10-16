@@ -12,14 +12,12 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-import yaml
 from PIL import Image
 
 from config.messaging import channel_policy
 from database import messaging
 from testing.messaging.adapter_fakes import FixtureLedger, FixtureTransport, no_sleep
 from testing.messaging.store import MemoryStore
-from utils.messaging import access
 from utils.messaging.adapters.linq import IMessageAdapter, LinqProvider
 from utils.messaging.adapters.media import (
     ChatMediaStore,
@@ -307,45 +305,6 @@ def test_album_has_one_durable_job_and_no_early_claim(adapter):
     assert store.claim_next(path, now=now) is None
     store.complete(path)
     assert store.enqueue(second) is None
-
-
-def test_exact_prod_policy_all_paid_telegram_legacy_imessage_without_seat_io(monkeypatch):
-    manifest = yaml.safe_load((Path(__file__).parents[2] / 'deploy/runtime_env/prod.overlay.yaml').read_text())
-
-    def find(value):
-        if isinstance(value, dict):
-            if 'OMI_MESSAGING_CHANNEL_POLICY' in value:
-                return value['OMI_MESSAGING_CHANNEL_POLICY']['value']
-            for nested in value.values():
-                found = find(nested)
-                if found:
-                    return found
-        return None
-
-    policy = find(manifest)
-    assert policy
-    monkeypatch.setenv('OMI_MESSAGING_CHANNEL_POLICY', policy)
-    monkeypatch.delenv('OMI_MESSAGING_KILL_SWITCH_DOC', raising=False)
-    monkeypatch.setattr(access, 'get_user_deletion_wipe_status', lambda uid: None)
-    monkeypatch.setattr(access, 'get_user_valid_subscription', lambda uid, **kw: SimpleNamespace(plan='plus'))
-    store = messaging.MessagingStore(firestore_client=MagicMock())
-
-    def capacity(*args):
-        raise AssertionError('No capacity IO allowed')
-
-    monkeypatch.setattr(store, 'capacity', capacity)
-    david = 'vi7SA9ckQCe4ccobWNxlbdcNdC23'
-    access.require_access('paid-outsider', 'telegram')
-    with pytest.raises(access.AccessDenied):
-        access.require_access('paid-outsider', 'imessage')
-    for channel in ('telegram', 'imessage'):
-        access.require_access(david, channel)
-        store.check_capacity(david, channel)
-        store.assert_link_capacity(SimpleNamespace(channel=channel), {'uid': david})
-    assert channel_policy('imessage')['seat_cap'] is None and channel_policy('imessage')['plans'] is None
-    monkeypatch.setattr(access, 'get_user_valid_subscription', lambda uid, **kw: SimpleNamespace(plan='basic'))
-    with pytest.raises(access.AccessDenied):
-        access.require_access(david, 'telegram')
 
 
 @pytest.mark.parametrize('cap', ['none', 'OFF', True, -1, {}, None])

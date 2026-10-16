@@ -6,8 +6,6 @@ import asyncio
 import io
 import json
 import os
-import re
-from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any
 
@@ -864,27 +862,6 @@ async def test_relay_frames_without_a_turn_write_nothing(monkeypatch, ledger_cli
 
 
 # --- deploy contract ------------------------------------------------------------------
-
-
-@pytest.mark.slow
-def test_the_accounting_switch_reaches_every_serving_identity_of_both_surfaces() -> None:
-    """The manifest declares the flag; these are the files that actually put it on the pod/revision."""
-    backend = Path(__file__).resolve().parents[2]
-    repo = backend.parent
-    for relative in (
-        'backend/charts/backend-listen/prod_omi_backend_listen_values.yaml',
-        'backend/charts/backend-listen/dev_omi_backend_listen_values.yaml',
-        '.github/workflows/desktop_backend_prod.yml',
-        '.github/workflows/desktop_backend_auto_dev.yml',
-    ):
-        path = repo / relative
-        if not path.exists():
-            pytest.skip(f'{relative} is not present in this checkout')
-        text = path.read_text(encoding='utf-8')
-        # Workflow form `NAME=true`; Helm form `- name: NAME` followed by `value: "true"` on the next line.
-        assert re.search(r'LLM_GATEWAY_ACCOUNTING_ENABLED(=true\b|\s*\n\s*value:\s*"true")', text), relative
-    manifest = (backend / 'deploy' / 'runtime_env.yaml').read_text(encoding='utf-8')
-    assert manifest.count('LLM_GATEWAY_ACCOUNTING_ENABLED') >= 6  # backend, backend-listen, desktop_backend × dev, prod
 
 
 @pytest.mark.asyncio

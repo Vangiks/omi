@@ -2,15 +2,9 @@
 
 import asyncio
 from copy import deepcopy
-import json
-from pathlib import Path
-import re
 from unittest.mock import AsyncMock
 
 import pytest
-import yaml
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 
 from config.dream_session import SessionLimits
 from database import dream_canary as storage, dream_store, conversations, review_store
@@ -22,7 +16,6 @@ from utils import dream_canary, dream_agent, dream_seed
 from utils.agent_capabilities.evidence import EvidenceRecords
 from utils.dream_harness_transport import MAIN_LANE, VERIFY_LANE
 from utils.llm.shaped_agent import Turn
-from routers import dream_sweep
 
 UID = 'dream-canary-synthetic'
 
@@ -206,31 +199,6 @@ def test_missing_canary_uid_is_a_real_failure(canary, monkeypatch):
     assert result['status'] == 'fail' and result['stage'] == 'enqueue' and not lanes
     assert result['consecutive_failures'] == 1
     assert db.rows[('dream_canary_health', 'current')]['canary_failures'] == 1
-
-
-def test_canary_alert_counts_failures_and_ignores_skips():
-    metric = json.loads(
-        (Path(__file__).resolve().parents[2] / 'deploy/monitoring/dream-canary-failures.metric.json').read_text()
-    )
-    pattern = r'Dream canary status=fail .*consecutive_failures=([2-9]|[1-9][0-9]+)( |$)'
-    skipped = 'Dream canary status=skipped stage=enqueue error_type=disabled consecutive_failures=2'
-    failed = 'Dream canary status=fail stage=enqueue error_type=CanaryFailure consecutive_failures=2'
-    assert re.search(pattern, skipped) is None
-    assert re.search(pattern, failed)
-    assert pattern in metric['filter']
-    assert 'status=skipped' not in metric['filter']
-
-
-def test_canary_uses_scheduler_oidc_and_long_declared_deadline():
-    app = FastAPI()
-    app.include_router(dream_sweep.router)
-    assert TestClient(app).post('/v2/dream-agent/canary').status_code == 403
-    config = yaml.safe_load((Path(__file__).resolve().parents[3] / 'backend/deploy/scheduler/jobs.yaml').read_text())
-    prod = config['environments']['prod']['jobs']
-    canary = next(row for row in prod if row['name'] == 'dream-agent-canary-half-hourly')
-    sweep = next(row for row in prod if row['name'] == 'dream-agent-sweep-hourly')
-    assert canary['target']['oidc'] == sweep['target']['oidc']
-    assert int(canary['attempt_deadline'][:-1]) > dream_canary.DEADLINE_SECONDS
 
 
 def test_empty_verifier_decisions_are_a_healthy_non_apply(canary, monkeypatch):

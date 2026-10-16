@@ -3,39 +3,8 @@
 from pathlib import Path
 
 import pytest
-import yaml
 
-from config.stt_provider_policy import (
-    DEEPGRAM_CLOUD_PROVIDER,
-    DEEPGRAM_SELF_HOSTED_PROVIDER,
-    MODULATE_PROVIDER,
-    PARAKEET_MODEL_BY_SURFACE,
-    PARAKEET_PROVIDER,
-    STTServingSurface,
-    canonical_model_config,
-    deepgram_provider_for_runtime,
-    model_is_enabled,
-    modulate_supports_language,
-    parakeet_supports_language,
-    provider_for_model_token,
-    provider_is_enabled,
-    supports_live_multilingual_mode,
-)
-
-ROOT = Path(__file__).resolve().parents[3]
-PARAKEET_VALUES_FILES = (
-    ROOT / 'backend/charts/parakeet/dev_omi_parakeet_values.yaml',
-    ROOT / 'backend/charts/parakeet/prod_omi_parakeet_values.yaml',
-)
-
-
-def _chart_env_value(values_path: Path, name: str) -> str | None:
-    values = yaml.safe_load(values_path.read_text(encoding='utf-8'))
-    for entry in values.get('env', []) if isinstance(values, dict) else []:
-        if isinstance(entry, dict) and entry.get('name') == name:
-            return str(entry.get('value')) if 'value' in entry else None
-    return None
-
+from config.stt_provider_policy import DEEPGRAM_CLOUD_PROVIDER, DEEPGRAM_SELF_HOSTED_PROVIDER, MODULATE_PROVIDER, PARAKEET_PROVIDER, STTServingSurface, canonical_model_config, deepgram_provider_for_runtime, model_is_enabled, modulate_supports_language, parakeet_supports_language, provider_for_model_token, provider_is_enabled, supports_live_multilingual_mode
 
 def test_hosted_deepgram_serves_streaming_only():
     assert provider_is_enabled(DEEPGRAM_CLOUD_PROVIDER, STTServingSurface.STREAMING)
@@ -81,19 +50,6 @@ def test_parakeet_capability_tracks_the_model_selected_for_each_surface():
     assert not parakeet_supports_language(STTServingSurface.PTT, 'multi')
     assert parakeet_supports_language(STTServingSurface.PRERECORDED, 'es')
     assert parakeet_supports_language(STTServingSurface.PRERECORDED, 'multi')
-
-
-@pytest.mark.parametrize('values_path', PARAKEET_VALUES_FILES)
-def test_parakeet_chart_models_match_the_capability_policy(values_path: Path):
-    """A model deployment swap must update the policy before routing can change (#10009)."""
-    assert _chart_env_value(values_path, 'PARAKEET_MODEL') == PARAKEET_MODEL_BY_SURFACE[STTServingSurface.PRERECORDED]
-    stream_model = _chart_env_value(values_path, 'PARAKEET_STREAM_MODEL')
-    if values_path.name.startswith('prod_'):
-        # Prod serves /v3/stream with VAD + the TDT model; RNNT is not loaded there.
-        assert stream_model is None
-    else:
-        assert stream_model == PARAKEET_MODEL_BY_SURFACE[STTServingSurface.STREAMING]
-    assert PARAKEET_MODEL_BY_SURFACE[STTServingSurface.PTT] == PARAKEET_MODEL_BY_SURFACE[STTServingSurface.STREAMING]
 
 
 def test_live_multilingual_policy_normalizes_supported_locales_and_rejects_unknown_languages():

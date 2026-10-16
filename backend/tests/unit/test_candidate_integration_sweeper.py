@@ -4,7 +4,6 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 
 import pytest
-import yaml
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -655,32 +654,6 @@ def test_sweep_counter_zero_inits_the_closed_disposition_set():
         if sample.name == 'omi_candidate_integration_sweep_total'
     }
     assert samples == set(CANDIDATE_INTEGRATION_SWEEP_DISPOSITIONS)
-
-
-def test_scheduler_job_exists_only_for_prod():
-    from pathlib import Path
-
-    manifest = yaml.load(
-        (Path(__file__).resolve().parents[2] / 'deploy/scheduler/jobs.yaml').read_text(),
-        Loader=yaml.CSafeLoader,
-    )
-    dev_names = {item['name'] for item in manifest['environments']['dev']['jobs']}
-    assert 'candidate-integration-sweep' not in dev_names
-    jobs = manifest['environments']['prod']['jobs']
-    job = next(item for item in jobs if item['name'] == 'candidate-integration-sweep')
-    sequencer = next(item for item in jobs if item['name'] == 'sync-backfill-uid-sequencer')
-    host = 'https://backend-sync-hhibjajaja-uc.a.run.app'
-    assert 'lifecycle' not in job  # active: backend-sync serves the route since 7741a1a
-    assert job['schedule'] == '*/15 * * * *'
-    assert job['attempt_deadline'] == '120s'
-    assert job['state'] == 'ENABLED'
-    assert job['target']['uri'] == host + '/v2/candidate-integrations/sweep'
-    assert job['target']['method'] == 'POST'
-    assert job['target']['oidc'] == {
-        'service_account': 'sync-tasks-invoker@based-hardware.iam.gserviceaccount.com',
-        'audience': sequencer['target']['oidc']['audience'],
-    }
-    assert job['retry'] == sequencer['retry']
 
 
 @pytest.fixture

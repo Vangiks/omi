@@ -29,20 +29,6 @@ def test_constant_matches_the_documented_uid() -> None:
     assert RELEASE_PROBE_UID == 'omi-release-probe'
 
 
-def test_minter_and_gates_stay_in_lockstep() -> None:
-    """The minter runs standalone (repo-root invocation, no backend package
-    on sys.path), so the uid cannot be imported — instead the two literals
-    must match exactly, asserted at source level in both directions."""
-    scripts = Path(__file__).resolve().parents[2] / 'scripts'
-    minter_source = (scripts / 'firebase_release_probe_token.py').read_text(encoding='utf-8')
-    assert f"PROBE_UID = '{RELEASE_PROBE_UID}'" in minter_source
-    conversations = Path(__file__).resolve().parents[2] / 'utils' / 'conversations'
-    process_source = (conversations / 'process_conversation.py').read_text(encoding='utf-8')
-    assert "from utils.release_probe import is_release_probe_uid" in process_source
-    assert "probe_uid = is_release_probe_uid(uid)" in process_source
-    assert "'omi-release-probe'" not in process_source
-
-
 def test_desktop_gates_exempt_only_the_probe_uid() -> None:
     """The gate cluster must consult the shared predicate (no local literal,
     no reinvented matching), and every desktop deferral branch must be

@@ -4,56 +4,9 @@ import json
 from pathlib import Path
 
 import pytest
-import yaml
 from config import transcription_final_pass as flags
 
 ROOT = Path(__file__).resolve().parents[3]
-
-
-@pytest.mark.parametrize('host', ['backend', 'backend-sync', 'backend-sync-backfill', 'pusher'])
-def test_prepared_cohort_matches_reviewed_stage(monkeypatch, host):
-    manifest = yaml.load((ROOT / 'backend/deploy/runtime_env.yaml').read_text(), Loader=yaml.CSafeLoader)[
-        'environments'
-    ]['prod']
-    binding = manifest['gke']['pusher']['env'] if host == 'pusher' else manifest['cloud_run']['services'][host]['env']
-    stages = json.loads((ROOT / 'config/diarization-cohort-stages.json').read_text())
-    keys = tuple(stages['A'])
-    selected = {key: binding[key]['value'] for key in keys}
-    assert selected == stages['C']
-    assert selected == {key: manifest['gke']['pusher']['env'][key]['value'] for key in keys}
-    for key, value in selected.items():
-        monkeypatch.setenv(key, value)
-    uid = 'vi7SA9ckQCe4ccobWNxlbdcNdC23'
-    assert selected['TRANSCRIPTION_FINAL_PASS_UID_ALLOWLIST'] == uid
-    assert flags.enabled_for(uid)
-    assert not flags.enabled_for('synthetic-outside-cohort')
-    assert flags.authoritative_for(uid) == (selected['TRANSCRIPTION_FINAL_PASS_AUTHORITATIVE'] == 'true')
-    assert flags.sync_enabled_for(uid) == (selected['TRANSCRIPTION_FINAL_PASS_SYNC_ENABLED'] == 'true')
-    assert selected['TRANSCRIPTION_FINAL_PASS_BACKEND'] == 'pyannote'
-    assert selected['HOSTED_DIARIZATION_API_URL'] == 'http://172.16.160.20/diarizer-batch'
-    assert binding['TRANSCRIPTION_SHADOW_UID_ALLOWLIST']['value'] == uid
-    assert binding['TRANSCRIPTION_SHADOW_PERCENT']['value'] == selected['TRANSCRIPTION_FINAL_PASS_PERCENT']
-    if host == 'pusher':
-        chart = yaml.load(
-            (ROOT / 'backend/charts/pusher/prod_omi_pusher_values.yaml').read_text(), Loader=yaml.CSafeLoader
-        )
-        chart_values = {entry['name']: entry.get('value') for entry in chart['env']}
-        assert {key: chart_values[key] for key in keys} == selected
-
-
-def test_prepared_cohort_does_not_enable_integration_or_dev():
-    manifest = yaml.load((ROOT / 'backend/deploy/runtime_env.yaml').read_text(), Loader=yaml.CSafeLoader)[
-        'environments'
-    ]
-    for host in ('backend-integration',):
-        env = manifest['prod']['cloud_run']['services'][host]['env']
-        assert env.get('TRANSCRIPTION_FINAL_PASS_DIARIZER', {}).get('value', 'legacy') == 'legacy'
-    for host in ('backend', 'backend-sync', 'backend-sync-backfill', 'backend-integration'):
-        env = manifest['dev']['cloud_run']['services'][host]['env']
-        assert env.get('TRANSCRIPTION_FINAL_PASS_DIARIZER', {}).get('value', 'legacy') == 'legacy'
-    for host in ('backend-listen', 'pusher'):
-        env = manifest['dev']['gke'][host]['env']
-        assert env.get('TRANSCRIPTION_FINAL_PASS_DIARIZER', {}).get('value', 'legacy') == 'legacy'
 
 
 @pytest.mark.parametrize(

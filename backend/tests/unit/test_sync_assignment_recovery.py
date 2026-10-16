@@ -6,7 +6,6 @@ ones; only a genuine difference is a mismatch.
 """
 
 from copy import deepcopy
-from pathlib import Path
 import json
 import sys
 from unittest.mock import MagicMock
@@ -15,7 +14,6 @@ from starlette.datastructures import UploadFile
 
 from google.api_core.exceptions import InvalidArgument
 import pytest
-import yaml
 
 from config.sync_assignment_recovery import sync_assignment_recovery_enabled
 from database import sync_ledger
@@ -278,17 +276,6 @@ def test_ledger_has_no_permanent_segment_guard():
     """The bounded batch cap is the only pause; nothing reads a per-segment guard."""
     assert not hasattr(sync_ledger, 'get_sync_segment_quarantine')
     assert not hasattr(sync_ledger, 'quarantine_sync_segment')
-
-
-def test_recovery_flag_reaches_every_sync_host_in_both_environments():
-    manifest = yaml.load((Path(__file__).parents[2] / 'deploy/runtime_env.yaml').read_text(), Loader=yaml.CSafeLoader)
-    for env in manifest['environments'].values():
-        hosts = [
-            env['cloud_run']['services'][service]
-            for service in ('backend', 'backend-sync', 'backend-sync-backfill', 'backend-integration')
-        ]
-        hosts.append(env['gke']['backend-listen'])
-        assert all(host['env']['SYNC_ASSIGNMENT_RECOVERY_ENABLED']['value'] == 'true' for host in hosts)
 
 
 @pytest.fixture

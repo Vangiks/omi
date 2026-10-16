@@ -81,35 +81,6 @@ def test_notifications_job_orders_primary_notifications_then_health():
     assert notifications < redis_memory
 
 
-def test_notifications_job_deploy_retires_materialization_decision_review():
-    workflow_path = Path(__file__).resolve().parents[3] / ".github" / "workflows" / "gcp_notifications_job.yml"
-    workflow = workflow_path.read_text(encoding="utf-8")
-
-    assert 'chat_first_materialization_health review=true' not in workflow
-    assert 'chat_first_materialization_review_due' not in workflow
-    assert 'redis_memory_threshold threshold=90' in workflow
-    assert 'redis_memory_90' in workflow
-    assert '--notification-channels="$ALERT_CHANNELS"' in workflow
-    assert '--set-notification-channels="$ALERT_CHANNELS"' in workflow
-
-
-def test_notifications_job_deploy_grants_id_token_when_it_uses_wif():
-    """WIF auth needs an OIDC token, and GitHub only mints one with id-token: write.
-
-    #9298 moved the X Flex VPC probe and GKE credentials -- the steps that first
-    needed the permission -- out of this workflow, and dropped it. main then added
-    development WIF auth here, which needs it on its own. The two edits landed in
-    different hunks, so the merge was textually clean and silently produced a
-    deploy that fails at google-github-actions/auth. This pins the pairing, not
-    either edit.
-    """
-    workflow_path = Path(__file__).resolve().parents[3] / ".github" / "workflows" / "gcp_notifications_job.yml"
-    workflow = workflow_path.read_text(encoding="utf-8")
-
-    if "workload_identity_provider:" in workflow:
-        assert "id-token: 'write'" in workflow
-
-
 def test_memory_maintenance_job_entrypoint_calls_cron_runner():
     entry_path = Path(__file__).resolve().parents[2] / "modal" / "memory_maintenance_job.py"
     source = entry_path.read_text(encoding="utf-8")

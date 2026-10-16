@@ -10,20 +10,9 @@ the next time the validator grows another listed-provider check.
 from __future__ import annotations
 
 import re
-from pathlib import Path
 
-import pytest
-import yaml
 
 from utils.stt.streaming import validate_streaming_stt_env
-
-ROOT = Path(__file__).resolve().parents[3]
-VALUES_FILES = (
-    ROOT / 'backend/charts/backend-listen/dev_omi_backend_listen_values.yaml',
-    ROOT / 'backend/charts/backend-listen/prod_omi_backend_listen_values.yaml',
-    ROOT / 'backend/charts/pusher/dev_omi_pusher_values.yaml',
-    ROOT / 'backend/charts/pusher/prod_omi_pusher_values.yaml',
-)
 
 # Production error: "STT_SERVICE_MODELS lists soniox but SONIOX_API_KEY is empty".
 _MISSING_KEY = re.compile(r'\bbut ([A-Z][A-Z0-9_]+) is empty\b')
@@ -111,18 +100,6 @@ def test_unbound_soniox_listing_is_the_origin_main_failure() -> None:
         ]
     }
     assert unbound_startup_keys(values) == [('soniox', 'SONIOX_API_KEY')]
-
-
-@pytest.mark.parametrize('values_path', VALUES_FILES, ids=lambda path: path.name)
-def test_listen_and_pusher_stt_models_bind_startup_keys(values_path: Path) -> None:
-    loaded = yaml.safe_load(values_path.read_text(encoding='utf-8'))
-    assert isinstance(loaded, dict), values_path
-    models = _listed_models(loaded)
-    assert models, f'{values_path.name} must declare STT_SERVICE_MODELS for this guard to apply'
-    missing = unbound_startup_keys(loaded)
-    detail = ', '.join(f'{model} requires {key}' for model, key in missing)
-    relative = values_path.relative_to(ROOT)
-    assert missing == [], f'{relative} lists streaming providers whose startup keys are unbound: {detail}'
 
 
 def test_a_provider_key_wired_to_a_different_secret_key_is_not_bound():

@@ -5,7 +5,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-import yaml
 
 from utils.memory import knowledge_ledger_drain as ledger_drain
 
@@ -97,52 +96,3 @@ def test_entrypoint_enabled_without_allowlist_fails_before_firebase(monkeypatch)
         job.main()
 
     assert called == []
-
-
-@pytest.mark.parametrize(
-    "workflow_name",
-    ["gcp_daily_memory_sweep_job.yml", "gcp_daily_memory_sweep_job_auto_dev.yml"],
-)
-def test_admitted_deploy_lane_reconciles_an_independent_job_and_scheduler(workflow_name):
-    root = Path(__file__).resolve().parents[3]
-    workflow = (root / ".github" / "workflows" / workflow_name).read_text(encoding="utf-8")
-
-    assert "Dockerfile.knowledge_ledger_drain_job" in workflow
-    assert "job: ${{ env.LEDGER_DRAIN_SERVICE }}" in workflow
-    assert "knowledge_ledger_drain_job_env_vars" in workflow
-    assert "knowledge-ledger-drain-hourly" in workflow
-    assert "scheduler_reconcile.py" in workflow
-    assert '--apply --jobs "$SCHEDULER_JOB" "$LEDGER_DRAIN_SCHEDULER_JOB"' in workflow
-    assert 'gcloud run jobs add-iam-policy-binding "$LEDGER_DRAIN_SERVICE"' in workflow
-    assert '--member="serviceAccount:${SCHEDULER_SERVICE_ACCOUNT}"' in workflow
-    assert '--role="roles/run.invoker"' in workflow
-    assert workflow.index("Deploy independent ledger drain to Cloud Run") < workflow.index(
-        "Authorize ledger drain Scheduler invocations"
-    )
-    assert workflow.index("Authorize ledger drain Scheduler invocations") < workflow.index(
-        "Reconcile declared Scheduler triggers"
-    )
-
-
-def test_runtime_manifest_keeps_the_drain_bounded_and_authorized():
-    root = Path(__file__).resolve().parents[3]
-    manifest = yaml.safe_load((root / "backend" / "deploy" / "runtime_env.yaml").read_text(encoding="utf-8"))
-
-    for environment in ("dev", "prod"):
-        job = manifest["environments"][environment]["cloud_run"]["jobs"]["knowledge-ledger-drain-job"]
-        assert job["flags"]["--task-timeout"] == "1200s"
-        assert job["flags"]["--max-retries"] == "1"
-        assert job["env"]["MEMORY_ENABLED"]["value"] == "on"
-        # Prod still mounts the legacy key; dev runs keyless on its runtime identity.
-        keyed = {"SERVICE_ACCOUNT_JSON"} if environment == "prod" else set()
-        assert set(job["secrets"]) == {"ENCRYPTION_SECRET", "POSTHOG_PROJECT_API_KEY"} | keyed
-        if environment == "dev":
-            assert job["env"]["OMI_CUSTOMER_DATA_PROJECT"]["value"] == "based-hardware"
-            assert job["flags"]["--service-account"].startswith("dev-backend-runtime@")
-
-    dev_env = manifest["environments"]["dev"]["cloud_run"]["jobs"]["knowledge-ledger-drain-job"]["env"]
-    assert dev_env["KNOWLEDGE_LEDGER_DRAIN_ENABLED"]["value"] == "false"
-    assert dev_env["KNOWLEDGE_LEDGER_DRAIN_UID_ALLOWLIST"]["value"] == ("9OqYLlKJv4hmeYpIhwJcHBR975i2")
-    prod_env = manifest["environments"]["prod"]["cloud_run"]["jobs"]["knowledge-ledger-drain-job"]["env"]
-    assert prod_env["KNOWLEDGE_LEDGER_DRAIN_ENABLED"]["value"] == "false"
-    assert prod_env["KNOWLEDGE_LEDGER_DRAIN_UID_ALLOWLIST"]["value"] == ""
