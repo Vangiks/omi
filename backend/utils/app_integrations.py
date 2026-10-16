@@ -43,7 +43,6 @@ from database.goals import get_user_goals
 from database.notifications import get_mentor_notification_frequency
 from database.users import get_user_language_preference  # used via module attribute by proactivity_producers
 from utils.subscription import is_trial_paywalled
-from utils.mentor_admission import mentor_plan_allows_evaluation
 from database.redis_db import (
     get_generic_cache,
     set_generic_cache,
@@ -733,10 +732,6 @@ def admit_mentor_evaluation(uid: str, conversation_messages: list[dict]) -> tupl
         )
         if skip_reason:
             logger.info(f"mentor_gate_debounce skipped uid={uid} reason={skip_reason} words={gate_word_count}")
-            return None
-        # Resolve entitlement only after every cheap rejection. Free users
-        # consume neither a gate evaluation nor any context/model work.
-        if not mentor_plan_allows_evaluation(uid):
             return None
         _record_mentor_gate_evaluation(
             uid,

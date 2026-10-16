@@ -9,7 +9,6 @@ from fastapi import FastAPI, HTTPException
 from routers import desktop_task_gate as route
 from utils.llm import screen_task_gate as gate
 from utils.llm.jev_client import JevAnswers
-from utils.managed_compute import Decision
 from utils.rate_limit_config import get_effective_limit
 from utils.llm import screen_task_admission as admission
 import redis
@@ -18,11 +17,6 @@ import redis
 @pytest.fixture(autouse=True)
 def managed_admission(monkeypatch):
     monkeypatch.delenv('SCREEN_TASK_STOP', raising=False)
-    monkeypatch.setattr(
-        route,
-        'authorize_managed_compute',
-        lambda *a: Decision(True, 'plan_paid', 'screen_frame_judge', 'omi', None, True),
-    )
     monkeypatch.setattr(route, 'check_screen_task_limit', lambda *a: None)
 
 
@@ -73,7 +67,6 @@ async def test_http_route_rejects_without_pixels_and_logs_only_bounded_fields(mo
     app = FastAPI()
     app.include_router(route.router)
     app.dependency_overrides[route.screen_task_gate.__defaults__[0].dependency] = lambda: 'synthetic-user'
-    monkeypatch.setattr(route, 'is_desktop_trial_paywalled', lambda *a: False)
     seen = []
     monkeypatch.setattr(
         route, 'decide_screen_task', lambda state: seen.append(state) or gate.ScreenTaskGateDecision(False, 'rejected')
@@ -91,31 +84,16 @@ async def test_http_route_rejects_without_pixels_and_logs_only_bounded_fields(mo
 
 
 @pytest.mark.asyncio
-async def test_http_gate_preserves_trial_paywall(monkeypatch):
-    app = FastAPI()
-    app.include_router(route.router)
-    app.dependency_overrides[route.screen_task_gate.__defaults__[0].dependency] = lambda: 'synthetic-user'
-    monkeypatch.setattr(route, 'is_desktop_trial_paywalled', lambda *a: True)
-    monkeypatch.setattr(route, 'decide_screen_task', lambda *a: pytest.fail('paywalled request called Jev'))
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url='http://local') as client:
-        result = await client.post('/v1/screen-task/gate', json={'ocr_text': 'screen'})
-    assert result.status_code == 402
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize('reason,status', [('basic_not_entitled', 402), ('authorization_unavailable', 503)])
-async def test_managed_denial_is_terminal_and_never_calls_provider(monkeypatch, reason, status):
+async def test_http_gate_ignores_plan_and_trial(monkeypatch):
+    """The fork has no billing (#3): a basic user past the trial still gets a gate decision."""
     app = FastAPI()
     app.include_router(route.router)
     app.dependency_overrides[route.get_current_user_uid] = lambda: 'synthetic-user'
-    monkeypatch.setattr(
-        route, 'authorize_managed_compute', lambda *a: Decision(False, reason, 'screen_frame_judge', 'omi', None, True)
-    )
-    monkeypatch.setattr(route, 'decide_screen_task', lambda *a: pytest.fail('denied request spent provider work'))
+    monkeypatch.setattr(route, 'decide_screen_task', lambda *a: gate.ScreenTaskGateDecision(True, 'passed'))
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url='http://local') as client:
         result = await client.post('/v1/screen-task/gate', json={'ocr_text': 'synthetic'})
-    assert result.status_code == status
-    assert result.headers['X-Omi-Retryable'] == 'false'
+    assert result.status_code == 200
+    assert result.json() == {'should_extract': True, 'gate_outcome': 'passed', 'audit_sample': False}
 
 
 @pytest.mark.asyncio
@@ -129,9 +107,6 @@ async def test_gate_has_separate_burst_and_daily_budgets_and_typed_quota(monkeyp
             raise HTTPException(429, headers={'Retry-After': '70'})
 
     monkeypatch.setattr(route, 'check_screen_task_limit', limit)
-    monkeypatch.setattr(
-        route, 'authorize_managed_compute', lambda *a: pytest.fail('quota request resolved subscription')
-    )
     monkeypatch.setattr(route, 'decide_screen_task', lambda *a: pytest.fail('quota request spent provider work'))
     app = FastAPI()
     app.include_router(route.router)
@@ -191,7 +166,6 @@ def _gate_app():
 
 
 def _serve_gate(monkeypatch):
-    monkeypatch.setattr(route, 'is_desktop_trial_paywalled', lambda *a: False)
     monkeypatch.setattr(route, 'decide_screen_task', lambda *a: gate.ScreenTaskGateDecision(False, 'rejected'))
 
 
@@ -230,7 +204,6 @@ async def test_build_floor_refuses_only_identified_old_macos_on_gate_and_admissi
     if refused:
         monkeypatch.setattr(route, 'check_screen_task_limit', lambda *a: pytest.fail('refused build was admitted'))
         monkeypatch.setattr(route, 'decide_screen_task', lambda *a: pytest.fail('refused build called the provider'))
-        monkeypatch.setattr(route, 'authorize_managed_compute', lambda *a: pytest.fail('refused build resolved a plan'))
     else:
         _serve_gate(monkeypatch)
     async with httpx.AsyncClient(transport=httpx.ASGITransport(_gate_app()), base_url='http://local') as client:

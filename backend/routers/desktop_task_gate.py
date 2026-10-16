@@ -9,13 +9,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from utils.executors import db_executor, llm_executor, run_blocking
 from utils.llm.screen_task_gate import decide_screen_task
 from utils.other.endpoints import get_current_user_uid
-from utils.managed_compute import authorize_managed_compute
 from utils.llm.screen_task_admission import (
     check_screen_task_limit,
     screen_task_build_floor_refusal,
     screen_task_stopped,
 )
-from utils.subscription import is_desktop_trial_paywalled
 from utils.metrics import SCREEN_TASK_GATE_FRAMES_TOTAL
 
 logger = logging.getLogger(__name__)
@@ -65,17 +63,6 @@ async def screen_task_gate(
             detail={'error': 'gate_budget_exhausted' if error.status_code == 429 else 'gate_admission_denied'},
             headers={**(error.headers or {}), 'X-Omi-Retryable': 'false'},
         ) from error
-    decision = await run_blocking(db_executor, authorize_managed_compute, uid, 'screen_frame_judge', 'omi')
-    if not decision.allowed:
-        SCREEN_TASK_GATE_FRAMES_TOTAL.labels(outcome='plan_denied').inc()
-        raise HTTPException(
-            status_code=503 if decision.reason == 'authorization_unavailable' else 402,
-            detail={'error': 'plan_gated', 'reason': decision.reason},
-            headers={'X-Omi-Retryable': 'false'},
-        )
-    if await run_blocking(db_executor, is_desktop_trial_paywalled, uid, 'desktop'):
-        SCREEN_TASK_GATE_FRAMES_TOTAL.labels(outcome='trial_expired').inc()
-        raise HTTPException(status_code=402, detail='trial_expired', headers={'X-Omi-Retryable': 'false'})
     existing = '\n'.join(task[:512] for task in body.related_tasks)
     state = (
         f'User: {body.user_context}. App: {body.app_name}.\nEXISTING TASKS:\n{existing}\n'

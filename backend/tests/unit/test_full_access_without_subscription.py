@@ -12,7 +12,6 @@ from config.plan_catalog import FULL_ACCESS_PLAN
 from database import users as users_db
 from database import user_usage as user_usage_db
 from utils import subscription as subscription_utils
-from utils.managed_compute import authorize_managed_compute
 
 
 def _client_without_user_doc() -> MagicMock:
@@ -42,24 +41,6 @@ def test_valid_subscription_is_full_access(firestore_without_user, provision):
     assert subscription is not None
     assert subscription.plan == FULL_ACCESS_PLAN
     firestore_without_user.collection.return_value.document.return_value.set.assert_not_called()
-
-
-def test_screen_frame_judge_is_allowed(firestore_without_user):
-    decision = authorize_managed_compute('local-dev-user', 'screen_frame_judge', 'omi')
-
-    assert decision.allowed
-
-
-@pytest.mark.asyncio
-async def test_gemini_proxy_plan_gate_passes(firestore_without_user, monkeypatch):
-    from routers import desktop_proxy
-
-    async def run_inline(_executor, fn, *args, **kwargs):
-        return fn(*args, **kwargs)
-
-    monkeypatch.setattr(desktop_proxy, 'run_blocking', run_inline)
-
-    await desktop_proxy._enforce_managed_plan_gate('local-dev-user', 'models/gemini-2.5-flash:generateContent')
 
 
 def test_chat_quota_does_not_block_heavy_usage(firestore_without_user, monkeypatch):

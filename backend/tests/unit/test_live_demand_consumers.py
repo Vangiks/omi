@@ -14,7 +14,7 @@ from utils.async_tasks import WebSocketTaskSupervisor
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    'consumer', ['none', 'app', 'audio_app', 'webhook', 'mentor', 'mentor_off', 'mentor_free', 'mentor_not_cohort']
+    'consumer', ['none', 'app', 'audio_app', 'webhook', 'mentor', 'mentor_off', 'mentor_not_cohort']
 )
 async def test_active_consumers_require_vendor(monkeypatch, consumer):
     monkeypatch.setenv('MENTOR_PIPELINE', 'cohort' if consumer.startswith('mentor') else 'off')
@@ -22,7 +22,6 @@ async def test_active_consumers_require_vendor(monkeypatch, consumer):
     monkeypatch.setattr(
         demand_consumers, 'get_mentor_notification_frequency', lambda uid: 0 if consumer == 'mentor_off' else 3
     )
-    monkeypatch.setattr(demand_consumers, 'mentor_plan_allows_evaluation', lambda uid: consumer != 'mentor_free')
     monkeypatch.setattr(
         proactivity_flags, 'mentor_pipeline', lambda uid: None if consumer == 'mentor_not_cohort' else 'v2'
     )
@@ -35,7 +34,7 @@ async def test_active_consumers_require_vendor(monkeypatch, consumer):
     monkeypatch.setattr(demand_consumers, 'user_webhook_status_db', lambda uid, kind: consumer == 'webhook')
     monkeypatch.setattr(demand_consumers, 'get_user_webhook_db', lambda uid, kind: 'https://example.invalid/hook')
     assert await demand_consumers.realtime_consumer_active('user') == (
-        consumer not in {'none', 'mentor_off', 'mentor_free', 'mentor_not_cohort'}
+        consumer not in {'none', 'mentor_off', 'mentor_not_cohort'}
     )
 
 

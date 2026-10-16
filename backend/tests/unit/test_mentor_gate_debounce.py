@@ -146,9 +146,7 @@ def test_cheap_rejections_do_not_resolve_entitlement(gate, skip):
         gate.monkeypatch.setattr(
             app.mentor_gate_state, '_read_shared', MagicMock(side_effect=[None, {'ts': app.time.time()}])
         )
-    app.mentor_plan_allows_evaluation.reset_mock()
     assert _run(gate, messages=messages) is None
-    app.mentor_plan_allows_evaluation.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

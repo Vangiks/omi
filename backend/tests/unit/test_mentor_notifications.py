@@ -142,7 +142,6 @@ def _apply_fakes(monkeypatch):
     monkeypatch.setattr(app_int, 'deserialize_conversations', mock_deserialize_convos)
     monkeypatch.setattr(app_int, 'get_available_apps', mock_get_available_apps)
     monkeypatch.setattr(app_int, 'is_trial_paywalled', mock_is_trial_paywalled)
-    monkeypatch.setattr(app_int, 'mentor_plan_allows_evaluation', MagicMock(return_value=True))
     monkeypatch.setattr(app_int, 'send_notification', mock_send_notification)
     monkeypatch.setattr(app_int, 'dispatch_notification', mock_dispatch_notification)
     monkeypatch.setattr(app_int, 'incr_daily_notification_count', redis_mod.incr_daily_notification_count)
@@ -218,7 +217,6 @@ async def test_buffer_threshold_skips_plan_and_model_work(monkeypatch, segments)
     monkeypatch.setattr(app_int, 'get_available_apps', MagicMock(return_value=[]))
     calls = []
     for name in [
-        'mentor_plan_allows_evaluation',
         'generate_embedding',
     ]:
         mock = MagicMock()

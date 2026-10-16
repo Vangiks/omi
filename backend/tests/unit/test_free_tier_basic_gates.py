@@ -78,7 +78,7 @@ def test_readers_are_independent_and_re_read_env_at_call_time(monkeypatch, name,
 def test_each_gate_site_calls_only_its_own_reader() -> None:
     proxy = (BACKEND / 'routers/desktop_proxy.py').read_text(encoding='utf-8')
     coordinator = (BACKEND / 'utils/conversations/process_conversation.py').read_text(encoding='utf-8')
-    assert 'basic_plan_gate_proxy_embed_enabled()' in proxy
-    assert 'basic_plan_gate_eager_extraction_enabled' not in proxy
+    # The proxy has no plan gate (#3).
+    assert 'basic_plan_gate' not in proxy
     assert 'basic_plan_gate_eager_extraction_enabled()' in coordinator
     assert 'basic_plan_gate_proxy_embed_enabled' not in coordinator
