@@ -1,1 +1,0 @@
-SELECT event, COUNT(*) FROM events WHERE app_namespace = :app_namespace AND build_number = :build_number AND event IN ('Product Journey Started', 'Product Journey First Result', 'Product Journey Outcome', 'Product Value') GROUP BY event;
