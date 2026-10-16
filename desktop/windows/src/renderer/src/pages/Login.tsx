@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import { Apple } from 'lucide-react'
 import type { SignInProvider } from '../../../shared/types'
-import { signInWithProvider } from '../lib/firebase'
+import { isLocalSignInAvailable, signInLocally, signInWithProvider } from '../lib/firebase'
 import omiLogo from '../assets/omilogo.png'
 import { BrandImage } from '../components/ui/BrandImage'
 
@@ -17,6 +17,23 @@ export function Login(): React.JSX.Element {
   // state, so a late failure from a superseded-era attempt (however phrased)
   // can never clobber the retry's pending UI.
   const attemptRef = useRef(0)
+
+  const [localPending, setLocalPending] = useState(false)
+
+  const onLocalClick = async (): Promise<void> => {
+    attemptRef.current++ // supersede any pending provider attempt's UI writes
+    setError(null)
+    setActiveProvider(null)
+    setLocalPending(true)
+    try {
+      await signInLocally()
+    } catch (e) {
+      console.error('Local sign-in failed:', e)
+      setError((e as Error).message)
+    } finally {
+      setLocalPending(false)
+    }
+  }
 
   const onClick = async (provider: SignInProvider): Promise<void> => {
     // No guard on `waiting`: clicking again supersedes the pending attempt in
@@ -42,6 +59,16 @@ export function Login(): React.JSX.Element {
         <BrandImage src={omiLogo} alt="omi" className="h-24 w-auto" />
         <p className="mt-6 text-base leading-relaxed text-white/70">Sign in to continue</p>
         <div className="h-48" />
+        {isLocalSignInAvailable() && (
+          <button
+            type="button"
+            disabled={localPending}
+            onClick={() => void onLocalClick()}
+            className="mb-3 flex items-center justify-center rounded-xl border border-white/20 px-8 py-3.5 font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+          >
+            Sign in locally
+          </button>
+        )}
         <button
           type="button"
           onClick={() => void onClick('apple')}

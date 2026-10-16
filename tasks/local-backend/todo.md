@@ -103,8 +103,8 @@
 **Что сделать:** в `src/renderer/src/lib/firebase.ts` при заданном `VITE_FIREBASE_AUTH_EMULATOR_HOST` вызвать `connectAuthEmulator`. На `src/renderer/src/pages/Login.tsx` в этом режиме показать кнопку «Войти локально»: `POST /v1/auth/local-dev/custom-token`, затем `signInWithCustomToken`.
 
 **Готово, когда:**
-- [ ] в режиме `local-backend` вход по кнопке открывает приложение с пустой базой; пользователь появился в Auth-эмуляторе
-- [ ] без переменной эмулятора кнопки нет, вход через Google и Apple не изменился
+- [x] в режиме `local-backend` вход по кнопке открывает приложение с пустой базой; пользователь появился в Auth-эмуляторе
+- [x] без переменной эмулятора кнопки нет, вход через Google и Apple не изменился
 
 **Проверка:** `vitest:src/renderer/src/pages`, `checks`, ручной вход в `app`
 

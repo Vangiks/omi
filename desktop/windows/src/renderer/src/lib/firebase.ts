@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app'
 import {
   initializeAuth,
   getAuth,
+  connectAuthEmulator,
   signInWithCustomToken,
   signOut,
   updateProfile,
@@ -43,6 +44,14 @@ export const auth = (() => {
   }
 })()
 
+// Local-backend profile (.env.local-backend.example): talk to the Firebase Auth
+// emulator of the deploy/local stack. Must run before any other auth call, so it
+// sits right after init. Unset in stock profiles, which never reach this branch.
+const authEmulatorHost = import.meta.env.VITE_FIREBASE_AUTH_EMULATOR_HOST as string | undefined
+if (authEmulatorHost) {
+  connectAuthEmulator(auth, `http://${authEmulatorHost}`, { disableWarnings: true })
+}
+
 // Belt-and-suspenders: once auth init has settled, sweep any lingering plaintext
 // `firebase:authUser:*` key that Firebase's own migration didn't clear (e.g. a
 // window that loaded mid-migration). Guarded so it only removes a key the
@@ -83,6 +92,30 @@ export async function signInWithProvider(provider: SignInProvider): Promise<User
       /* cosmetic only */
     }
   }
+  return cred.user
+}
+
+/** True only in the local-backend profile, where auth runs on the emulator. */
+export function isLocalSignInAvailable(): boolean {
+  return Boolean(authEmulatorHost)
+}
+
+/**
+ * Local-backend sign-in: the backend's local-dev endpoint (which exists only
+ * when the backend itself is bound to the Auth emulator) mints a custom token
+ * for a fixed local user; from there the session behaves like any other.
+ */
+export async function signInLocally(): Promise<User> {
+  if (!authEmulatorHost) throw new Error('Local sign-in needs the Firebase Auth emulator')
+  const body = new FormData()
+  body.set('uid', 'local-dev-user')
+  const res = await fetch(`${import.meta.env.VITE_OMI_API_BASE}/v1/auth/local-dev/custom-token`, {
+    method: 'POST',
+    body
+  })
+  if (!res.ok) throw new Error(`Local backend answered ${res.status}`)
+  const { custom_token: customToken } = (await res.json()) as { custom_token: string }
+  const cred = await signInWithCustomToken(auth, customToken)
   return cred.user
 }
 
