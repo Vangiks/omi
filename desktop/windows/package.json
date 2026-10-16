@@ -3,6 +3,7 @@
   "version": "1.0.35",
   "description": "An Electron application with React and TypeScript",
   "main": "./out/main/index.js",
+  "packageManager": "pnpm@10.34.7",
   "engines": {
     "node": ">=22.19.0 <23"
   },

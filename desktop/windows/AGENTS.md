@@ -18,8 +18,9 @@ produces a stray, untracked `package-lock.json` — if you see unexplained diffs
 in those three files with no matching commit, this is almost certainly why;
 `git restore` them and reinstall with pnpm.
 
-**pnpm major-version pin:** CI pins `pnpm/action-setup@v6` to **version 10**.
-If your local `pnpm --version` is a different major (e.g. a system package
+**pnpm major-version pin:** CI pins `pnpm/action-setup@v6` to **version 10**,
+and `package.json`'s `packageManager` pins the same major for corepack, so a
+corepack-managed `pnpm` resolves to 10 here automatically. If your local `pnpm --version` is a different major (e.g. a system package
 manager installed 11+), `.npmrc`'s `node-linker=hoisted` may be silently
 ignored, breaking the pi-mono dependency-closure postinstall check
 (`scripts/verify-pimono-unpack.mjs`) with "closure package(s) do
@@ -58,6 +59,7 @@ for this alone. **Node pin:** `>=22.19.0 <23` (`.nvmrc`; 24+ fails pretest).
 
 `.github/workflows/desktop-windows-ci.yml` — three jobs, triggered on
 `desktop/windows/**` changes:
+
 - **checks** (ubuntu): `pnpm typecheck`, `pnpm lint` (blocking), `pnpm test`.
 - **build-windows** (real `windows-latest` runner): builds the native `.NET`
   OCR/UI-automation helpers, rebuilds `better-sqlite3`, runs

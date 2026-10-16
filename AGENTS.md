@@ -22,7 +22,8 @@ omiGlass and device SDKs were removed. `CLAUDE.md` points here.
 - Git hooks come from `lefthook.yml` and install with `npx pnpm@10 install` in `desktop/windows`.
   Pre-push runs desktop typecheck, lint and the meeting tests. Keep Git identity in the user's
   configuration; temporary test identities use `git -c`.
-- Run desktop commands in `desktop/windows` through `npx pnpm@10`: the system pnpm breaks
+- `desktop/windows/package.json` pins pnpm 10 through `packageManager`, so corepack's `pnpm`
+  picks the right version; without corepack use `npx pnpm@10`. pnpm 11 ignores
   `node-linker=hoisted`. Never run `npm install` there.
 - Ask before pushing to `origin` or opening a PR to `upstream`. Keep code meant for upstream free
   of fork-only changes so it can go out from a branch based on `upstream/main`.
