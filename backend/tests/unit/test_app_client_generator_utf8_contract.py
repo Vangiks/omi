@@ -12,7 +12,6 @@ TEXT_IO_SURFACES = (
     'backend/scripts/generate_ts_openapi_types.py',
     'backend/scripts/inventory_app_client_schemas.py',
     'backend/scripts/run_dart_wire_hardening_check.py',
-    'backend/tests/unit/test_app_client_dart_generator.py',
     'backend/tests/unit/test_app_client_generator_utf8_contract.py',
     'backend/tests/unit/test_app_client_openapi_compatibility.py',
     'backend/tests/unit/test_app_client_schema_inventory.py',
@@ -21,7 +20,6 @@ TEXT_IO_SURFACES = (
     'backend/tests/unit/test_assistant_settings_response_models.py',
     'backend/tests/unit/test_desktop_rest_inventory.py',
     'backend/tests/unit/test_dev_ask_endpoint.py',
-    'backend/tests/unit/test_flutter_rest_inventory.py',
     'backend/tests/unit/test_integration_public_contract.py',
     'backend/tests/unit/test_windows_rest_inventory.py',
 )

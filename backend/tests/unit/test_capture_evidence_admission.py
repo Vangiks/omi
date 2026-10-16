@@ -53,10 +53,3 @@ def test_prod_listen_helm_values_admit_s1():
     assert lines[index + 1] == 'value: "true"'
 
 
-def test_mobile_release_builds_send_s1():
-    text = (ROOT / 'codemagic.yaml').read_text(encoding='utf-8')
-    builds = [chunk for chunk in text.split('flutter build ')[1:] if chunk.startswith(('ipa', 'appbundle'))]
-    assert builds, 'codemagic.yaml must define mobile release builds'
-    for build in builds:
-        command = build.split('$PROVENANCE_ARGS', 1)[0]
-        assert f'--dart-define={FLAG}=true' in command, 'every mobile release build must opt in to S1'

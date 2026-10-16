@@ -128,15 +128,6 @@ def test_app_receipt_body_is_owned_by_native_card_without_changing_other_turns()
         assert app_receipt_text('Existing reply', blocks) == 'Existing reply'
 
 
-def test_mobile_receipt_fixture_is_current_real_backend_serializer_output():
-    import json
-    from pathlib import Path
-    from testing.messaging.receipt_payloads import receipt_payloads
-
-    fixture = Path(__file__).resolve().parents[3] / 'app/test/fixtures/backend_edit_receipts.json'
-    assert json.loads(fixture.read_text()) == receipt_payloads()
-
-
 def test_mixed_create_edit_fallback_matches_mobile_without_duplicate_prose():
     from utils.messaging.receipt_presentation import app_receipt_text
 

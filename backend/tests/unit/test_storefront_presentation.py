@@ -41,7 +41,6 @@ from utils.storefront_copy import (
 
 PERIOD_END = int(datetime(2026, 11, 1, tzinfo=timezone.utc).timestamp())
 GOLDEN_DIR = Path(__file__).resolve().parents[1] / 'fixtures' / 'storefront_v2'
-APP_FIXTURE_DIR = Path(__file__).resolve().parents[3] / 'app' / 'test' / 'fixtures' / 'storefront_v2'
 PLANS = ('basic', 'plus', 'operator', 'architect', 'unlimited', 'unlimited_v2')
 LADDER = ('basic', 'plus', 'operator', 'architect')
 INTERVALS = ('month', 'year')
@@ -905,7 +904,3 @@ def test_golden_storefront_scenarios():
         if os.environ.get('UPDATE_STOREFRONT_GOLDENS') == '1':
             path.write_text(payload, encoding='utf-8')
         assert path.read_text(encoding='utf-8') == payload
-    for name in SCENARIOS:
-        path = GOLDEN_DIR / f'{name}.json'
-        app_path = APP_FIXTURE_DIR / f'{name}.json'
-        assert app_path.read_bytes() == path.read_bytes()

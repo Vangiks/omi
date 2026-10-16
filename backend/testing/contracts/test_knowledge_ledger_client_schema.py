@@ -22,7 +22,6 @@ from scripts import generate_dart_models, generate_swift_openapi_types, generate
 ROOT_DIR = Path(__file__).resolve().parents[3]
 SPEC_PATH = ROOT_DIR / 'docs' / 'api-reference' / 'app-client-openapi.json'
 FIXTURE_PATH = Path(__file__).with_name('fixtures') / 'knowledge_ledger_memories.json'
-DART_PATH = ROOT_DIR / 'app' / 'lib' / 'backend' / 'schema' / 'gen' / 'memories_wire.g.dart'
 SWIFT_PATH = ROOT_DIR / 'desktop' / 'macos' / 'Desktop' / 'Sources' / 'Generated' / 'OmiApi.generated.swift'
 
 LEDGER_MEMORY_FIELDS = {
@@ -173,10 +172,9 @@ def test_optional_evidence_and_capture_context_types_are_rendered_for_each_gener
     assert 'capture_context?: MemoryCaptureContext | null;' in typescript_memory
 
 
-def test_checked_in_mobile_desktop_windows_and_web_artifacts_share_the_same_mapping():
+def test_checked_in_desktop_and_web_artifacts_share_the_same_mapping():
     spec = _spec()
 
-    assert DART_PATH.read_text(encoding='utf-8') == generate_dart_models.build_output(spec, 'memories')
     assert SWIFT_PATH.read_text(encoding='utf-8') == generate_swift_openapi_types.generate(
         spec, 'docs/api-reference/app-client-openapi.json'
     )
