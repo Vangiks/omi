@@ -26,8 +26,19 @@
 // forged token's `aud` and defeat the check. The project id is public config, not a
 // secret; the trust requirement is only that its source be main-controlled.
 //
+// AUTH EMULATOR (local-backend profile, deploy/local). The emulator issues UNSIGNED
+// tokens (alg:none, empty signature), so no signature check can pass. They are
+// accepted only when BOTH hold, each frozen into the main bundle at build time:
+//   - VITE_FIREBASE_AUTH_EMULATOR_HOST is set (the bundle was built for the
+//     emulator; stock .env profiles never set it), and
+//   - the trusted project id starts with `demo-`, a namespace that cannot exist in
+//     real Firebase, so no real account's token can carry that `aud`/`iss`.
+// Claims (exp, iss, aud, non-empty sub) are still checked. In such a build anyone
+// can mint a token for any uid — the same holds for the local backend that accepts
+// them, so this adds no access the emulator doesn't already give.
+//
 // SECURITY: the token is a live ~1h credential — never logged here.
-import { decodeProtectedHeader, importX509, jwtVerify } from 'jose'
+import { UnsecuredJWT, decodeProtectedHeader, importX509, jwtVerify } from 'jose'
 
 /** Google's public x509 certs for Firebase ID tokens, keyed by the token's `kid`. */
 const SECURETOKEN_CERTS_URL =
@@ -50,6 +61,25 @@ let certCache: { certs: CertMap; expiresAt: number } | null = null
 function expectedProjectId(): string {
   const id = import.meta.env.VITE_FIREBASE_PROJECT_ID as string | undefined
   return typeof id === 'string' ? id.trim() : ''
+}
+
+/** True only in a bundle built for the Auth emulator against a demo- project. */
+function emulatorBuild(projectId: string): boolean {
+  const host = import.meta.env.VITE_FIREBASE_AUTH_EMULATOR_HOST as string | undefined
+  return typeof host === 'string' && host.trim() !== '' && projectId.startsWith('demo-')
+}
+
+/** The `sub` of an unsigned emulator token with valid claims, or null. */
+function verifyEmulatorToken(token: string, projectId: string): string | null {
+  try {
+    const { payload } = UnsecuredJWT.decode(token, {
+      issuer: `https://securetoken.google.com/${projectId}`,
+      audience: projectId
+    })
+    return typeof payload.sub === 'string' && payload.sub ? payload.sub : null
+  } catch {
+    return null
+  }
 }
 
 /** Seconds from a `Cache-Control` header's `max-age`, or the fallback TTL. */
@@ -94,9 +124,9 @@ async function signingCerts(fetchImpl: typeof fetch): Promise<CertMap | null> {
 /**
  * The `sub` (Firebase uid) of a genuine, unexpired, Google-signed Firebase ID
  * token for THIS project, or null. Null on: wrong/absent signature, `alg` != RS256
- * (alg:none / HS256 / confusion), unknown `kid`, expired `exp`, wrong `aud`/`iss`,
- * empty `sub`, cert-fetch failure with no cached cert, or a misconfigured project
- * id. `fetchImpl` is injectable only for hermetic tests; production uses global
+ * (alg:none outside an emulator build / HS256 / confusion), unknown `kid`, expired
+ * `exp`, wrong `aud`/`iss`, empty `sub`, cert-fetch failure with no cached cert, or
+ * a misconfigured project id. `fetchImpl` is injectable only for hermetic tests; production uses global
  * fetch — the public contract is `verifyFirebaseIdToken(token)`.
  */
 export async function verifyFirebaseIdToken(
@@ -114,6 +144,8 @@ export async function verifyFirebaseIdToken(
   } catch {
     return null
   }
+  if (header.alg === 'none' && emulatorBuild(projectId))
+    return verifyEmulatorToken(token, projectId)
   if (header.alg !== 'RS256') return null
   const kid = header.kid
   if (typeof kid !== 'string' || !kid) return null

@@ -8,7 +8,7 @@
 // and verified in-process.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { SignJWT, generateKeyPair, importPKCS8 } from 'jose'
+import { SignJWT, UnsecuredJWT, generateKeyPair, importPKCS8 } from 'jose'
 import { verifyFirebaseIdToken, __resetFirebaseCertCacheForTests } from './firebaseIdToken'
 
 const PROJECT_ID = 'demo-omi'
@@ -228,5 +228,84 @@ describe('verifyFirebaseIdToken — configuration & cert resilience', () => {
     await verifyFirebaseIdToken(token, fetcher)
     await verifyFirebaseIdToken(token, fetcher)
     expect(fetcher).toHaveBeenCalledTimes(1)
+  })
+})
+
+// Local-backend profile: the Firebase Auth EMULATOR issues UNSIGNED tokens
+// (alg:none, empty signature). They are accepted only when the bundle was BUILT
+// for the emulator (VITE_FIREBASE_AUTH_EMULATOR_HOST) AND trusts a `demo-`
+// project, which cannot exist in real Firebase. Claims are still checked.
+describe('verifyFirebaseIdToken — Auth emulator tokens', () => {
+  const EMULATOR_PROJECT = 'demo-omi-local'
+  const EMULATOR_ISS = `https://securetoken.google.com/${EMULATOR_PROJECT}`
+
+  const emulatorToken = (overrides: Record<string, unknown> = {}): string =>
+    new UnsecuredJWT(claims({ aud: EMULATOR_PROJECT, iss: EMULATOR_ISS, ...overrides })).encode()
+
+  const emulatorBuild = (): void => {
+    vi.stubEnv('VITE_FIREBASE_PROJECT_ID', EMULATOR_PROJECT)
+    vi.stubEnv('VITE_FIREBASE_AUTH_EMULATOR_HOST', '127.0.0.1:9099')
+  }
+
+  it('rejects an emulator token in a build without the emulator (stock behavior)', async () => {
+    vi.stubEnv('VITE_FIREBASE_PROJECT_ID', EMULATOR_PROJECT)
+    const fetchImpl = goodCertFetch()
+    expect(await verifyFirebaseIdToken(emulatorToken(), fetchImpl)).toBeNull()
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
+  it('rejects an emulator token when the trusted project is not a demo- project', async () => {
+    vi.stubEnv('VITE_FIREBASE_PROJECT_ID', 'based-hardware')
+    vi.stubEnv('VITE_FIREBASE_AUTH_EMULATOR_HOST', '127.0.0.1:9099')
+    const token = emulatorToken({
+      aud: 'based-hardware',
+      iss: 'https://securetoken.google.com/based-hardware'
+    })
+    expect(await verifyFirebaseIdToken(token, goodCertFetch())).toBeNull()
+  })
+
+  it('accepts a well-formed emulator token in an emulator build, without fetching certs', async () => {
+    emulatorBuild()
+    const fetchImpl = goodCertFetch()
+    expect(await verifyFirebaseIdToken(emulatorToken({ sub: 'local-dev-user' }), fetchImpl)).toBe(
+      'local-dev-user'
+    )
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
+  it('rejects a wrong audience', async () => {
+    emulatorBuild()
+    expect(
+      await verifyFirebaseIdToken(emulatorToken({ aud: 'demo-other' }), goodCertFetch())
+    ).toBeNull()
+  })
+
+  it('rejects a wrong issuer', async () => {
+    emulatorBuild()
+    const token = emulatorToken({ iss: 'https://securetoken.google.com/demo-other' })
+    expect(await verifyFirebaseIdToken(token, goodCertFetch())).toBeNull()
+  })
+
+  it('rejects an expired token', async () => {
+    emulatorBuild()
+    const past = Math.floor(Date.now() / 1000) - 7200
+    const token = emulatorToken({ iat: past, exp: past + 3600 })
+    expect(await verifyFirebaseIdToken(token, goodCertFetch())).toBeNull()
+  })
+
+  it('rejects an empty sub', async () => {
+    emulatorBuild()
+    expect(await verifyFirebaseIdToken(emulatorToken({ sub: '' }), goodCertFetch())).toBeNull()
+  })
+
+  it('rejects alg:none with a non-empty signature segment', async () => {
+    emulatorBuild()
+    expect(await verifyFirebaseIdToken(`${emulatorToken()}AAAA`, goodCertFetch())).toBeNull()
+  })
+
+  it('still verifies genuinely signed tokens for the demo project', async () => {
+    emulatorBuild()
+    const token = await sign(claims({ aud: EMULATOR_PROJECT, iss: EMULATOR_ISS }))
+    expect(await verifyFirebaseIdToken(token, goodCertFetch())).toBe('uid-123')
   })
 })
