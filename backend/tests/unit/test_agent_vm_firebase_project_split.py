@@ -142,7 +142,7 @@ def test_valid_subscription_without_provision_does_not_write_free() -> None:
     subscription = users_db.get_user_valid_subscription("uid", firestore_client=client, provision=False)
 
     assert subscription is not None
-    assert subscription.plan == PlanType.basic
+    assert subscription.plan == PlanType.architect
     user_ref.set.assert_not_called()
 
 
@@ -190,7 +190,7 @@ def test_screen_vector_entitlement_does_not_write_when_customer_subscription_doc
     entitled = grants_cloud_screen_vectors(uid)
     stored = users_db.get_user_valid_subscription(uid, firestore_client=customer_client, provision=False)
 
-    assert entitled is False
+    assert entitled is True
     assert stored is not None
-    assert stored.plan == PlanType.basic
+    assert stored.plan == PlanType.architect
     user_ref.set.assert_not_called()

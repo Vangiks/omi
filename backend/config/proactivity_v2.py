@@ -11,6 +11,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from config.plan_catalog import FULL_ACCESS_PLAN
 from config.plan_catalog_generated import PAID_PLAN_IDS, PROACTIVITY_V2_BUDGET, PlanType
 
 
@@ -85,17 +86,8 @@ def daily_cap(plan: str) -> tuple[int, bool]:
 
 
 def active_plan(user: dict[str, Any], now: datetime) -> str:
-    subscription = user.get('subscription', {})
-    if not isinstance(subscription, dict):
-        raise ProactivityDenied('unknown_plan')
-    raw_plan = subscription.get('plan', 'basic')
-    plan = PlanType('basic' if raw_plan == 'free' else raw_plan).value
-    if plan == 'basic':
-        return plan
-    expiry = subscription.get('current_period_end')
-    if not isinstance(expiry, (int, float)) or isinstance(expiry, bool) or expiry < now.timestamp():
-        return 'basic'
-    return plan
+    """Every user has full access (#3); the stored subscription is not read."""
+    return FULL_ACCESS_PLAN.value
 
 
 def utc_now() -> datetime:

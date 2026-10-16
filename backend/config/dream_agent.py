@@ -3,7 +3,7 @@
 import math
 import os
 from dataclasses import dataclass
-from config.plan_catalog import PAID_PLAN_IDS
+from config.plan_catalog import FULL_ACCESS_PLAN, PAID_PLAN_IDS
 
 from utils.agent_capabilities.registry import AUTO, KINDS
 
@@ -52,7 +52,7 @@ def eligible(uid, user):
     return (
         policy == 'all'
         or (policy == 'allowlist' and _allowlisted(uid))
-        or (policy == 'paid' and (user.get('subscription') or {}).get('plan', user.get('plan', '')) in PAID_PLAN_IDS)
+        or (policy == 'paid' and FULL_ACCESS_PLAN.value in PAID_PLAN_IDS)
     )
 
 

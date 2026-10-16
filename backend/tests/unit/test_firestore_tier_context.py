@@ -237,6 +237,6 @@ def test_subscription_update_invalidates_and_missing_never_provisions(monkeypatc
     assert users.get_existing_user_subscription('owner') is None
     assert tier._cache['owner'][0] == 'unattributed'
     resolved = users.get_user_valid_subscription('owner', provision=False)
-    assert resolved.plan == 'basic'  # Business fallback is not an observed basic owner.
-    assert tier._cache['owner'][0] == 'unattributed'
+    assert resolved.plan == 'architect'  # Every user has full access (#3).
+    assert tier._cache['owner'][0] == 'architect'
     client.collection.return_value.document.return_value.set.assert_not_called()

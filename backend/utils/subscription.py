@@ -16,11 +16,13 @@ from database.announcements import compare_versions
 from config.plan_catalog import (
     DESKTOP_ENTITLED_PLAN_TYPES,
     MOBILE_PLAN_TYPES,
+    FULL_ACCESS_PLAN,
     PAID_PLAN_TYPES,
     PLAN_DISPLAY_NAMES,
     PRIMARY_BILLING_ENV_VARS,
     RECOGNIZED_STRIPE_PRICE_INTERVALS,
     allocation_limit,
+    full_access_subscription,
     get_plan_allocation,
     plan_uses_overage,
     resolve_stripe_price_plan,
@@ -1297,6 +1299,11 @@ def get_basic_plan_limits() -> PlanLimits:
 def get_default_basic_subscription() -> Subscription:
     """Returns a default Subscription object for the basic plan."""
     return Subscription(limits=get_basic_plan_limits())
+
+
+def get_full_access_subscription() -> Subscription:
+    """The subscription every user has in the fork (#3)."""
+    return Subscription(**full_access_subscription(), limits=get_plan_limits(FULL_ACCESS_PLAN))
 
 
 def get_plan_limits(plan: PlanType) -> PlanLimits:

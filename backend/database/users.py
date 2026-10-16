@@ -1797,47 +1797,14 @@ def set_user_onboarding_state(uid: str, onboarding_data: dict, *, firestore_clie
 
 
 def get_user_subscription(uid: str, *, firestore_client: Any | None = None, read_only: bool = False) -> Subscription:
-    """Get a subscription; read_only suppresses default creation and legacy migration."""
-    user_ref = (firestore_client or db).collection('users').document(uid)
-    user_doc = user_ref.get(['subscription'])
-    if user_doc.exists:
-        user_data = user_doc.to_dict()
-        if 'subscription' in user_data:
-            sub_data = user_data['subscription']
-            legacy_free_plan = isinstance(sub_data, dict) and sub_data.get('plan') == 'free'
-
-            def subscription_payload(_snapshot: object) -> dict:
-                if not isinstance(sub_data, dict):
-                    raise TypeError('Firestore subscription payload must be a mapping')
-                payload = dict(sub_data)
-                if legacy_free_plan:
-                    payload['plan'] = PlanType.basic.value
-                return payload
-
-            subscription = parse_snapshot_strict(Subscription, user_doc, payload_from_snapshot=subscription_payload)
-            # Handle migration for old 'free' plan identifier after validating the normalized payload.
-            if legacy_free_plan and not read_only:
-                sub_data['plan'] = PlanType.basic.value
-                update_user_subscription(uid, sub_data)
-            observe_subscription(uid, subscription)
-            return subscription
-
-    # If subscription doesn't exist for the user, create and return a default free plan.
+    """Every user has full access (#3); the stored subscription is neither read nor written."""
     # Imported here, not at module scope: utils.subscription imports this module, so a
-    # module-level import makes utils.subscription unimportable on its own (see
-    # get_user_valid_subscription, which defers the same import for the same reason).
-    from utils.subscription import get_default_basic_subscription
+    # module-level import makes utils.subscription unimportable on its own.
+    from utils.subscription import get_full_access_subscription
 
-    default_subscription = get_default_basic_subscription()
-    if read_only:
-        return default_subscription
-    # Strip dynamic fields before storing
-    sub_to_store = default_subscription.model_dump()
-    sub_to_store.pop('features', None)
-    sub_to_store.pop('limits', None)
-    user_ref.set({'subscription': sub_to_store}, merge=True)
-    observe_subscription(uid, default_subscription)
-    return default_subscription
+    subscription = get_full_access_subscription()
+    observe_subscription(uid, subscription)
+    return subscription
 
 
 def get_existing_user_subscription(uid: str, *, firestore_client: Any | None = None) -> Optional[Subscription]:
@@ -1951,45 +1918,8 @@ def set_user_training_data_opt_in(uid: str, status: str):
 def get_user_valid_subscription(
     uid: str, *, firestore_client: Any | None = None, provision: bool = True
 ) -> Optional[Subscription]:
-    """
-    Gets the user's subscription if it is currently valid for use.
-
-    A subscription is considered valid if:
-    - It's a basic (free) plan with 'active' status.
-    - It's a paid plan with a 'current_period_end' that has not passed yet.
-      This allows users to use the service until the end of the billing period
-      they paid for, even after cancelling.
-
-    Returns the Subscription object if valid, otherwise None.
-
-    ``provision=False`` never merge-writes a default Free plan. Desktop-backend
-    quota must use that mode against the customer Firestore so a miss cannot
-    stamp ``plan: basic`` onto a paying user.
-    """
-    # Imported here, not at module scope: utils.subscription imports this module, and a
-    # module-level import back into it forms a cycle that makes utils.subscription raise
-    # ImportError whenever it is the first of the pair to be imported.
-    from utils.subscription import get_default_basic_subscription
-
-    if provision:
-        subscription = get_user_subscription(uid, firestore_client=firestore_client)
-    else:
-        subscription = get_existing_user_subscription(uid, firestore_client=firestore_client)
-        if subscription is None:
-            subscription = get_default_basic_subscription()
-
-    # Basic (free) plans are only valid if their status is active.
-    if subscription.plan == PlanType.basic:
-        return subscription if subscription.status == SubscriptionStatus.active else None
-
-    # For paid plans, validity is determined by the period end.
-    if subscription.current_period_end:
-        period_end_dt = datetime.fromtimestamp(subscription.current_period_end, tz=timezone.utc)
-        if period_end_dt >= datetime.now(timezone.utc):
-            return subscription
-
-    # Fallback to default basic subscription
-    return get_default_basic_subscription()
+    """The full-access subscription; nothing is written to Firestore in either ``provision`` mode."""
+    return get_user_subscription(uid, firestore_client=firestore_client)
 
 
 # **************************************

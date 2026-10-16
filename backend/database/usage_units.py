@@ -11,7 +11,7 @@ from typing import Any, Mapping
 
 from google.cloud import firestore
 from google.cloud.firestore_v1 import FieldFilter
-from config.plan_catalog import resolve_subscription_entitlements
+from config.plan_catalog import full_access_subscription, resolve_subscription_entitlements
 from config.rate_card import (
     budget_units,
     normalize_transcription_provider,
@@ -210,9 +210,7 @@ def get_usage_units(
     client = firestore_client or get_customer_firestore_client()
     user = client.collection('users').document(uid)
     if entitlements is None:
-        snap = user.get(['subscription'])
-        data = snap.to_dict() or {}
-        entitlements = resolve_subscription_entitlements(data.get('subscription') or {})
+        entitlements = resolve_subscription_entitlements(full_access_subscription())
     totals: dict[str, int] = {}
     statuses: dict[str, dict[str, int]] = {}
     funding_totals: dict[str, int] = {}

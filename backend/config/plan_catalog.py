@@ -51,6 +51,17 @@ from config.plan_catalog_generated import (  # noqa: F401 - this module is the p
 )
 
 
+# The fork has no billing (#3): every user gets this plan, whatever Firestore holds.
+FULL_ACCESS_PLAN = PlanType.architect
+# 2100-01-01 UTC. Paid-plan checks treat a missing or past period end as basic.
+FULL_ACCESS_PERIOD_END = 4102444800
+
+
+def full_access_subscription() -> dict[str, Any]:
+    """The subscription payload every plan reader sees instead of the stored one."""
+    return {'plan': FULL_ACCESS_PLAN.value, 'status': 'active', 'current_period_end': FULL_ACCESS_PERIOD_END}
+
+
 class UnresolvedPlanDecision(ValueError):
     """A consumer requested a value whose product policy is still open."""
 

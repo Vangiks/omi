@@ -277,7 +277,7 @@ def test_access_admits_every_valid_paid_plan(monkeypatch, plan):
 
 
 @pytest.mark.parametrize('plan', ['basic', 'free', 'expired', 'missing'])
-def test_access_rejects_free_and_expired_subscriptions(monkeypatch, plan):
+def test_access_admits_free_and_expired_subscriptions(monkeypatch, plan):
     from database import users
     from models.users import PlanType, Subscription, SubscriptionStatus
     from utils.messaging import access
@@ -285,8 +285,7 @@ def test_access_rejects_free_and_expired_subscriptions(monkeypatch, plan):
     monkeypatch.setenv('OMI_MESSAGING_CHANNELS', 'on')
     monkeypatch.setenv('OMI_MESSAGING_CHANNELS_UIDS', 'u')
     monkeypatch.setattr(access, 'get_user_deletion_wipe_status', lambda uid: None)
-    # Free uses the catalog's basic wire identity. Expired paid plans must be
-    # downgraded by the real subscription authority, never trusted as paid.
+    # Every user has full access (#3): the stored plan no longer matters.
     subscription = (
         None
         if plan == 'missing'
@@ -297,8 +296,7 @@ def test_access_rejects_free_and_expired_subscriptions(monkeypatch, plan):
         )
     )
     monkeypatch.setattr(users, 'get_existing_user_subscription', lambda uid, **kwargs: subscription)
-    with pytest.raises(PermissionError, match='Paid plan required'):
-        access.require_access('u')
+    access.require_access('u')
 
 
 @pytest.mark.parametrize('case', ['paid', 'basic', 'expired', 'outside-cohort', 'switch-off'])
@@ -331,8 +329,9 @@ def test_link_proof_http_admission(monkeypatch, case):
         response = client.post(
             '/v1/messaging/link-proofs', json={'channel': 'telegram', 'provider': 'telegram', 'kind': 'token'}
         )
-    assert response.status_code == (200 if case == 'paid' else 403)
-    if case == 'paid':
+    admitted = case in ('paid', 'basic', 'expired')
+    assert response.status_code == (200 if admitted else 403)
+    if admitted:
         assert response.json()['proof']
     else:
         assert response.json()['detail'] == 'Messaging channels unavailable'

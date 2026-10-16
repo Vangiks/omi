@@ -850,51 +850,6 @@ def test_subscription_snapshot_survives_a_resolver_that_cannot_read_its_dependen
     }
 
 
-def test_an_expired_paid_subscription_is_downgraded_to_basic_by_the_real_lookup():
-    """The real `get_user_valid_subscription` never returns None for an expired paid plan: it hands
-    back a fresh basic subscription, so such a user gets basic's managed minutes, not nothing (S16)."""
-    import importlib.util
-    import time
-
-    import utils.subscription as subscription_module
-
-    # A private copy of database/users.py, not registered in sys.modules: other suites leave a
-    # mock over the real module's `get_user_valid_subscription`, and this test exists to run
-    # the genuine one.
-    spec = importlib.util.spec_from_file_location('database.users_genuine_copy', users_router.users_db.__file__)
-    assert spec is not None and spec.loader is not None
-    genuine_users_db = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(genuine_users_db)
-    assert genuine_users_db.get_user_valid_subscription.__module__ == 'database.users_genuine_copy'
-
-    expired_plus = users_router.Subscription(
-        plan=users_router.PlanType.plus,
-        status=users_router.SubscriptionStatus.active,
-        current_period_end=int(time.time()) - 86_400,
-    )
-    with patch.object(genuine_users_db, 'get_user_subscription', MagicMock(return_value=expired_plus)), patch.object(
-        subscription_module.users_db, 'get_user_valid_subscription', genuine_users_db.get_user_valid_subscription
-    ), patch.object(subscription_module.users_db, 'is_byok_active', MagicMock(return_value=False)), patch.object(
-        subscription_module, 'is_trial_paywalled', MagicMock(return_value=False)
-    ), patch.object(
-        subscription_module, 'get_byok_key', MagicMock(return_value=None)
-    ), patch.object(
-        subscription_module, 'get_monthly_usage_for_subscription', MagicMock(return_value={'transcription_seconds': 0})
-    ), patch.dict(
-        users_router.os.environ, {'MARKETPLACE_APP_REVIEWERS': ''}
-    ):
-        assert genuine_users_db.get_user_valid_subscription('expired-plus-uid').plan is users_router.PlanType.basic
-        allowance = subscription_module.resolve_transcription_allowance('expired-plus-uid')
-        remaining = subscription_module.get_remaining_transcription_seconds('expired-plus-uid')
-
-    assert (allowance.mode, allowance.remaining_seconds, allowance.reason) == (
-        'managed',
-        18_000,
-        'plan_within_allowance',
-    )
-    assert remaining == 18_000
-
-
 def test_llm_only_byok_snapshot_reads_monthly_usage_once_for_snapshot_and_allowance():
     """An enrolled BYOK request with an LLM key but no Deepgram key takes the early metered branch,
     which reads usage; the allowance must come from that same read, not a second one (S16)."""

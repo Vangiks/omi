@@ -4,6 +4,7 @@ from uuid import uuid4
 
 import pytest
 
+from config.plan_catalog import FULL_ACCESS_PLAN
 from config.proactivity_v2 import AttemptEnvelope, ProactivityDenied, daily_cap
 from database import proactivity as ledger
 from database import proactivity_budget as money
@@ -113,11 +114,12 @@ def test_cap_arithmetic(plan, cap):
 
 def test_exact_cap_shared_across_producers_and_redis_loss(store):
     authority = money.BudgetAuthority(firestore_client=store, redis_client=Redis(), clock=lambda: NOW)
-    first = reserve(authority, claim(store), 66666)
+    cap, _ = daily_cap(FULL_ACCESS_PLAN.value)
+    first = reserve(authority, claim(store), cap)
     authority.redis.values.clear()
     with pytest.raises(ProactivityDenied, match='budget_exhausted'):
         reserve(authority, claim(store, 'mentor', 'conversation_mentor_v2'), 1)
-    assert authority.settle(reservation=first, event=event(first, 66665))
+    assert authority.settle(reservation=first, event=event(first, cap - 1))
     assert reserve(authority, claim(store, 'mentor2', 'conversation_mentor_v2'), 1).reserved_micro_usd == 1
 
 

@@ -245,10 +245,10 @@ def test_hub_telemetry_lands_on_the_question_transactions_own_day_and_plan(store
 
     monkeypatch.setattr(llm_usage_db, 'usage_bucket_update', spy)
     _hub_report(turn_id='turn-1')
-    assert seen == [('basic', '2026-09-02')]
+    assert seen == [('architect', '2026-09-02')]
     day = store.rows[('users', UID, 'llm_usage', '2026-09-02')]
-    assert day['plan_usage']['basic']['desktop_chat']['input_tokens'] == 10
-    assert day['plan_usage']['basic']['backend_chat']['quota_questions'] == 1
+    assert day['plan_usage']['architect']['desktop_chat']['input_tokens'] == 10
+    assert day['plan_usage']['architect']['backend_chat']['quota_questions'] == 1
 
 
 def test_a_hub_report_that_fails_to_commit_records_neither_question_nor_cost_and_retries_cleanly(store) -> None:
@@ -788,7 +788,7 @@ def test_the_admission_counter_does_not_mark_the_plan_cost_missing(monkeypatch) 
     responses, _ = omni_relay._count_relay_response(UID)
     assert responses == 1
     day = next(data for path, data in store.rows.items() if path[:3] == ('users', UID, 'llm_usage'))
-    metadata = day['plan_usage']['basic']['_metadata']
+    metadata = day['plan_usage']['architect']['_metadata']
     assert metadata['last_cost_status'] == 'excluded'
     assert 'missing' not in metadata['cost_status_counts']
 

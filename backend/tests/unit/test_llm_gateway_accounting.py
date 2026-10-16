@@ -593,7 +593,7 @@ def test_firestore_ledger_write_is_immutable_idempotent_and_snapshots_subscripti
     assert record_llm_gateway_attempt(event, firestore_client=client)
     assert not record_llm_gateway_attempt(event, firestore_client=client)
     stored = client.collections[ATTEMPTS_COLLECTION]['invocation-1:1']
-    assert stored['subscription_tier'] == 'pro'
+    assert stored['subscription_tier'] == 'architect'
     assert stored['plan_id'] == 'architect'
     assert stored['plan_attribution_status'] == 'complete'
     assert stored['cost_attribution_status'] == 'missing'
@@ -612,7 +612,7 @@ def test_firestore_ledger_marks_priced_omi_cost_complete_for_the_canonical_plan(
 
     assert record_llm_gateway_attempt(event, firestore_client=client)
     stored = client.collections[ATTEMPTS_COLLECTION]['invocation-1:2']
-    assert stored['plan_id'] == 'operator'
+    assert stored['plan_id'] == 'architect'
     assert stored['cost_attribution_status'] == 'complete'
 
 
@@ -656,7 +656,7 @@ def test_user_day_rollup_hashes_uid_and_accumulates_one_document_per_user_day() 
     assert rollup.get('fc_chat', 0) == 0
     # Last-seen attribution: the second attempt had no platform and no price.
     assert rollup['app_platform'] == 'unattributed'
-    assert rollup['subscription_tier'] == 'pro'
+    assert rollup['subscription_tier'] == 'architect'
     assert rollup['plan_id'] == 'architect'
     # The rollup never carries the raw Firebase uid, in values or field names.
     assert 'user_uid' not in rollup
