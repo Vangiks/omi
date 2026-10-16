@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { AudioWaveform, Gift, MessageCircle, Mic, Scan, Settings } from 'lucide-react'
+import { AudioWaveform, Mic, Scan, Settings } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { getPreferences, onPreferencesChange, setPreferences } from '../../../lib/preferences'
 import { cn } from '../../../lib/utils'
 import type { RewindSettings } from '../../../../../shared/types'
 
 // The Hub's top-right controls: a screen-capture pill, a listening pill, and the
-// gear menu. Both pills drive the app's REAL capture state — the same
+// Settings gear. Both pills drive the app's REAL capture state — the same
 // rewindGetSettings/rewindSetSettings + `continuousRecording` preference the
 // sidebar toggles — and both SUBSCRIBE to changes (rewind:settings from main,
 // onPreferencesChange for the mic), which is what actually keeps them from
@@ -16,9 +15,6 @@ import type { RewindSettings } from '../../../../../shared/types'
 //
 // Mac reveals a listening-MODE sub-control on hover. Windows has no
 // listening-mode concept, so that sub-control is omitted rather than invented.
-
-const REFER_URL = 'https://affiliate.omi.me'
-const DISCORD_URL = 'https://discord.com/invite/8MP3b9ymvx'
 
 // Shared pill states. Mac also has a `blocked` (red) state for a denied capture
 // permission; Windows screen capture has no permission gate (RewindSettings
@@ -62,52 +58,24 @@ function Pill(props: {
   )
 }
 
-function GearMenu(): React.JSX.Element {
+function SettingsButton(): React.JSX.Element {
   const navigate = useNavigate()
-
-  const row = (Icon: LucideIcon, label: string, onSelect: () => void): React.JSX.Element => (
-    <DropdownMenu.Item
-      onSelect={onSelect}
-      className="flex cursor-pointer select-none items-center rounded-lg px-[9px] py-[7px] text-[13px] font-medium text-home-ink outline-none data-[highlighted]:bg-home-tileHover"
-    >
-      <Icon className="mr-2 h-[13px] w-[18px] shrink-0 text-home-secondary" strokeWidth={2.5} />
-      {label}
-    </DropdownMenu.Item>
-  )
-
   return (
-    <DropdownMenu.Root>
-      <DropdownMenu.Trigger asChild>
-        <button
-          type="button"
-          aria-label="Home menu"
-          className={cn(
-            'focus-ring group flex h-[34px] w-[34px] items-center justify-center rounded-full',
-            'border border-home-hairline/[0.68] bg-home-tile/[0.86] transition-colors duration-150',
-            'hover:border-home-hairline/90 hover:bg-home-tileHover'
-          )}
-        >
-          <Settings
-            className="h-[14px] w-[14px] text-home-secondary transition-colors duration-150 group-hover:text-home-ink"
-            strokeWidth={2.5}
-          />
-        </button>
-      </DropdownMenu.Trigger>
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content
-          align="end"
-          sideOffset={8}
-          className="z-50 w-[190px] rounded-xl border border-home-hairline bg-home-panel p-1.5 shadow-[0_16px_40px_rgba(0,0,0,0.5)]"
-        >
-          {/* External links go through main's shell.openExternal bridge, so they
-              open in the user's real browser rather than an Electron window. */}
-          {row(Gift, 'Refer a Friend', () => void window.omi?.openExternalUrl?.(REFER_URL))}
-          {row(MessageCircle, 'Discord', () => void window.omi?.openExternalUrl?.(DISCORD_URL))}
-          <DropdownMenu.Separator className="my-1.5 h-px bg-home-hairline" />
-          {row(Settings, 'Settings', () => navigate('/settings'))}
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
+    <button
+      type="button"
+      onClick={() => navigate('/settings')}
+      aria-label="Settings"
+      className={cn(
+        'focus-ring group flex h-[34px] w-[34px] items-center justify-center rounded-full',
+        'border border-home-hairline/[0.68] bg-home-tile/[0.86] transition-colors duration-150',
+        'hover:border-home-hairline/90 hover:bg-home-tileHover'
+      )}
+    >
+      <Settings
+        className="h-[14px] w-[14px] text-home-secondary transition-colors duration-150 group-hover:text-home-ink"
+        strokeWidth={2.5}
+      />
+    </button>
   )
 }
 
@@ -160,7 +128,7 @@ export function HubHeader(): React.JSX.Element {
         label={micOn ? 'Stop listening' : 'Start listening'}
         onClick={toggleMic}
       />
-      <GearMenu />
+      <SettingsButton />
     </div>
   )
 }
