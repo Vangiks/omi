@@ -2,6 +2,7 @@ import { resolve } from 'path'
 import { defineConfig } from 'electron-vite'
 import react from '@vitejs/plugin-react'
 import { resolveDevInstance } from './src/main/devInstance'
+import { addCspConnectSources, localBackendCspSources } from './src/main/localBackendOrigins'
 
 // Resolve THIS checkout's dev instance from the worktree it lives in. The primary
 // checkout stays on 5179 with the default profile (zero change). A linked worktree
@@ -155,7 +156,22 @@ export default defineConfig({
             if (/ort-wasm.*\.wasm$/.test(key)) delete bundle[key]
           }
         }
-      }
+      },
+      (() => {
+        // A profile with plain-http backends (`--mode local-backend`) adds their
+        // origins to every HTML entry's CSP connect-src. Stock profiles add
+        // nothing. See src/main/localBackendOrigins.ts.
+        let sources: string[] = []
+        return {
+          name: 'local-backend-csp',
+          configResolved(config): void {
+            sources = localBackendCspSources(config.env)
+          },
+          transformIndexHtml(html: string): string {
+            return addCspConnectSources(html, sources)
+          }
+        }
+      })()
     ]
   }
 })

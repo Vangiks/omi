@@ -10,6 +10,11 @@ interface ImportMetaEnv {
    *  build time). Main verifies the relayed Firebase ID token's aud/iss against
    *  it (auth/firebaseIdToken.ts); it must come from here, never the renderer. */
   readonly VITE_FIREBASE_PROJECT_ID?: string
+  /** Desktop backend base (shared VITE_ prefix). Main reads it for the CORS
+   *  shim of the local-backend profile (localBackendOrigins.ts). */
+  readonly VITE_OMI_DESKTOP_API_BASE?: string
+  /** `host:port` of the Firebase Auth emulator; set only by the local-backend profile. */
+  readonly VITE_FIREBASE_AUTH_EMULATOR_HOST?: string
 }
 
 interface ImportMeta {

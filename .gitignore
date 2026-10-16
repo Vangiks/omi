@@ -2,6 +2,7 @@
 .env*
 !.env.template
 !.env.example
+!desktop/windows/.env.*.example
 !.env.local-dev.template
 !.env.dev.template
 !.env.prod.template

@@ -17,6 +17,7 @@ import { APP_BG_HEX, HOME_BG_HEX, WCO_SYMBOL_HEX } from '../shared/chrome'
 import iconPath from '../../resources/icon.png?asset'
 import { listCaptureSources } from './ipc/capture'
 import { isAllowedExternalScheme } from './externalUrl'
+import { localBackendCorsUrls } from './localBackendOrigins'
 import { installContextMenu } from './contextMenu'
 import { GPU_CONTEXT_LOST_CHANNEL } from '../shared/types'
 import type { ConversationFolder, LiveNote } from '../shared/types'
@@ -715,7 +716,9 @@ app.whenReady().then(async () => {
     // Static analysis suggests it may not actually need CORS help (a same-shape
     // JSON POST that PostHog answers with permissive CORS), but including it is
     // harmless and avoids a surprise block if PostHog tightens its headers.
-    'https://us.i.posthog.com/*'
+    'https://us.i.posthog.com/*',
+    // Plain-http backends of the local-backend profile; empty for stock profiles.
+    ...localBackendCorsUrls(import.meta.env)
   ]
   session.defaultSession.webRequest.onBeforeSendHeaders({ urls: apiUrls }, (details, cb) => {
     const headers = { ...details.requestHeaders }
