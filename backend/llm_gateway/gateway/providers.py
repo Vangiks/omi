@@ -57,7 +57,6 @@ from utils.llm.vertex_reservation_state import ReservationState
 from utils.llm.vertex_reservation_probe import probe_reservation
 from config.vertex_reservations import State
 from utils.llm import vertex_pt_routing as ptr
-from utils.llm.openrouter import OPENROUTER_BASE_URL, openrouter_api_key, openrouter_model_id, provider_route
 from utils.llm.vertex_reservation_response import ReservationResponseEvidence, completed_provisioned_traffic
 from utils.log_sanitizer import sanitize
 
@@ -115,49 +114,13 @@ class OpenAICompatibleChatCompletionProvider:
         api_key_env: str = OPENAI_API_KEY_ENV_VAR,
         base_url: str | None = None,
         default_headers: Mapping[str, str] | None = None,
-        openrouter_provider: str | None = None,
         http_client: httpx.AsyncClient | None = None,
     ) -> None:
         self._api_key_env = api_key_env
         self._base_url = (base_url or os.getenv(OPENAI_BASE_URL_ENV_VAR, DEFAULT_OPENAI_BASE_URL)).rstrip('/')
         self._default_headers = dict(default_headers or {})
-        # Set for providers OpenRouter can serve. The provider name in the route stays
-        # as configured, so executor request shaping keyed on it keeps working.
-        self._openrouter_provider = openrouter_provider
         self._http_client = http_client or httpx.AsyncClient()
         self._owns_http_client = http_client is None
-
-    def _endpoint(
-        self,
-        body: Mapping[str, Any],
-        *,
-        provider_ref: ProviderRef,
-        credentials: CredentialContext,
-    ) -> tuple[str, dict[str, str], dict[str, Any]]:
-        """Return the base URL, headers and body for one call.
-
-        With OPENROUTER_API_KEY set, Omi-paid calls go to OpenRouter with the same
-        model under its OpenRouter name. BYOK keys belong to the user and stay
-        direct, as do requests that point at files stored with the provider.
-        """
-        openrouter_provider = self._openrouter_provider
-        if (
-            openrouter_provider is not None
-            and credentials.mode != CredentialMode.BYOK
-            and not _references_provider_files(body)
-            and provider_route(openrouter_provider) == 'openrouter'
-        ):
-            return (
-                OPENROUTER_BASE_URL,
-                _json_headers(openrouter_api_key()),
-                {**body, 'model': openrouter_model_id(openrouter_provider, str(body['model']))},
-            )
-        api_key = _resolve_provider_api_key(
-            credentials=credentials,
-            provider_ref=provider_ref,
-            api_key_env=self._api_key_env,
-        )
-        return self._base_url, {**_json_headers(api_key), **self._default_headers}, dict(body)
 
     async def create_chat_completion(
         self,
@@ -167,14 +130,22 @@ class OpenAICompatibleChatCompletionProvider:
         credentials: CredentialContext,
         timeout_ms: int,
     ) -> ProviderResponse:
-        base_url, headers, body = self._endpoint(request, provider_ref=provider_ref, credentials=credentials)
+        api_key = _resolve_provider_api_key(
+            credentials=credentials,
+            provider_ref=provider_ref,
+            api_key_env=self._api_key_env,
+        )
 
         try:
             async with self._http_client.stream(
                 'POST',
-                f'{base_url}/chat/completions',
-                json=body,
-                headers=headers,
+                f'{self._base_url}/chat/completions',
+                json=dict(request),
+                headers={
+                    'Authorization': f'Bearer {api_key}',
+                    'Content-Type': 'application/json',
+                    **self._default_headers,
+                },
                 timeout=timeout_ms / 1000.0,
             ) as response:
                 status_code = response.status_code
@@ -212,14 +183,22 @@ class OpenAICompatibleChatCompletionProvider:
         credentials: CredentialContext,
         timeout_ms: int,
     ):
-        base_url, headers, body = self._endpoint(request, provider_ref=provider_ref, credentials=credentials)
+        api_key = _resolve_provider_api_key(
+            credentials=credentials,
+            provider_ref=provider_ref,
+            api_key_env=self._api_key_env,
+        )
 
         try:
             async with self._http_client.stream(
                 'POST',
-                f'{base_url}/chat/completions',
-                json=body,
-                headers=headers,
+                f'{self._base_url}/chat/completions',
+                json=dict(request),
+                headers={
+                    'Authorization': f'Bearer {api_key}',
+                    'Content-Type': 'application/json',
+                    **self._default_headers,
+                },
                 timeout=timeout_ms / 1000.0,
             ) as response:
                 if response.status_code >= 400:
@@ -246,17 +225,22 @@ class OpenAICompatibleChatCompletionProvider:
         credentials: CredentialContext,
         timeout_ms: int,
     ) -> ProviderResponse:
-        base_url, headers, payload = self._endpoint(
-            {'model': provider_ref.model, 'input': list(request['input'])},
-            provider_ref=provider_ref,
+        api_key = _resolve_provider_api_key(
             credentials=credentials,
+            provider_ref=provider_ref,
+            api_key_env=self._api_key_env,
         )
+        payload = {'model': provider_ref.model, 'input': list(request['input'])}
         try:
             async with self._http_client.stream(
                 'POST',
-                f'{base_url}/embeddings',
+                f'{self._base_url}/embeddings',
                 json=payload,
-                headers=headers,
+                headers={
+                    'Authorization': f'Bearer {api_key}',
+                    'Content-Type': 'application/json',
+                    **self._default_headers,
+                },
                 timeout=timeout_ms / 1000.0,
             ) as response:
                 if response.status_code >= 400:
@@ -1040,30 +1024,6 @@ def _openai_finish_reason(stop_reason: Any) -> str:
     if stop_reason == 'tool_use':
         return 'tool_calls'
     return 'stop'
-
-
-def _json_headers(api_key: str) -> dict[str, str]:
-    return {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'}
-
-
-def _references_provider_files(body: Mapping[str, Any]) -> bool:
-    """True when a message part points at a file stored with the provider by file_id.
-
-    File-chat documents are uploaded to OpenAI and passed by id; another host
-    cannot read them, so these requests keep the direct provider key.
-    """
-    messages = body.get('messages')
-    if not isinstance(messages, list):
-        return False
-    for message in messages:
-        content = message.get('content') if isinstance(message, Mapping) else None
-        if not isinstance(content, list):
-            continue
-        for part in content:
-            file_ref = part.get('file') if isinstance(part, Mapping) and part.get('type') == 'file' else None
-            if isinstance(file_ref, Mapping) and file_ref.get('file_id'):
-                return True
-    return False
 
 
 def _resolve_provider_api_key(

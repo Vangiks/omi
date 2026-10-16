@@ -566,7 +566,6 @@ def test_chat_completions_rejects_unknown_request_parameter(monkeypatch):
 def test_chat_completions_fails_closed_when_openai_key_is_not_configured(monkeypatch):
     monkeypatch.setenv('LLM_GATEWAY_SERVICE_TOKEN', 'shared-secret')
     monkeypatch.delenv('OPENAI_API_KEY', raising=False)
-    monkeypatch.delenv('OPENROUTER_API_KEY', raising=False)
 
     response = TestClient(app).post('/v1/chat/completions', json=valid_request(), headers=auth_headers())
 

@@ -47,7 +47,6 @@ def test_ready_does_not_require_anthropic_key_after_chat_agent_migration(monkeyp
 def test_ready_fails_closed_when_managed_openai_key_is_missing(monkeypatch):
     monkeypatch.setenv('LLM_GATEWAY_SERVICE_TOKEN', 'shared-secret')
     monkeypatch.delenv('OPENAI_API_KEY', raising=False)
-    monkeypatch.delenv('OPENROUTER_API_KEY', raising=False)
 
     response = TestClient(app).get('/ready', headers=auth_headers())
 
@@ -58,7 +57,6 @@ def test_ready_fails_closed_when_managed_openai_key_is_missing(monkeypatch):
 def test_ready_fails_closed_when_the_managed_web_search_key_is_missing(monkeypatch):
     monkeypatch.setenv('LLM_GATEWAY_SERVICE_TOKEN', 'shared-secret')
     monkeypatch.delenv('PERPLEXITY_API_KEY', raising=False)
-    monkeypatch.delenv('OPENROUTER_API_KEY', raising=False)
 
     response = TestClient(app).get('/ready', headers=auth_headers())
 
@@ -165,19 +163,6 @@ def test_ready_fails_closed_on_schema_validation_error(monkeypatch):
 
     assert response.status_code == 503
     assert response.json()['detail'] == 'llm gateway config is invalid'
-
-
-def test_ready_passes_with_only_an_openrouter_key(monkeypatch):
-    monkeypatch.setenv('LLM_GATEWAY_SERVICE_TOKEN', 'shared-secret')
-    for env in ('OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'PERPLEXITY_API_KEY'):
-        monkeypatch.delenv(env, raising=False)
-    monkeypatch.setenv('OPENROUTER_API_KEY', 'or-key')
-
-    response = TestClient(app).get('/ready', headers=auth_headers())
-
-    assert response.status_code == 200
-    assert response.json()['managed_chat_provider'] == 'openai'
-    assert response.json()['managed_web_search_provider'] == 'perplexity'
 
 
 def auth_headers() -> dict[str, str]:

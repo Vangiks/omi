@@ -30,7 +30,7 @@
 ```
 T1 эмуляторы в контейнере и сохранение данных
  └── T2 бэкенд, шлюз, desktop-backend, Redis, Typesense; init.sh; smoke без денег
-      └── T3 pusher и Deepgram; smoke --paid (нужен LLM: llm-openrouter T2–T3 или прямой ключ)
+      └── T3 pusher и Deepgram; smoke --paid (нужны прямые ключи моделей)
            │
 T4 клиент: профиль, CSP, CORS ──────────┐
  └── T5 вход через эмулятор             │ (T4–T7 после T2)

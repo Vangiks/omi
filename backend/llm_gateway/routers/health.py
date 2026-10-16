@@ -7,7 +7,6 @@ from llm_gateway.gateway.auth import ServiceAuthDependency
 from llm_gateway.gateway.config_loader import ConfigValidationError, GatewayConfig
 from llm_gateway.gateway.schemas import RolloutStage, Surface
 from llm_gateway.routers.dependencies import get_gateway_config
-from utils.llm.openrouter import provider_route
 
 router = APIRouter()
 
@@ -32,12 +31,12 @@ def get_ready(caller: ServiceAuthDependency) -> dict[str, object]:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail='llm gateway managed messages provider is not configured',
         )
-    if _managed_openai_chat_enabled(config) and provider_route('openai') == 'none':
+    if _managed_openai_chat_enabled(config) and not os.getenv('OPENAI_API_KEY', '').strip():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail='llm gateway managed chat provider is not configured',
         )
-    if _managed_perplexity_chat_enabled(config) and provider_route('perplexity') == 'none':
+    if _managed_perplexity_chat_enabled(config) and not os.getenv('PERPLEXITY_API_KEY', '').strip():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail='llm gateway managed web search provider is not configured',
