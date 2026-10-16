@@ -17,6 +17,11 @@ Trusted by 300,000+ professionals.
 
 </div>
 
+> **This fork** ([Vangiks/omi](https://github.com/Vangiks/omi)) keeps the Electron desktop app
+> (`desktop/windows`, developed on Linux), `web/` and the backend, which runs locally in Docker
+> (`deploy/local`). The mobile app, firmware, Omi Glass and device SDKs were removed;
+> `desktop/macos` stays for reference.
+
 ## Quick Start
 
 ### macOS
@@ -29,25 +34,29 @@ Builds the macOS app, connects to the cloud backend, and launches. No env files,
 
 > **Requirements:** macOS 14+, [Xcode](https://developer.apple.com/xcode/) (includes Swift & code signing), [Node.js](https://nodejs.org/)
 
-### Windows
+### Desktop app (Linux, Windows)
 
-```powershell
-git clone https://github.com/BasedHardware/omi.git
-cd omi\desktop\windows
-npm install
-copy .env.example .env
-npm run dev
+```sh
+cd desktop/windows
+cp .env.example .env
+npx pnpm@10 install --frozen-lockfile
+npx pnpm@10 run dev
 ```
 
-Starts the Windows desktop app from source using the public config in `.env.example`.
+Use `npx pnpm@10`, not `npm install`: the system pnpm and npm break the hoisted layout. Linux runtime
+packages and Wayland notes are in [`desktop/windows/LINUX.md`](desktop/windows/LINUX.md).
 
-> **Requirements:** [Node.js](https://nodejs.org/)
+### Local backend
 
-For development worktrees, run the baseline local setup once. It installs the Git hooks and syncs the pinned backend Python environment used by selected pre-push checks; mobile and desktop runtime environments remain opt-in.
-
-```bash
-make setup
+```sh
+cd deploy/local
+./init.sh
+docker compose up -d --build --wait
 ```
+
+See [`deploy/local/README.md`](deploy/local/README.md).
+
+For backend development outside Docker, `make setup` syncs the pinned backend Python environment.
 
 <details>
   <summary>Full Installation</summary>
@@ -78,18 +87,10 @@ cp ../../backend/.env.example ../../backend/.env
 See [desktop/macos/README.md](desktop/macos/README.md) for environment variables and credential setup.
 
 
-### Mobile App
-
-```bash
-cd app && bash setup.sh ios    # or: bash setup.sh android
-```
-
 </details>
 
 <p align="center">
   <a href="https://macos.omi.me"><img src="docs/assets/readme/download-macos-badge.png" alt="Download for macOS" height="50"></a>
-  <a href="https://apps.apple.com/us/app/friend-ai-wearable/id6502156163"><img src="docs/assets/readme/download-appstore-badge.png" alt="Download on the App Store" height="50"></a>
-  <a href="https://play.google.com/store/apps/details?id=com.friend.ios"><img src="docs/assets/readme/download-gplay-badge.png" alt="Get it on Google Play" height="50"></a>
 </p>
 
 <p align="center">
@@ -104,14 +105,14 @@ cd app && bash setup.sh ios    # or: bash setup.sh android
 ┌─────────────────────────────────────────────────────────┐
 │                      Your Devices                       │
 │                                                         │
-│  ┌──────────┐  ┌──────────────┐  ┌───────────────────┐  │
-│  │ Omi      │  │ macOS App    │  │ Mobile App        │  │
-│  │ Wearable │  │ (Swift/Python) │  │ (Flutter)         │  │
-│  └────┬─────┘  └──────┬───────┘  └────────┬──────────┘  │
-│       │    BLE         │   HTTPS/WS        │             │
-└───────┼────────────────┼───────────────────┼─────────────┘
-        │                │                   │
-        ▼                ▼                   ▼
+│  ┌───────────────────┐  ┌──────────────┐  ┌──────────┐  │
+│  │ Desktop App       │  │ macOS App    │  │ Web App  │  │
+│  │ (Electron)        │  │ (Swift)      │  │ (Next.js)│  │
+│  └─────────┬─────────┘  └──────┬───────┘  └────┬─────┘  │
+│            │      HTTPS/WS     │               │        │
+└────────────┼───────────────────┼───────────────┼────────┘
+             │                   │               │
+             ▼                   ▼               ▼
 ┌─────────────────────────────────────────────────────────┐
 │                    Omi Backend (Python)                  │
 │                                                         │
@@ -129,12 +130,13 @@ cd app && bash setup.sh ios    # or: bash setup.sh android
 
 | Component | Path | Stack |
 |-----------|------|-------|
-| **macOS app** | [`desktop/macos/`](desktop/macos/) | Swift, SwiftUI, Python desktop backend |
-| Mobile app | [`app/`](app/) | Flutter (iOS & Android) |
+| **Desktop app** | [`desktop/windows/`](desktop/windows/) | Electron, React, TypeScript (Windows, Linux) |
+| macOS app (reference) | [`desktop/macos/`](desktop/macos/) | Swift, SwiftUI, Python desktop backend |
+| Web | [`web/`](web/) | Next.js: user app, admin, public share pages |
 | Backend API | [`backend/`](backend/) | Python, FastAPI, Firebase |
-| Firmware | [`omi/`](omi/) | nRF, Zephyr, C |
-| Omi Glass | [`omiGlass/`](omiGlass/) | ESP32-S3, C |
-| SDKs | [`sdks/`](sdks/) | Device (Python/Swift/RN + multi-lang protocol) |
+| Local backend | [`deploy/local/`](deploy/local/) | Docker Compose, Firebase emulators |
+| Plugins | [`plugins/`](plugins/) | Plugin SDK and example apps |
+| CLI | [`sdks/python-cli/`](sdks/python-cli/) | `omi` command-line client |
 
 </details>
 
@@ -144,9 +146,8 @@ cd app && bash setup.sh ios    # or: bash setup.sh android
 - [Introduction](https://docs.omi.me/)
 - [Quick Start Guide](https://docs.omi.me/quickstart)
 - [macOS App Development](desktop/macos/README.md)
-- [Mobile App Setup](https://docs.omi.me/doc/developer/AppSetup)
 - [Backend Setup](https://docs.omi.me/doc/developer/backend/Backend_Setup)
-- [Contributing](https://docs.omi.me/doc/developer/Contribution) — also [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`PRODUCT.md`](PRODUCT.md)
+- [Product behavior](PRODUCT.md)
 
 ### Building Apps
 - [App Development Guide](https://docs.omi.me/doc/developer/apps/Introduction)
@@ -163,26 +164,6 @@ cd app && bash setup.sh ios    # or: bash setup.sh android
 - [Transcription Pipeline](https://docs.omi.me/doc/developer/backend/transcription)
 - [Chat System](https://docs.omi.me/doc/developer/backend/chat_system)
 - [Audio Streaming Pipeline](https://docs.omi.me/doc/developer/backend/backend_deepdive)
-- [BLE Protocol](https://docs.omi.me/doc/developer/Protocol)
-
-## Omi Hardware
-![Omi](https://github.com/user-attachments/assets/7a658366-9e02-4057-bde5-a510e1f0217a)
-
-Open-source AI wearables that pair with the mobile app for 24h+ continuous capture.
-
-<p align="center">
-  <img src="https://github.com/user-attachments/assets/834d3fdb-31b5-4f22-ae35-da3d2b9a8f59" alt="Omi Wearable" width="49%" />
-  <img src="https://github.com/user-attachments/assets/fdad4226-e5ce-4c55-b547-9101edfa3203" alt="Omi Glass" width="49%" />
-</p>
-
-- [Buy Omi](https://www.omi.me/pages/product)
-- [Buy Omi Glass Dev Kit](https://www.omi.me/glass) — ESP32-S3, camera + audio
-- [Open Source Hardware Designs](https://docs.omi.me/doc/hardware/consumer/electronics)
-- [Buying Guide](https://docs.omi.me/doc/assembly/Buying_Guide)
-- [Build the Device](https://docs.omi.me/doc/assembly/Build_the_device)
-- [Flash Firmware](https://docs.omi.me/doc/get_started/Flash_device)
-- [Integrate Your Wearable](https://docs.omi.me/doc/integrations)
-- [Hardware Specs](https://docs.omi.me/doc/hardware/DevKit2)
 
 ## License
 
