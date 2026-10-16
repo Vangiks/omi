@@ -29,7 +29,7 @@ description: Заводит задачи в GitHub Issues этого репоз�
    EOF
    ```
 
-   Подзадачу заводи с `--parent N`. Зависимость ставь через `gh issue edit N --add-blocked-by M`.
+   Подзадачу заводи с `--parent N`. Зависимость ставь через `gh issue edit N --add-blocked-by M`. Если в текущей ветке есть `tasks/plan.md`, добавь в него новую подзадачу, см. правила в `AGENTS.md`.
 
 7. **Перечисли созданные issues** с номерами и ссылками.
 
