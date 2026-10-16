@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import httpx
 import pytest
 
@@ -519,3 +521,219 @@ def test_no_provider_normalizer_hardcodes_created():
         if match.start() < fake_start
     ]
     assert offenders == [], f'hardcoded chat.completion `created` outside the test double at line(s): {offenders}'
+
+
+# --- OpenRouter route (OPENROUTER_API_KEY wins over the direct key) ---------------------
+
+_CHAT_OK = {
+    'id': 'chatcmpl_or',
+    'object': 'chat.completion',
+    'model': 'openai/gpt-6-luna',
+    'choices': [{'message': {'role': 'assistant', 'content': '{}'}}],
+}
+
+
+def _recording_client(seen: list[httpx.Request], payload: dict | None = None) -> httpx.AsyncClient:
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json=payload or _CHAT_OK)
+
+    return httpx.AsyncClient(transport=httpx.MockTransport(handler))
+
+
+def _managed_credentials():
+    return build_omi_managed_credential_context(ServiceCaller(name='backend'))
+
+
+@pytest.mark.asyncio
+async def test_openai_chat_goes_to_openrouter_when_its_key_is_set(monkeypatch):
+    monkeypatch.setenv('OPENAI_API_KEY', 'direct-key')
+    monkeypatch.setenv('OPENROUTER_API_KEY', 'or-key')
+    seen: list[httpx.Request] = []
+    provider = OpenAICompatibleChatCompletionProvider(openrouter_provider='openai', http_client=_recording_client(seen))
+
+    await provider.create_chat_completion(
+        {'model': 'gpt-6-luna', 'messages': [], 'stream': False},
+        provider_ref=ProviderRef(provider='openai', model='gpt-6-luna'),
+        credentials=_managed_credentials(),
+        timeout_ms=8000,
+    )
+
+    assert seen[0].url == 'https://openrouter.ai/api/v1/chat/completions'
+    assert seen[0].headers['authorization'] == 'Bearer or-key'
+    assert json.loads(seen[0].content)['model'] == 'openai/gpt-6-luna'
+
+
+@pytest.mark.asyncio
+async def test_openai_chat_stream_goes_to_openrouter_when_its_key_is_set(monkeypatch):
+    monkeypatch.setenv('OPENAI_API_KEY', 'direct-key')
+    monkeypatch.setenv('OPENROUTER_API_KEY', 'or-key')
+    seen: list[httpx.Request] = []
+    provider = OpenAICompatibleChatCompletionProvider(openrouter_provider='openai', http_client=_recording_client(seen))
+
+    _ = [
+        chunk
+        async for chunk in provider.stream_chat_completion(
+            {'model': 'gpt-6-luna', 'messages': [], 'stream': True},
+            provider_ref=ProviderRef(provider='openai', model='gpt-6-luna'),
+            credentials=_managed_credentials(),
+            timeout_ms=8000,
+        )
+    ]
+
+    assert seen[0].url == 'https://openrouter.ai/api/v1/chat/completions'
+    assert seen[0].headers['authorization'] == 'Bearer or-key'
+    assert json.loads(seen[0].content)['model'] == 'openai/gpt-6-luna'
+
+
+@pytest.mark.asyncio
+async def test_openai_embeddings_go_to_openrouter_when_its_key_is_set(monkeypatch):
+    monkeypatch.setenv('OPENAI_API_KEY', 'direct-key')
+    monkeypatch.setenv('OPENROUTER_API_KEY', 'or-key')
+    seen: list[httpx.Request] = []
+    embeddings_ok = {'object': 'list', 'data': [{'object': 'embedding', 'index': 0, 'embedding': [0.1]}]}
+    provider = OpenAICompatibleChatCompletionProvider(
+        openrouter_provider='openai', http_client=_recording_client(seen, embeddings_ok)
+    )
+
+    await provider.create_embedding(
+        {'input': ['hello']},
+        provider_ref=ProviderRef(provider='openai', model='text-embedding-3-large'),
+        credentials=_managed_credentials(),
+        timeout_ms=8000,
+    )
+
+    assert seen[0].url == 'https://openrouter.ai/api/v1/embeddings'
+    assert seen[0].headers['authorization'] == 'Bearer or-key'
+    assert json.loads(seen[0].content)['model'] == 'openai/text-embedding-3-large'
+
+
+@pytest.mark.asyncio
+async def test_perplexity_chat_goes_to_openrouter_when_its_key_is_set(monkeypatch):
+    monkeypatch.setenv('PERPLEXITY_API_KEY', 'direct-key')
+    monkeypatch.setenv('OPENROUTER_API_KEY', 'or-key')
+    seen: list[httpx.Request] = []
+    provider = OpenAICompatibleChatCompletionProvider(
+        api_key_env='PERPLEXITY_API_KEY',
+        base_url='https://api.perplexity.ai',
+        openrouter_provider='perplexity',
+        http_client=_recording_client(seen),
+    )
+
+    await provider.create_chat_completion(
+        {'model': 'sonar-pro', 'messages': [], 'stream': False},
+        provider_ref=ProviderRef(provider='perplexity', model='sonar-pro'),
+        credentials=_managed_credentials(),
+        timeout_ms=8000,
+    )
+
+    assert seen[0].url == 'https://openrouter.ai/api/v1/chat/completions'
+    assert seen[0].headers['authorization'] == 'Bearer or-key'
+    assert json.loads(seen[0].content)['model'] == 'perplexity/sonar-pro'
+
+
+@pytest.mark.asyncio
+async def test_openai_chat_stays_direct_without_openrouter_key(monkeypatch):
+    monkeypatch.setenv('OPENAI_API_KEY', 'direct-key')
+    monkeypatch.setenv('OPENROUTER_API_KEY', '')
+    seen: list[httpx.Request] = []
+    provider = OpenAICompatibleChatCompletionProvider(openrouter_provider='openai', http_client=_recording_client(seen))
+
+    await provider.create_chat_completion(
+        {'model': 'gpt-6-luna', 'messages': [], 'stream': False},
+        provider_ref=ProviderRef(provider='openai', model='gpt-6-luna'),
+        credentials=_managed_credentials(),
+        timeout_ms=8000,
+    )
+
+    assert seen[0].url == 'https://api.openai.com/v1/chat/completions'
+    assert seen[0].headers['authorization'] == 'Bearer direct-key'
+    assert json.loads(seen[0].content)['model'] == 'gpt-6-luna'
+
+
+@pytest.mark.asyncio
+async def test_openai_byok_stays_direct_with_openrouter_key(monkeypatch):
+    monkeypatch.setenv('OPENROUTER_API_KEY', 'or-key')
+    seen: list[httpx.Request] = []
+    provider = OpenAICompatibleChatCompletionProvider(openrouter_provider='openai', http_client=_recording_client(seen))
+
+    await provider.create_chat_completion(
+        {'model': 'gpt-4o-mini', 'messages': [], 'stream': False},
+        provider_ref=ProviderRef(provider='openai', model='gpt-4o-mini'),
+        credentials=build_byok_credential_context(ServiceCaller(name='backend'), {'openai': 'sk-user'}),
+        timeout_ms=8000,
+    )
+
+    assert seen[0].url == 'https://api.openai.com/v1/chat/completions'
+    assert seen[0].headers['authorization'] == 'Bearer sk-user'
+    assert json.loads(seen[0].content)['model'] == 'gpt-4o-mini'
+
+
+# file-chat document requests reference files stored at OpenAI by file_id; OpenRouter cannot read them.
+_FILE_CHAT_REQUEST = {
+    'model': 'gpt-6-luna',
+    'stream': True,
+    'messages': [
+        {
+            'role': 'user',
+            'content': [
+                {'type': 'text', 'text': 'Summarize the file'},
+                {'type': 'file', 'file': {'file_id': 'file-abc123'}},
+            ],
+        }
+    ],
+}
+
+
+@pytest.mark.asyncio
+async def test_openai_file_id_requests_stay_on_the_direct_key(monkeypatch):
+    monkeypatch.setenv('OPENAI_API_KEY', 'direct-key')
+    monkeypatch.setenv('OPENROUTER_API_KEY', 'or-key')
+    seen: list[httpx.Request] = []
+    provider = OpenAICompatibleChatCompletionProvider(openrouter_provider='openai', http_client=_recording_client(seen))
+
+    _ = [
+        chunk
+        async for chunk in provider.stream_chat_completion(
+            _FILE_CHAT_REQUEST,
+            provider_ref=ProviderRef(provider='openai', model='gpt-6-luna'),
+            credentials=_managed_credentials(),
+            timeout_ms=8000,
+        )
+    ]
+
+    assert seen[0].url == 'https://api.openai.com/v1/chat/completions'
+    assert seen[0].headers['authorization'] == 'Bearer direct-key'
+    assert json.loads(seen[0].content)['model'] == 'gpt-6-luna'
+
+
+@pytest.mark.asyncio
+async def test_openai_file_id_requests_fail_as_config_error_without_direct_key(monkeypatch):
+    monkeypatch.delenv('OPENAI_API_KEY', raising=False)
+    monkeypatch.setenv('OPENROUTER_API_KEY', 'or-key')
+    seen: list[httpx.Request] = []
+    provider = OpenAICompatibleChatCompletionProvider(openrouter_provider='openai', http_client=_recording_client(seen))
+
+    with pytest.raises(ProviderFailure) as exc_info:
+        await provider.create_chat_completion(
+            {**_FILE_CHAT_REQUEST, 'stream': False},
+            provider_ref=ProviderRef(provider='openai', model='gpt-6-luna'),
+            credentials=_managed_credentials(),
+            timeout_ms=8000,
+        )
+
+    assert exc_info.value.failure_class == FailureClass.INVALID_CONFIG
+    assert seen == []
+
+
+def test_registry_routes_openai_and_perplexity_through_openrouter(monkeypatch):
+    from llm_gateway.routers import dependencies
+
+    dependencies.get_provider_registry.cache_clear()
+    try:
+        registry = dependencies.get_provider_registry()
+        assert registry.provider_for('openai')._openrouter_provider == 'openai'
+        assert registry.provider_for('perplexity')._openrouter_provider == 'perplexity'
+        assert registry.provider_for('openrouter')._openrouter_provider is None
+    finally:
+        dependencies.get_provider_registry.cache_clear()

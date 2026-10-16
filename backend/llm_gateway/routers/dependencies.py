@@ -20,7 +20,7 @@ def get_gateway_config() -> GatewayConfig:
 def get_provider_registry() -> ProviderRegistry:
     return ProviderRegistry(
         {
-            'openai': OpenAICompatibleChatCompletionProvider(),
+            'openai': OpenAICompatibleChatCompletionProvider(openrouter_provider='openai'),
             'openrouter': OpenAICompatibleChatCompletionProvider(
                 api_key_env='OPENROUTER_API_KEY',
                 base_url='https://openrouter.ai/api/v1',
@@ -29,6 +29,7 @@ def get_provider_registry() -> ProviderRegistry:
             'perplexity': OpenAICompatibleChatCompletionProvider(
                 api_key_env='PERPLEXITY_API_KEY',
                 base_url='https://api.perplexity.ai',
+                openrouter_provider='perplexity',
             ),
             'gemini': VertexGeminiProvider(),
             'anthropic': AnthropicMessagesProvider(),

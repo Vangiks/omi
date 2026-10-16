@@ -55,8 +55,6 @@ DIRECT_PROVIDER_ALLOWLIST = {
     DirectUse('llm_gateway/routers/openai_compatible.py', 'OPENAI_API_KEY'),
     DirectUse('llm_gateway/routers/anthropic_messages.py', 'ANTHROPIC_API_KEY'),
     DirectUse('llm_gateway/routers/health.py', 'ANTHROPIC_API_KEY'),
-    DirectUse('llm_gateway/routers/health.py', 'OPENAI_API_KEY'),
-    DirectUse('llm_gateway/routers/health.py', 'PERPLEXITY_API_KEY'),
     DirectUse('llm_gateway/routers/health.py', 'OPENROUTER_API_KEY'),
     DirectUse('routers/desktop_proxy.py', 'GEMINI_API_KEY'),
     DirectUse('routers/desktop_realtime.py', 'GEMINI_API_KEY'),

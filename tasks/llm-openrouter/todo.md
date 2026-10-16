@@ -33,12 +33,16 @@
 **Что сделать:** `OpenAICompatibleChatCompletionProvider` для провайдеров `openai` и `perplexity` при маршруте `openrouter` берет адрес `https://openrouter.ai/api/v1`, ключ OpenRouter и переводит `request['model']`. То же в `create_embedding`. `routers/health.py` считает OpenAI и Perplexity готовыми при ключе OpenRouter.
 
 **Готово, когда:**
-- [ ] с `OPENROUTER_API_KEY` (заданный `OPENAI_API_KEY` не мешает) запрос чата уходит на `openrouter.ai/api/v1/chat/completions` с `Authorization: Bearer <ключ OpenRouter>` и моделью `openai/gpt-6-luna`
-- [ ] эмбеддинги уходят на `openrouter.ai/api/v1/embeddings` с моделью `openai/text-embedding-3-large`
-- [ ] запрос Perplexity уходит туда же с моделью `perplexity/sonar-pro`
-- [ ] запросы линий `omi:auto:file-chat-*` (вложения в чате, `file_id` из хранилища OpenAI) идут на прямой ключ OpenAI даже при заданном ключе OpenRouter; без `OPENAI_API_KEY` — понятная ошибка, а не 404 от OpenRouter
-- [ ] без `OPENROUTER_API_KEY` запросы идут как раньше; BYOK-режим не меняется
-- [ ] проверка готовности проходит с одним ключом OpenRouter
+- [x] с `OPENROUTER_API_KEY` (заданный `OPENAI_API_KEY` не мешает) запрос чата уходит на `openrouter.ai/api/v1/chat/completions` с `Authorization: Bearer <ключ OpenRouter>` и моделью `openai/gpt-6-luna`
+- [x] эмбеддинги уходят на `openrouter.ai/api/v1/embeddings` с моделью `openai/text-embedding-3-large`
+- [x] запрос Perplexity уходит туда же с моделью `perplexity/sonar-pro`
+- [x] запросы линий `omi:auto:file-chat-*` (вложения в чате, `file_id` из хранилища OpenAI) идут на прямой ключ OpenAI даже при заданном ключе OpenRouter; без `OPENAI_API_KEY` — понятная ошибка, а не 404 от OpenRouter
+- [x] без `OPENROUTER_API_KEY` запросы идут как раньше; BYOK-режим не меняется
+- [x] проверка готовности проходит с одним ключом OpenRouter
+
+**Заметки после выполнения:**
+- Вложения узнаются по содержимому запроса, а не по имени линии: провайдер не знает линию. На прямом ключе остаются запросы с частью `{type: file, file: {file_id}}`. Это линия документов. Картинки в линии `file-chat-vision` идут base64 и уходят в OpenRouter.
+- `tests/conftest.py` задает фейковый `OPENROUTER_API_KEY` для всех тестов, поэтому три негативных теста («ключей нет») теперь убирают и его. Из guardrail-теста убраны две устаревшие записи `health.py`. В T4 это коснется больше тестов.
 
 **Проверка:** `pytest:gw` (новые случаи в стиле `test_llm_gateway_openai_provider.py:19`, через `httpx.MockTransport`)
 
