@@ -33,7 +33,9 @@ const h = vi.hoisted(() => {
     send(data: unknown): void {
       this.sent.push(data)
     }
-    close(): void {
+    closeArgs: unknown[] | null = null
+    close(...args: unknown[]): void {
+      this.closeArgs = args
       this.readyState = FakeWebSocket.CLOSED
     }
     simulateOpen(): void {
@@ -189,5 +191,28 @@ describe('PTT stream lane', () => {
 
     ipc.stop('dropped-lane', 41)
     expect(isListenSessionOwnedBy('dropped-lane', 41)).toBe(false)
+  })
+})
+
+// The backend finalizes a desktop conversation on disconnect only for close code
+// 1000 (routers/listen/runtime.py, `_teardown_components`). A bare close() sends
+// no code, the server sees 1005, and the conversation stays in_progress until a
+// stale sweep an hour later. So an explicit stop closes normally; a replace keeps
+// the old behavior so a reconnect can resume the same conversation.
+describe('listen socket close code', () => {
+  it('closes with 1000 when the renderer stops a conversation session', () => {
+    ipc.start('conv-stop', 1, 'conversation')
+    const ws = lastWs()
+    ws.simulateOpen()
+    ipc.stop('conv-stop')
+    expect(ws.closeArgs?.[0]).toBe(1000)
+  })
+
+  it('does not close with 1000 when the same session id is replaced', () => {
+    ipc.start('conv-replace', 1, 'conversation')
+    const first = lastWs()
+    first.simulateOpen()
+    ipc.start('conv-replace', 1, 'conversation')
+    expect(first.closeArgs?.[0]).not.toBe(1000)
   })
 })

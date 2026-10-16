@@ -279,7 +279,7 @@ function stopKeepalive(s: Session): void {
 /** The one way a session dies early: mark closed, drop buffers, remove from the
  *  map, close the socket. Shared by replace/supersede/stop so Session cleanup
  *  can't drift between call sites. */
-function killSession(id: string, s: Session, why: string): void {
+function killSession(id: string, s: Session, why: string, closeCode?: number): void {
   console.log(`[omi-listen] ${why} ${id} mode=${s.mode} (readyState=${s.ws.readyState})`)
   s.closed = true
   s.pending = []
@@ -287,7 +287,7 @@ function killSession(id: string, s: Session, why: string): void {
   stopKeepalive(s)
   sessions.delete(id)
   try {
-    s.ws.close()
+    s.ws.close(closeCode)
   } catch {
     /* ignore */
   }
@@ -531,7 +531,11 @@ function finalizeSession(sessionId: string): void {
 function stopSession(sessionId: string, ownerId?: number): void {
   if (ownerId !== undefined && sessionOwners.get(sessionId) !== ownerId) return
   const s = sessions.get(sessionId)
-  if (s) killSession(sessionId, s, 'stop')
+  // 1000 tells the backend the recording ended: it finalizes a desktop
+  // conversation on disconnect only for a normal close (macOS sends the same).
+  // A bare close() arrives as 1005 and the conversation stays in_progress.
+  // Replace/supersede/owner-gone keep the bare close: a reconnect may resume it.
+  if (s) killSession(sessionId, s, 'stop', 1000)
   sessionOwners.delete(sessionId)
 }
 
