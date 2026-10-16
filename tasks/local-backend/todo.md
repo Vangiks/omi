@@ -18,9 +18,9 @@
 **Что сделать:** образ с Node 22, OpenJDK 21 и `firebase-tools` той же версии, что в корневом `package.json`. Свой `firebase.json` с хостами `0.0.0.0`, правилами и индексами из корня репо. В compose пока один сервис `firebase` с volume для данных и `--import`/`--export-on-exit`.
 
 **Готово, когда:**
-- [ ] `compose up -d firebase` поднимает Firestore на 8085 и Auth на 9099 только на `127.0.0.1`
-- [ ] документ, записанный через REST эмулятора, остается после `compose down` и `compose up`
-- [ ] в README записано, как ведут себя данные при `compose down`, `compose stop`, перезагрузке и `kill`
+- [x] `compose up -d firebase` поднимает Firestore на 8085 и Auth на 9099 только на `127.0.0.1`
+- [x] документ, записанный через REST эмулятора, остается после `compose down` и `compose up`
+- [x] в README записано, как ведут себя данные при `compose down`, `compose stop`, перезагрузке и `kill`
 
 **Проверка:** запись документа `curl`-ом, перезапуск, чтение
 

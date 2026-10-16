@@ -1,0 +1,36 @@
+name: omi-local
+
+services:
+  firebase:
+    build:
+      context: ../..
+      dockerfile: deploy/local/firebase/Dockerfile
+      args:
+        # Same version as devDependencies in the root package.json.
+        FIREBASE_TOOLS_VERSION: "15.22.0"
+    init: true
+    # The export on exit has to finish before Docker sends SIGKILL.
+    stop_grace_period: 60s
+    environment:
+      # Seconds between snapshots to the volume; 0 turns them off.
+      SNAPSHOT_INTERVAL: ${FIREBASE_SNAPSHOT_INTERVAL:-300}
+    ports:
+      - "127.0.0.1:8085:8085"
+      - "127.0.0.1:9099:9099"
+    volumes:
+      - emulator-data:/data
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          Promise.all(['http://127.0.0.1:8085/', 'http://127.0.0.1:9099/'].map((u) => fetch(u)))
+          .then(() => process.exit(0), () => process.exit(1))
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+volumes:
+  emulator-data:

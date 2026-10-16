@@ -1,0 +1,5 @@
+*
+!firestore.rules
+!firestore.indexes.json
+!deploy/local/firebase/firebase.json
+!deploy/local/firebase/entrypoint.sh
