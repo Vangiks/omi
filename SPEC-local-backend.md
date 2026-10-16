@@ -61,6 +61,9 @@ Omi работает у меня на машине целиком: бэкенд 
 - `pusher` не стартует без `MEMORY_ENABLED=on` (`pusher/main.py:37`). Бэкенд находит его по `HOSTED_PUSHER_API_URL=http://pusher:8080`.
 - `OMI_LLM_GATEWAY_FEATURE_MODE=gateway` разрешен только при `OMI_ENV_STAGE=local` (или `dev`, `test`).
 - Переменные окружения переносим из `_harness_service_extra` и `child_env_for` стенда (`scripts/dev-harness/dev_harness/config.py:357-448`).
+- По умолчанию `STT_SERVICE_MODELS` включает `soniox`, и без его ключа бэкенд не стартует. В compose стоит `dg-nova-3`; работу Deepgram проверяет T3.
+- Корневой `.dockerignore` исключал только `google-credentials.json`, и в образ попадали локальные `backend/.venv` (из-за него падает сборка) и `.env`. Добавлены исключения для локальных артефактов и `.env`.
+- У нового пользователя нет документа профиля, поэтому `GET /v1/users/profile` отвечает 410. Клиент этот маршрут не вызывает.
 
 ## Изменения в клиенте
 

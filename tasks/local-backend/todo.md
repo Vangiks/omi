@@ -37,9 +37,9 @@
 **Что сделать:** в compose добавить `redis`, `typesense`, `backend`, `llm-gateway`, `desktop-backend` с базовым образом `python:3.11-slim`. `.env.example` с переменными из `_harness_service_extra` стенда (адреса контейнеров, файловое хранилище, бакеты, `OMI_ENV_STAGE=local`, `OMI_LLM_GATEWAY_FEATURE_MODE=gateway`). `init.sh` создает `.env` со случайными секретами и спрашивает ключи. `smoke.sh` без платных шагов.
 
 **Готово, когда:**
-- [ ] `compose ps`: шесть сервисов `healthy`; порты 8000 и 10201 открыты только на `127.0.0.1`
-- [ ] `smoke` проходит: `/docs` у бэкенда и `desktop-backend`, `POST /v1/auth/local-dev/custom-token`, обмен на ID-токен в Auth-эмуляторе, `GET` профиля с этим токеном
-- [ ] `deploy/local/.env` в `.gitignore`; в репо нет ключей
+- [x] `compose ps`: шесть сервисов `healthy`; порты 8000 и 10201 открыты только на `127.0.0.1`
+- [x] `smoke` проходит: `/docs` у бэкенда и `desktop-backend`, `POST /v1/auth/local-dev/custom-token`, обмен на ID-токен в Auth-эмуляторе, `GET /v3/memories` с этим токеном (200) и без него (401). Профиль не подходит: у нового пользователя `GET /v1/users/profile` отвечает 410
+- [x] `deploy/local/.env` в `.gitignore`; в репо нет ключей
 
 **Проверка:** `compose up -d --build && compose ps && smoke`
 

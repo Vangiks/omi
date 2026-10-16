@@ -1,5 +1,68 @@
 name: omi-local
 
+# Environment shared by the Python services. Values mirror
+# _harness_service_extra in scripts/dev-harness/dev_harness/config.py, with
+# container names instead of 127.0.0.1. Secrets and provider keys come from
+# .env (see .env.example and init.sh).
+x-python-env: &python-env
+  PYTHONUNBUFFERED: "1"
+  OMI_ENV_STAGE: local
+  ENVIRONMENT: local-docker
+  PROVIDER_MODE: real
+  FIREBASE_PROJECT_ID: demo-omi-local
+  FIREBASE_AUTH_PROJECT_ID: demo-omi-local
+  FIRESTORE_DATABASE_ID: (default)
+  FIRESTORE_EMULATOR_HOST: firebase:8085
+  FIREBASE_AUTH_EMULATOR_HOST: firebase:9099
+  FIREBASE_API_KEY: local-firebase-auth-emulator-api-key
+  # Files go to the storage volume instead of GCS. local_storage.py accepts
+  # this only for a demo- project on the emulator, with the root inside the
+  # state root.
+  OMI_HARNESS_INSTANCE: docker
+  OMI_HARNESS_STATE_ROOT: /state
+  OMI_LOCAL_STORAGE_ROOT: /state/storage
+  OMI_LOCAL_STORAGE_BASE_URL: http://127.0.0.1:8000/_local/storage
+  BUCKET_SPEECH_PROFILES: speech-profiles
+  BUCKET_POSTPROCESSING: postprocessing
+  BUCKET_PRIVATE_CLOUD_SYNC: omi-private-cloud-sync
+  BUCKET_TEMPORAL_SYNC_LOCAL: sync-temporal
+  BUCKET_MEMORIES_RECORDINGS: memories-recordings
+  BUCKET_PLUGINS_LOGOS: plugins-logos
+  BUCKET_APP_THUMBNAILS: app-thumbnails
+  BUCKET_CHAT_FILES: chat-files
+  BUCKET_DESKTOP_UPDATES: desktop-updates
+  BUCKET_SCREEN_FRAMES: screen-frames
+  MEMORY_MODE: read
+  MEMORY_CANONICAL_CONSOLIDATION_ENABLED: "true"
+  REDIS_DB_HOST: redis
+  REDIS_DB_PORT: "6379"
+  REDIS_DB_PASSWORD: ""
+  TYPESENSE_HOST: typesense
+  TYPESENSE_HOST_PORT: "8108"
+  TYPESENSE_PROTOCOL: http
+  # Public address: the backend builds links for the client from it.
+  BASE_API_URL: http://127.0.0.1:8000
+  API_BASE_URL: http://127.0.0.1:8000
+  OMI_LLM_GATEWAY_URL: http://llm-gateway:8080
+  OMI_LLM_GATEWAY_FEATURE_MODE: gateway
+  SCREEN_FRAME_EGRESS_ENABLED: "true"
+  FREE_TIER_LOCAL_PROCESSING: "true"
+  FREE_TIER_LOCAL_PROCESSING_COHORT: "pct:100"
+  # The default chain lists soniox, and startup fails without its key.
+  STT_SERVICE_MODELS: dg-nova-3
+
+x-backend-build: &backend-build
+  context: ../..
+  dockerfile: backend/Dockerfile
+  args:
+    PYTHON_BASE_IMAGE: python:3.11-slim
+
+x-python-healthcheck: &python-healthcheck
+  interval: 10s
+  timeout: 5s
+  retries: 30
+  start_period: 60s
+
 services:
   firebase:
     build:
@@ -32,5 +95,108 @@ services:
       retries: 30
       start_period: 30s
 
+  redis:
+    image: redis:7
+    # Cache only, nothing to persist.
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  typesense:
+    image: typesense/typesense:27.1
+    command: ["--data-dir", "/data", "--api-key", "${TYPESENSE_API_KEY:?run init.sh}", "--enable-cors"]
+    volumes:
+      - typesense-data:/data
+    healthcheck:
+      # The image has no curl; bash can open the socket itself.
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8108 && printf 'GET /health HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q '\"ok\":true' <&3"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  # The backend image runs as uid 10001, and a fresh named volume is owned by
+  # root. This one-shot container hands the volume to that user.
+  storage-init:
+    image: omi-local-backend
+    build: *backend-build
+    user: root
+    entrypoint: ["chown", "10001:10001", "/state"]
+    volumes:
+      - storage:/state
+
+  llm-gateway:
+    image: omi-local-backend
+    build: *backend-build
+    command: ["uvicorn", "llm_gateway.main:app", "--host", "0.0.0.0", "--port", "8080"]
+    env_file: .env
+    environment: *python-env
+    depends_on:
+      storage-init:
+        condition: service_completed_successfully
+    healthcheck:
+      <<: *python-healthcheck
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+
+  backend:
+    image: omi-local-backend
+    build: *backend-build
+    env_file: .env
+    environment: *python-env
+    ports:
+      - "127.0.0.1:8000:8080"
+    volumes:
+      - storage:/state
+    depends_on:
+      storage-init:
+        condition: service_completed_successfully
+      firebase:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      typesense:
+        condition: service_healthy
+      llm-gateway:
+        condition: service_healthy
+    healthcheck:
+      <<: *python-healthcheck
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/docs"]
+
+  desktop-backend:
+    build:
+      context: ../..
+      dockerfile: backend/Dockerfile.desktop_backend
+      args:
+        PYTHON_BASE_IMAGE: python:3.11-slim
+    # Same user as the backend so files they share in the volume stay writable.
+    user: "10001:10001"
+    env_file: .env
+    environment:
+      <<: *python-env
+      USE_VERTEX_AI: "false"
+    ports:
+      - "127.0.0.1:10201:8080"
+    volumes:
+      - storage:/state
+    depends_on:
+      storage-init:
+        condition: service_completed_successfully
+      firebase:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      typesense:
+        condition: service_healthy
+      llm-gateway:
+        condition: service_healthy
+    healthcheck:
+      <<: *python-healthcheck
+      # This image has no curl.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=4)"]
+
 volumes:
   emulator-data:
+  typesense-data:
+  storage:
