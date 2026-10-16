@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from models.support import SupportLookupResponse, SupportTraceResponse, SupportTraceRow
-from models.users import PlanLimits, Subscription
+from config.plan_catalog import FULL_ACCESS_PLAN
 from scripts import export_openapi
 from utils.support_trace import project_support_trace
 
@@ -216,8 +216,8 @@ def test_lookup_allowlist_and_hashed_audit(harness):
     data = response.json()
     assert set(data) == set(SupportLookupResponse.model_fields)
     assert data['email'] == EMAIL and data['uid'] == 'target-customer'
-    assert data['plan'] == 'basic' and data['transcription_seconds_used'] == 125
-    assert data['transcription_seconds_remaining'] == max(0, data['transcription_seconds_limit'] - 125)
+    assert data['plan'] == FULL_ACCESS_PLAN.value and data['transcription_seconds_used'] == 125
+    assert data['transcription_seconds_limit'] is None and data['transcription_seconds_remaining'] is None
     for forbidden in ('phone', 'transcript', 'summary', 'audio_url', 'memories', 'stripe_subscription_id', 'events'):
         assert forbidden not in data
     assert 'SECRET' not in response.text
@@ -242,26 +242,12 @@ def test_unlimited_limit_is_null(harness, plan):
     assert response.json()['transcription_seconds_remaining'] is None
 
 
-def test_finite_zero_is_not_unlimited(harness):
-    harness.store.subscription['limits'] = {'transcription_seconds': 0}
-    response = lookup(harness)
-    assert response.status_code == 200
-    assert response.json()['transcription_seconds_limit'] == response.json()['transcription_seconds_remaining'] == 0
-
-
 @pytest.mark.parametrize('stored', [None, {'plan': 'free'}])
 def test_subscription_reader_does_not_create_or_migrate(harness, stored):
     harness.store.subscription = stored
-    from testing.import_isolation import AutoMockModule, stub_modules
-
-    factory = AutoMockModule('utils.subscription')
-    factory.get_default_basic_subscription = Mock(
-        return_value=Subscription(limits=PlanLimits(transcription_seconds=1200))
-    )
-    with stub_modules({'utils.subscription': factory}):
-        response = lookup(harness)
+    response = lookup(harness)
     assert response.status_code == 200, response.text
-    assert response.json()['plan'] == 'basic'
+    assert response.json()['plan'] == FULL_ACCESS_PLAN.value
     assert len(harness.store.writes) == 1
     assert harness.store.subscription == stored
 
