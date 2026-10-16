@@ -33,6 +33,9 @@ x-python-env: &python-env
   BUCKET_DESKTOP_UPDATES: desktop-updates
   BUCKET_SCREEN_FRAMES: screen-frames
   MEMORY_MODE: read
+  # Memory intake fence. Off pauses every memory write, and pusher refuses to
+  # start. Production sets on for the API, listen and pusher.
+  MEMORY_ENABLED: "on"
   MEMORY_CANONICAL_CONSOLIDATION_ENABLED: "true"
   REDIS_DB_HOST: redis
   REDIS_DB_PORT: "6379"
@@ -46,10 +49,11 @@ x-python-env: &python-env
   OMI_LLM_GATEWAY_URL: http://llm-gateway:8080
   OMI_LLM_GATEWAY_FEATURE_MODE: gateway
   SCREEN_FRAME_EGRESS_ENABLED: "true"
-  FREE_TIER_LOCAL_PROCESSING: "true"
-  FREE_TIER_LOCAL_PROCESSING_COHORT: "pct:100"
   # The default chain lists soniox, and startup fails without its key.
   STT_SERVICE_MODELS: dg-nova-3
+  # Conversation notes run only on the shaped path; off (the code default)
+  # fails every summary. Production sets on (backend/docs/feature-flag-registry.md).
+  OMI_SHAPED_AGENT_MODE: "on"
 
 x-backend-build: &backend-build
   context: ../..
@@ -117,15 +121,35 @@ services:
       timeout: 5s
       retries: 30
 
-  # The backend image runs as uid 10001, and a fresh named volume is owned by
-  # root. This one-shot container hands the volume to that user.
-  storage-init:
+  # One-shot setup before the Python services start:
+  # - the backend image runs as uid 10001, and a fresh named volume is owned
+  #   by root, so hand the volume to that user;
+  # - create the Typesense collection for conversation search from the
+  #   schema in the repo. Nothing else creates it, and without it every
+  #   conversation upsert fails with 404.
+  setup:
     image: omi-local-backend
     build: *backend-build
     user: root
-    entrypoint: ["chown", "10001:10001", "/state"]
+    env_file: .env
+    entrypoint:
+      - sh
+      - -ec
+      - |
+        chown 10001:10001 /state
+        code=$$(curl -sS -o /tmp/out -w '%{http_code}' -X POST \
+          -H "X-TYPESENSE-API-KEY: $$TYPESENSE_API_KEY" -H 'Content-Type: application/json' \
+          --data-binary @/app/typesense/conversations.schema http://typesense:8108/collections)
+        case "$$code" in
+          201) echo "typesense: created collection conversations" ;;
+          409) echo "typesense: collection conversations already exists" ;;
+          *) echo "typesense: HTTP $$code"; cat /tmp/out; exit 1 ;;
+        esac
     volumes:
       - storage:/state
+    depends_on:
+      typesense:
+        condition: service_healthy
 
   llm-gateway:
     image: omi-local-backend
@@ -134,7 +158,7 @@ services:
     env_file: .env
     environment: *python-env
     depends_on:
-      storage-init:
+      setup:
         condition: service_completed_successfully
     healthcheck:
       <<: *python-healthcheck
@@ -144,13 +168,45 @@ services:
     image: omi-local-backend
     build: *backend-build
     env_file: .env
-    environment: *python-env
+    environment:
+      <<: *python-env
+      # Without it conversations are never finalized.
+      HOSTED_PUSHER_API_URL: http://pusher:8080
     ports:
       - "127.0.0.1:8000:8080"
     volumes:
       - storage:/state
     depends_on:
-      storage-init:
+      setup:
+        condition: service_completed_successfully
+      firebase:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      typesense:
+        condition: service_healthy
+      llm-gateway:
+        condition: service_healthy
+      pusher:
+        condition: service_healthy
+    healthcheck:
+      <<: *python-healthcheck
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/docs"]
+
+  # Finalizes conversations: summary, action items, memories.
+  pusher:
+    build:
+      context: ../..
+      dockerfile: backend/pusher/Dockerfile
+      args:
+        PYTHON_BASE_IMAGE: python:3.11-slim
+    env_file: .env
+    environment:
+      <<: *python-env
+    volumes:
+      - storage:/state
+    depends_on:
+      setup:
         condition: service_completed_successfully
       firebase:
         condition: service_healthy
@@ -162,7 +218,7 @@ services:
         condition: service_healthy
     healthcheck:
       <<: *python-healthcheck
-      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8080/docs"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
 
   desktop-backend:
     build:
@@ -181,7 +237,7 @@ services:
     volumes:
       - storage:/state
     depends_on:
-      storage-init:
+      setup:
         condition: service_completed_successfully
       firebase:
         condition: service_healthy
