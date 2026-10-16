@@ -38,7 +38,6 @@ RUN apt-get update && apt-get -y dist-upgrade \
 ENV LD_PRELOAD=libjemalloc.so.2
 
 COPY --from=builder /opt/venv /opt/venv
-COPY .github/scripts/desktop_release_manifest.py /app/desktop_release_manifest_contract.py
 COPY backend/ .
 
 # Precompile first-party bytecode. site-packages is already compiled by
