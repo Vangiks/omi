@@ -31,7 +31,7 @@ docker compose up -d --build --wait
 
 `storage-init` запускается один раз перед остальными и отдает volume `storage` пользователю, от имени которого работает бэкенд. В `docker compose ps -a` он виден как `Exited (0)`, так и должно быть.
 
-Версия `firebase-tools` в `compose.yaml` должна совпадать с версией в корневом `package.json`.
+Версия `firebase-tools` в `docker-compose.yaml` должна совпадать с версией в корневом `package.json`.
 
 Журналы сервиса: `docker compose logs -f backend`.
 

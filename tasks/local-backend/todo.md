@@ -3,7 +3,7 @@
 План и обоснования: `tasks/local-backend/plan.md`.
 
 Обозначения проверок:
-- `compose` = `docker compose -f deploy/local/compose.yaml` (из корня репо)
+- `compose` = `docker compose -f deploy/local/docker-compose.yaml` (из корня репо)
 - `smoke` = `deploy/local/smoke.sh`
 - `vitest:X` = `npx pnpm@10 exec vitest run X` (из `desktop/windows`)
 - `checks` = `npx pnpm@10 typecheck && npx pnpm@10 lint` (из `desktop/windows`)
@@ -26,7 +26,7 @@
 
 **Зависит от:** —
 
-**Файлы:** `deploy/local/firebase/Dockerfile`, `deploy/local/firebase/firebase.json`, `deploy/local/compose.yaml`, `deploy/local/README.md`
+**Файлы:** `deploy/local/firebase/Dockerfile`, `deploy/local/firebase/firebase.json`, `deploy/local/docker-compose.yaml`, `deploy/local/README.md`
 
 **Размер:** M
 
@@ -45,7 +45,7 @@
 
 **Зависит от:** T1
 
-**Файлы:** `deploy/local/compose.yaml`, `deploy/local/.env.example`, `deploy/local/init.sh`, `deploy/local/smoke.sh`, `.gitignore`
+**Файлы:** `deploy/local/docker-compose.yaml`, `deploy/local/.env.example`, `deploy/local/init.sh`, `deploy/local/smoke.sh`, `.gitignore`
 
 **Размер:** M
 
@@ -64,7 +64,7 @@
 
 **Зависит от:** T2
 
-**Файлы:** `deploy/local/compose.yaml`, `deploy/local/.env.example`, `deploy/local/smoke.sh`, `deploy/local/fixtures/sample.wav`, `SPEC-local-backend.md`
+**Файлы:** `deploy/local/docker-compose.yaml`, `deploy/local/.env.example`, `deploy/local/smoke.sh`, `deploy/local/fixtures/sample.wav`, `SPEC-local-backend.md`
 
 **Размер:** M
 
@@ -215,7 +215,7 @@
 
 **Зависит от:** T7, T8, T9
 
-**Файлы:** `deploy/local/compose.yaml`, `deploy/local/README.md`, `desktop/windows/changelog/unreleased/2026-10-local-backend.json`, `SPEC-local-backend.md`
+**Файлы:** `deploy/local/docker-compose.yaml`, `deploy/local/README.md`, `desktop/windows/changelog/unreleased/2026-10-local-backend.json`, `SPEC-local-backend.md`
 
 **Размер:** M
 

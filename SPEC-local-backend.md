@@ -107,7 +107,7 @@ npx pnpm@10 lint
 
 ```
 deploy/local/
-  compose.yaml                 сервисы, volume, healthcheck
+  docker-compose.yaml          сервисы, volume, healthcheck
   firebase/Dockerfile          эмуляторы Firestore и Auth
   firebase/firebase.json       хосты 0.0.0.0, порты, rules и indexes из корня репо
   .env.example                 все переменные с комментариями, без значений секретов
