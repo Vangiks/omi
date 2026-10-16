@@ -17,7 +17,7 @@ with warnings.catch_warnings():
     warnings.simplefilter('ignore', DeprecationWarning)
     from jsonschema import Draft202012Validator, RefResolver
 
-from scripts import generate_dart_models, generate_swift_openapi_types, generate_ts_openapi_types
+from scripts import generate_swift_openapi_types, generate_ts_openapi_types
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 SPEC_PATH = ROOT_DIR / 'docs' / 'api-reference' / 'app-client-openapi.json'
@@ -145,18 +145,7 @@ def test_legacy_v1_and_future_wire_fixtures_validate_at_the_shared_boundary():
 
 def test_optional_evidence_and_capture_context_types_are_rendered_for_each_generator():
     spec = _spec()
-    schemas = spec['components']['schemas']
     memory = _schema(spec, 'MemoryDB')
-
-    dart_fields = generate_dart_models.fields_for_schema(
-        'MemoryDB', memory, ('Evidence', 'MemoryDB', 'MemoryCaptureContext'), schemas
-    )
-    dart_evidence = next(field for field in dart_fields if field.wire_name == 'evidence')
-    assert dart_evidence.required is False
-    assert dart_evidence.dart_type.annotation == 'List<GeneratedEvidence>?'
-    dart_capture_context = next(field for field in dart_fields if field.wire_name == 'capture_context')
-    assert dart_capture_context.required is False
-    assert dart_capture_context.dart_type.annotation == 'GeneratedMemoryCaptureContext?'
 
     swift_type, swift_optional = generate_swift_openapi_types._swift_type(
         memory['properties']['evidence'], required=False

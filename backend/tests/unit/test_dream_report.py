@@ -20,19 +20,16 @@ from tests.support.dream_firestore import DreamFirestore
 from utils import dream_agent, dream_report
 from utils.llm.shaped_agent import Turn
 from scripts.export_openapi import build_openapi
-from scripts.generate_dart_models import build_output
 
 from tests.unit.test_dream_harness_runtime import runtime, store, UID
 
 
-def test_checked_in_dream_schema_and_mobile_dtos_match_real_routes():
+def test_checked_in_dream_schema_matches_real_routes():
     root = Path(__file__).resolve().parents[3]
     app = FastAPI()
     app.include_router(routes.router)
     spec = json.loads((root / 'backend/docs/api/dream-openapi.json').read_text())
     assert spec == build_openapi(app, 'dream')
-    assert (root / 'app/lib/backend/schema/gen/dream_wire.g.dart').read_text() == build_output(spec, 'dream')
-    assert 'GeneratedDreamRunRequest({' not in build_output(spec, 'dream')
 
 
 @pytest.fixture

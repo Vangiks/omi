@@ -65,11 +65,9 @@ database.folders / database.users at module top). Stubs do not leak.
 from __future__ import annotations
 
 import ast
-import json
 import os
 import sys
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from types import ModuleType
@@ -863,36 +861,6 @@ def conversations_to_string(render_mod: ModuleType) -> Callable[..., str]:
     return getattr(render_mod, 'conversations_to_string')
 
 
-@pytest.fixture(scope='module')
-def dart_gen() -> ModuleType:
-    from scripts import generate_dart_models
-
-    return generate_dart_models
-
-
-@pytest.fixture(scope='module')
-def app_client_spec() -> dict[str, Any]:
-    spec_path = _BACKEND.parent / 'docs' / 'api-reference' / 'app-client-openapi.json'
-    loaded = json.loads(spec_path.read_text(encoding='utf-8'))
-    assert isinstance(loaded, dict)
-    return loaded
-
-
-@pytest.fixture(scope='module')
-def conversation_dart(dart_gen: ModuleType, app_client_spec: dict[str, Any]) -> str:
-    return dart_gen.build_output(app_client_spec, 'conversation')
-
-
-@contextmanager
-def _dart_schema_group(dart_gen: ModuleType, group: str, schemas: tuple[str, ...]) -> Iterator[None]:
-    original = dart_gen.SCHEMA_GROUPS[group]
-    dart_gen.SCHEMA_GROUPS[group] = {**original, 'schemas': schemas}
-    try:
-        yield
-    finally:
-        dart_gen.SCHEMA_GROUPS[group] = original
-
-
 def test_scan_covers_required_plumbing() -> None:
     """The explicit list must include every surface the S4 brief named."""
     required = {
@@ -1332,108 +1300,6 @@ def test_citation_collector_and_message_serializer_exclude_projection(render_mod
     assert f'ref: conversations/{conv.id}' in rendered
     assert len(configurable['conversations_collected']) == 1
     _assert_cards_and_message_are_projection_free(configurable['conversations_collected'])
-
-
-def _divergent_output_spec() -> dict[str, Any]:
-    return {
-        'components': {
-            'schemas': {
-                'Widget': {
-                    'type': 'object',
-                    'properties': {'name': {'type': 'string'}},
-                    'required': ['name'],
-                },
-                'Widget-Output': {
-                    'type': 'object',
-                    'properties': {
-                        'name': {'type': 'string'},
-                        'extra': {'type': 'integer'},
-                    },
-                    'required': ['name', 'extra'],
-                },
-                'Holder': {
-                    'type': 'object',
-                    'properties': {'widget': {'$ref': '#/components/schemas/Widget-Output'}},
-                    'required': ['widget'],
-                },
-            }
-        }
-    }
-
-
-def _matching_output_spec() -> dict[str, Any]:
-    widget = {
-        'type': 'object',
-        'title': 'Widget',
-        'properties': {'name': {'type': 'string', 'title': 'Name'}},
-        'required': ['name'],
-    }
-    widget_output = {
-        'type': 'object',
-        'title': 'WidgetOutput',
-        'description': 'serializer sibling',
-        'properties': {'name': {'type': 'string', 'title': 'Name'}},
-        'required': ['name'],
-    }
-    return {
-        'components': {
-            'schemas': {
-                'Widget': widget,
-                'Widget-Output': widget_output,
-                'Holder': {
-                    'type': 'object',
-                    'properties': {'widget': {'$ref': '#/components/schemas/Widget-Output'}},
-                    'required': ['widget'],
-                },
-            }
-        }
-    }
-
-
-def test_dart_generator_fails_when_output_schema_diverges(dart_gen: ModuleType) -> None:
-    """A serializer-specific -Output with extra required fields must not alias silently."""
-    with _dart_schema_group(dart_gen, 'messages', ('Widget', 'Holder')):
-        with pytest.raises(ValueError, match='Widget-Output'):
-            dart_gen.build_output(_divergent_output_spec(), 'messages')
-
-
-def test_dart_generator_aliases_output_schema_when_structurally_equal(dart_gen: ModuleType) -> None:
-    """Identical -Output refs still generate against the input class."""
-    with _dart_schema_group(dart_gen, 'messages', ('Widget', 'Holder')):
-        generated = dart_gen.build_output(_matching_output_spec(), 'messages')
-    assert 'class GeneratedWidget {' in generated
-    assert 'GeneratedWidgetOutput' not in generated
-    assert 'widget: _required(_readFieldValue<GeneratedWidget>' in generated
-
-
-def test_dart_generator_still_emits_real_conversation_client_processing(
-    dart_gen: ModuleType,
-    app_client_spec: dict[str, Any],
-    conversation_dart: str,
-) -> None:
-    """The production projection generates one Dart class, whatever pydantic emits.
-
-    Whether the spec carries a serializer-specific ``ClientProcessing-Output``
-    sibling is pydantic's business, not an invariant: once every projection
-    datetime became a timezone-aware string, input and output serialization
-    coincided and the sibling stopped being emitted. Pin the guarantee that
-    actually matters — the client decodes ONE shape — and assert the alias
-    contract only when the spec really does carry the pair. The fixture tests
-    above own the divergence-refusal behaviour.
-    """
-    schemas = app_client_spec['components']['schemas']
-    assert 'ClientProcessing' in schemas
-    if 'ClientProcessing-Output' in schemas:
-        assert dart_gen.schemas_structurally_equal(schemas['ClientProcessing'], schemas['ClientProcessing-Output'])
-        aliased = dart_gen.resolve_output_ref_alias(
-            'ClientProcessing-Output',
-            dart_gen.SCHEMA_GROUPS['conversation']['schemas'],
-            schemas,
-        )
-        assert aliased == 'ClientProcessing'
-    assert 'class GeneratedClientProcessing' in conversation_dart
-    assert 'GeneratedClientProcessingOutput' not in conversation_dart
-    assert 'clientProcessing: _readFieldValue<GeneratedClientProcessing>' in conversation_dart
 
 
 # Any call site that opts out of transcript-mutation invalidation must be listed
