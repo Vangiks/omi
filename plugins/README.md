@@ -1,54 +1,32 @@
 # Omi Plugins
 
-This directory contains three distinct things:
+Reference material for building Omi apps: services that run outside the backend and
+plug into it through webhooks, chat tools and OAuth. The platform side (app store,
+webhook delivery, chat tools, MCP) lives in `backend/`; how to write an app is in
+`docs/doc/developer/apps/`.
 
-## 1. `omi-plugin-sdk/` — shared SDK (models only)
+## `omi-plugin-sdk/` — webhook payload models
 
-`omi-plugin-sdk` is a small Python package that owns the Omi webhook
-payload models (`omi_plugin_sdk.models`: `Conversation`, `TranscriptSegment`,
-`ActionItem`, ...). It is intentionally models-only — auth/webhook/FastAPI
-helpers were removed in July 2026.
+A small Python package with the Omi webhook payload models (`omi_plugin_sdk.models`:
+`Conversation`, `TranscriptSegment`, `ActionItem`, ...). It is models-only. The backend
+imports it from `plugins/omi-plugin-sdk/src` when present and falls back to built-in
+copies otherwise. Tests: `scripts/run-plugin-sdk-tests.sh`.
 
-SDK installation differs by consumer:
+## Example apps
 
-- **Legacy monolith** (`plugins/main.py`, `plugins/Dockerfile`): installs the
-  SDK through `plugins/requirements.txt`, which pins `./omi-plugin-sdk`.
-- **Independently deployed `omi-*-app/` services**: each has its own
-  `requirements.txt` and installs the SDK by relative path (`../omi-plugin-sdk`)
-  from within its own directory — not via `plugins/requirements.txt`.
+Each is a self-contained FastAPI service with its own `main.py`, `requirements.txt` and
+deploy descriptor (Procfile / railway.toml; GitHub also has a Dockerfile):
 
-## 2. `omi-*-app/` — independently deployed plugin services (28)
+- `omi-dropbox-app/` — conversation webhook (`POST /conversation`): saves each finished
+  conversation's summary, transcript and audio to Dropbox after an OAuth setup.
+- `omi-notion-app/` — OAuth plus chat tools that search, read and write Notion pages.
+- `omi-github-app/` — chat tools that create and manage GitHub issues.
+- `omi-google-calendar-app/` — OAuth plus chat tools for Google Calendar events.
 
-Each `omi-<name>-app/` directory (notion, github, slack, dropbox, whoop, ...)
-is a self-contained FastAPI service with its own `main.py`, dependency file,
-and deploy descriptor (Dockerfile / Procfile / railway.toml). They are
-deployed independently of each other and of the monolith.
+Chat-tool apps publish their tool list at `/.well-known/omi-tools.json`.
 
-## 3. Legacy monolith — `main.py` + `Dockerfile`
+The other upstream examples (Slack, Linear, Whoop, Shopify and more) are in
+BasedHardware/omi under `plugins/`.
 
-`plugins/main.py` is the old all-in-one plugin API (`uvicorn main:app`, built
-by `plugins/Dockerfile`, deployed manually via
-`.github/workflows/gcp_plugins.yml` — workflow_dispatch only). It is kept
-only because that Cloud Run deploy target still exists; do not add new
-business logic to it. Its live routers: `basic/` (conversation_created,
-mentor), `oauth/`, `zapier/`, `chatgpt/`, `subscription/`, `notifications/`,
-`iq_rating/`, and `_multion/` (the last legacy integration, dormant).
-`templates/` holds the setup-flow HTML it serves; `.env.template` lists its
-environment variables.
-
-- History and keep/retire decision: see `LEGACY_MONOLITH.md`.
-- Migration audit (historical): see `PLUGIN_REFACTOR_AUDIT.md`.
-
-## Other directories
-
-- `models.py` — root compatibility shim over `omi_plugin_sdk.models`.
-- `scripts/check_plugin_imports.py` — imports every `omi-*-app/main.py` and
-  builds their OpenAPI schemas (contract check for isolated-root builds).
-- `instructions/` — per-app instruction/asset content served to the mobile
-  app.
-- `hume-ai/`, `composio/`, `uber_call/` — standalone services hosted outside
-  the monorepo's deploy workflows.
-- `zapier/omi-zap/` — the Zapier integration package (not part of the monolith).
-  Its jest suite runs via `run-tests.sh`, registered as `omi-zap-tests` in
-  `.github/checks-manifest.yaml`.
-- `logos/`, `import/` — static assets and import tooling.
+`scripts/check_plugin_request_timeouts.py` fails any `requests` call in `plugins/`
+that has no timeout.
