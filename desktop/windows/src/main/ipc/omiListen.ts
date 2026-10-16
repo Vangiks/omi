@@ -39,6 +39,13 @@ function byokSttHeaders(base: Record<string, string>): Record<string, string> {
   }
 }
 
+/** WebSocket origin of the Omi API: VITE_OMI_API_BASE with https → wss and
+ *  http → ws (the local-backend profile's plain-http stack). */
+function listenOrigin(): string {
+  const base = (import.meta.env.VITE_OMI_API_BASE || 'https://api.omi.me').replace(/\/+$/, '')
+  return base.replace(/^http(s?):/, 'ws$1:')
+}
+
 /**
  * Build the WebSocket endpoint for a listen session by mode.
  *
@@ -72,7 +79,7 @@ export function buildListenEndpoint(
   const lang = encodeURIComponent(language || 'en')
   if (mode === 'ptt' || mode === 'transcribe') {
     return (
-      'wss://api.omi.me/v2/voice-message/transcribe-stream' +
+      `${listenOrigin()}/v2/voice-message/transcribe-stream` +
       `?language=${lang}` +
       '&sample_rate=16000' +
       '&codec=linear16' +
@@ -80,7 +87,7 @@ export function buildListenEndpoint(
     )
   }
   return (
-    'wss://api.omi.me/v4/listen' +
+    `${listenOrigin()}/v4/listen` +
     `?language=${lang}` +
     '&sample_rate=16000' +
     '&codec=pcm16' +

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import WebSocket from 'ws'
 import { buildListenEndpoint, shouldSendKeepalive, isSocketStale } from './omiListen'
 
@@ -64,6 +64,49 @@ describe('buildListenEndpoint', () => {
     expect(
       buildListenEndpoint('transcribe', 'en', 'ab12cd34-0000-0000-0000-000000000000')
     ).not.toContain('client_conversation_id')
+  })
+})
+
+// The host follows VITE_OMI_API_BASE (https → wss, http → ws), so the
+// local-backend profile records into the Docker stack instead of Omi's cloud.
+describe('buildListenEndpoint — host from VITE_OMI_API_BASE', () => {
+  const CLOUD_CONVERSATION =
+    'wss://api.omi.me/v4/listen?language=en&sample_rate=16000&codec=pcm16&channels=1' +
+    '&include_speech_profile=true&source=desktop&speaker_auto_assign=enabled'
+  const CLOUD_PTT =
+    'wss://api.omi.me/v2/voice-message/transcribe-stream?language=en&sample_rate=16000' +
+    '&codec=linear16&channels=1'
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('keeps the exact cloud URLs for the stock profile', () => {
+    vi.stubEnv('VITE_OMI_API_BASE', 'https://api.omi.me')
+    expect(buildListenEndpoint('conversation', 'en')).toBe(CLOUD_CONVERSATION)
+    expect(buildListenEndpoint('ptt', 'en')).toBe(CLOUD_PTT)
+  })
+
+  it('falls back to the cloud host when the base is unset', () => {
+    vi.stubEnv('VITE_OMI_API_BASE', '')
+    expect(buildListenEndpoint('conversation', 'en')).toBe(CLOUD_CONVERSATION)
+  })
+
+  it('uses plain ws for the local backend', () => {
+    vi.stubEnv('VITE_OMI_API_BASE', 'http://127.0.0.1:8000')
+    expect(buildListenEndpoint('conversation', 'en')).toBe(
+      CLOUD_CONVERSATION.replace('wss://api.omi.me', 'ws://127.0.0.1:8000')
+    )
+    expect(buildListenEndpoint('transcribe', 'en')).toBe(
+      CLOUD_PTT.replace('wss://api.omi.me', 'ws://127.0.0.1:8000')
+    )
+  })
+
+  it('tolerates a trailing slash on the base', () => {
+    vi.stubEnv('VITE_OMI_API_BASE', 'http://127.0.0.1:8000/')
+    expect(buildListenEndpoint('conversation', 'en')).toMatch(
+      /^ws:\/\/127\.0\.0\.1:8000\/v4\/listen\?/
+    )
   })
 })
 
