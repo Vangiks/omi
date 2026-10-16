@@ -1082,11 +1082,6 @@ app.whenReady().then(async () => {
     // click does not enter the gesture machine or emit PTT phases — a tray
     // click has no physical key to sample.
     openBar: () => summonFromTray(),
-    // Manual update check (mirrors Settings → About and Mac's "Check for Updates").
-    // checkForUpdatesNow never throws; log the outcome for a manual tester.
-    checkForUpdates: () => {
-      void checkForUpdatesNow().then((r) => console.log('[tray] update check:', r.status))
-    },
     // "Screen Analysis" toggle → flip the screenAnalysisEnabled master. Writing the
     // setting is the whole action: the proactive coordinator subscribes to
     // onAppSettingsChanged and starts/stops its screen-analysis loop off that write
