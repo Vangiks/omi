@@ -38,7 +38,6 @@ import { InsightToast } from './components/insight/InsightToast'
 import { TrayStateHost } from './components/tray/TrayStateHost'
 import { ChatBridgeHost } from './components/chat/ChatBridgeHost'
 import { VoiceHubDriverHost } from './components/chat/VoiceHubDriverHost'
-import { UsageLimitPopup } from './components/settings/billing/UsageLimitPopup'
 import { ClaudeAuthSheet } from './components/settings/billing/ClaudeAuthSheet'
 import { RecordHotkeyHost } from './components/hotkeys/RecordHotkeyHost'
 import { BackgroundConsentInterstitial } from './components/consent/BackgroundConsentInterstitial'
@@ -172,10 +171,6 @@ function AppShellInner(): React.JSX.Element {
           the coordinator + hub + pcmPlayer live here (D1). Inert until the bar
           delegates a hold (flag on) — flag off it never receives a begin. */}
       <VoiceHubDriverHost />
-      {/* Usage-limit popup + its chat-quota trigger. The popup deep-links into
-          the Plan & Usage settings tab; the trigger watches the shared chat
-          engine and raises it once when a send lands on an exhausted quota. */}
-      <UsageLimitPopup />
       {/* App-wide transient toasts (bottom-right). The toast() pub/sub had no host
           mounted, so every toast() call across the app (~28 sites: connect/copy/
           export feedback, mutation errors incl. the tasks failure signal) was a

@@ -10,9 +10,8 @@ function getFocusable(container: HTMLElement): HTMLElement[] {
   return Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
 }
 
-// Windows-native centered modal with a blurred scrim (the app's established
-// pattern — see UsageLimitPopup). Mac uses titlebar sheets; the Track 4 ruling is
-// to render these as clean centered dialogs instead. Backdrop click and Escape
+// Windows-native centered modal with a blurred scrim. Mac uses titlebar sheets;
+// the Track 4 ruling is to render these as clean centered dialogs instead. Backdrop click and Escape
 // dismiss; content clicks don't propagate to the scrim. Keyboard focus is trapped
 // inside the dialog and restored to the opener on close.
 export function ModalShell({

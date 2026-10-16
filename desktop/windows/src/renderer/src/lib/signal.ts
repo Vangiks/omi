@@ -1,5 +1,5 @@
-// Tiny generic pub/sub primitive shared by lib/usageLimit.ts and
-// lib/settingsNav.ts: holds a current value, broadcasts it to every subscriber
+// Tiny generic pub/sub primitive (lib/settingsNav.ts, lib/claudeSignIn.ts and
+// others): holds a current value, broadcasts it to every subscriber
 // on set(), and replays the current value to a NEW subscriber immediately (so
 // a set-before-subscribe race — e.g. navigate-then-mount — still delivers).
 // No external deps, no React coupling — same shape as the existing lib/toast.ts

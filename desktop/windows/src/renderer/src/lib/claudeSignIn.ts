@@ -29,8 +29,7 @@
 //    ChatProvider.startClaudeAuth's invalid-URL branch, which hides the sheet
 //    and sets an error rather than leaving a broken sheet up).
 //
-// The sheet is a global modal mounted once at the app root (like
-// UsageLimitPopup). The bar is a separate renderer and does not host it.
+// The sheet is a global modal mounted once at the app root. The bar is a separate renderer and does not host it.
 
 import { createSignal } from './signal'
 import type { CodingAgentStartAuthResult } from '../../../shared/types'

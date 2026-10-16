@@ -13,7 +13,6 @@ import { useEffect, useRef, useState } from 'react'
 import { KeyRound, ShieldCheck, AlertTriangle, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { SettingRow } from '../SettingRow'
 import { auth } from '../../../lib/firebase'
-import { dismissUsageLimit } from '../../../lib/usageLimit'
 import { fetchSubscription, fetchChatQuota } from '../../../lib/billing'
 import {
   BYOK_PROVIDERS,
@@ -137,9 +136,7 @@ export function DeveloperKeysSection(): React.JSX.Element {
     setStatuses(result.results)
     if (result.active) {
       setActivationError(null)
-      // Mac parity: on activation, refresh plan/quota and clear any sticky
-      // paywall so a user who just hit their limit isn't left blocked.
-      dismissUsageLimit()
+      // Mac parity: on activation, refresh plan/quota.
       void fetchSubscription().catch(() => {})
       void fetchChatQuota().catch(() => {})
     } else if (result.backendError) {
