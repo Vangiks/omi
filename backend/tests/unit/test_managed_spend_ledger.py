@@ -543,11 +543,8 @@ async def _run_relay(
     client_frames: list[str],
     upstream_frames: list[str | bytes],
     byok: bool = False,
-    byok_enrolled: bool | None = None,
     fail_downstream_send: bool = False,
 ) -> tuple[Any, _FakeUpstream]:
-    from models.users import PlanType
-
     drained = asyncio.Event()
     upstream = _FakeUpstream(upstream_frames, drained)
     validated = {provider: 'sk-user'} if byok else {}
@@ -558,20 +555,6 @@ async def _run_relay(
     monkeypatch.setattr(omni_relay, 'validate_byok_websocket_keys', lambda _uid, keys: (dict(keys), None))
     monkeypatch.setattr(omni_relay, 'set_validated_byok_keys', lambda _keys, _uid: None)
     monkeypatch.setattr(omni_relay, 'is_trial_paywalled', lambda *_a, **_k: False)
-    monkeypatch.setattr(
-        omni_relay.users_db, 'is_byok_active', lambda _uid: byok if byok_enrolled is None else byok_enrolled
-    )
-    monkeypatch.setattr(
-        omni_relay, 'get_chat_quota_snapshot', lambda *_a, **_k: {'plan': PlanType.basic, 'allowed': True}
-    )
-    monkeypatch.setattr(omni_relay, 'get_customer_firestore_client', lambda: object())
-    # S15's quota machinery is a different seam (test_realtime_quota_counter.py); keep it inert here.
-    monkeypatch.setattr(omni_relay, '_relay_responses_this_month', lambda _uid: 0)
-    monkeypatch.setattr(
-        omni_relay,
-        '_count_relay_response',
-        lambda _uid: (0, {'plan': PlanType.basic, 'allowed': True, 'unit': 'questions', 'used': 0.0, 'limit': 30.0}),
-    )
     monkeypatch.setattr(omni_relay, '_upstream', lambda _provider, _model: (('wss://upstream.invalid', {}), None))
     monkeypatch.setattr(omni_relay.websockets, 'connect', lambda *_a, **_k: _FakeConnect(upstream))
     socket = _client_socket(
@@ -690,7 +673,6 @@ async def test_payer_follows_the_credential_the_relay_selected_not_enrollment(mo
         client_frames=[],
         upstream_frames=[_OPENAI_DONE],
         byok=True,
-        byok_enrolled=False,
     )
     await ledger.drain_pending_writes()
 

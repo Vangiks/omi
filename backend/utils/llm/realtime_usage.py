@@ -161,13 +161,13 @@ _MAX_MODEL_CHARS = 128
 # Open response identities are retained through the same bound as completed
 # ones. The relay ends any session that has started this many responses
 # (MAX_RESPONSES_PER_SESSION below) and makes it reconnect with a fresh
-# observer, so no session — whatever its plan or how many month resets it
-# spans — ever reaches the identity-less overflow tally. The tally remains
+# observer, so no session — however long it stays open —
+# ever reaches the identity-less overflow tally. The tally remains
 # only as a defensive floor for a caller that does not enforce that limit.
 _MAX_OPEN_RESPONSES = 1024
 # Exported for the relay: the per-session response limit that keeps identity
 # exact. One below the identity capacity, so the response that trips the limit
-# — observed, counted for admission, then refused — still has its identity.
+# — observed, recorded as spend, then refused — still has its identity.
 MAX_RESPONSES_PER_SESSION = _MAX_OPEN_RESPONSES - 1
 # A provider response id is a short token; anything longer is not one and is
 # replaced by an anonymous key so hostile frames cannot park bytes in memory
