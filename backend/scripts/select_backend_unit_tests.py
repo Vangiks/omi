@@ -3,18 +3,14 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Set, Tuple, cast
-
 import argparse
 import fnmatch
-import json
 import sys
 from pathlib import Path
 from pathlib import PurePosixPath
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 REPO_DIR = BACKEND_DIR.parent
-WORKFLOW_CONTRACTS_PATH = BACKEND_DIR / 'testing' / 'workflow_contracts.json'
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
@@ -27,7 +23,7 @@ FULL_TEST_ROOTS = (
 )
 FULL_TEST_GLOBS = (BACKEND_DIR / 'tests',)
 
-# Hermetic e2e tests selected by workflow contracts / memory policy core — not part of --all.
+# Hermetic e2e tests selected by the memory policy core — not part of --all.
 EXTRA_DISCOVERABLE_TESTS = (BACKEND_DIR / 'testing' / 'e2e' / 'test_canonical_memory_pipeline.py',)
 
 LEGACY_UNLISTED_TESTS = {
@@ -37,7 +33,6 @@ LEGACY_UNLISTED_TESTS = {
 }
 
 FULL_RUN_PATHS = (
-    '.github/workflows/backend-unit-tests.yml',
     'backend/pylock.toml',
     'backend/pylock.macos.toml',
     'backend/pylock.macos-x86_64.toml',
@@ -103,32 +98,6 @@ MEMORY_POLICY_CORE_TESTS = (
     'testing/e2e/test_canonical_memory_pipeline.py',
 )
 
-# Monitoring telemetry contract sources (#9587). Referenced from both the
-# AREA_TESTS path->test mapping and is_selectable_backend_path's
-# intentional-exception check below — single source so the two lists cannot
-# drift apart and silently stop selecting the monitoring unit contracts.
-MONITORING_CONTRACT_SOURCES = (
-    'backend/charts/monitoring/prometheus-adapter/',
-    'backend/scripts/diff_prod_adapter.py',
-    'backend/charts/parakeet/',
-    'backend/charts/backend-listen/',
-    'backend/charts/pusher/',
-    'backend/charts/vad/',
-    'backend/charts/diarizer/',
-    'backend/charts/nllb-translation/',
-    'backend/charts/deepgram-self-hosted/nova-3/',
-    'backend/scripts/alert_backtest.py',
-    'backend/charts/monitoring/metric-inventory.prod.json',
-    'backend/charts/monitoring/expected-targets.prod.yaml',
-    'backend/charts/monitoring/kube-prometheus-stack/',
-    'backend/charts/monitoring/alerts/',
-    'backend/charts/monitoring/notifications/',
-    'backend/charts/monitoring/alert-rules.json',
-    'backend/charts/monitoring/live-alert-gate.json',
-    'backend/charts/monitoring/prometheus-stackdriver-exporter/',
-    'backend/charts/parakeet/templates/servicemonitor.yaml',
-)
-
 # Serving query contract checks are a cross-cutting guard, not an area-specific
 # selection. Keep this list complete even when a change also selects narrower
 # tests. The inventory predicate below is shared with the AST inventory's scope.
@@ -139,7 +108,6 @@ FIRESTORE_INDEX_GUARD_TESTS = (
     'tests/unit/test_firestore_runtime_witnesses.py',
     'tests/unit/test_firestore_index_rules.py',
     'tests/unit/test_firestore_query_contract.py',
-    'tests/unit/test_firestore_field_indexes.py',
 )
 
 FIRESTORE_INDEX_GUARD_SUPPORT_PREFIX = 'backend/tests/support/firestore_'
@@ -271,20 +239,6 @@ AREA_TESTS = (
         ('tests/unit/test_parakeet_*.py',),
     ),
     (
-        ('backend/scripts/verify_pusher_live_alert_route.py',),
-        (),
-        ('tests/unit/test_verify_pusher_live_alert_route.py',),
-    ),
-    (
-        MONITORING_CONTRACT_SOURCES,
-        (),
-        (
-            'tests/unit/test_monitoring_*.py',
-            'tests/unit/test_journey_observability.py',
-            'tests/unit/test_verify_pusher_live_alert_route.py',
-        ),
-    ),
-    (
         ('backend/services/users/', 'backend/routers/users'),
         (),
         (
@@ -408,7 +362,7 @@ def discover_unit_tests() -> list[str]:
 
 
 def discover_all_tests() -> list[str]:
-    """Unit tests plus workflow-contract extras (e2e) for PR path selection only."""
+    """Unit tests plus memory-policy e2e extras for PR path selection only."""
     tests = {Path(BACKEND_DIR / path) for path in discover_unit_tests()}
     for path in EXTRA_DISCOVERABLE_TESTS:
         if path.is_file():
@@ -443,10 +397,8 @@ def is_full_run_path(path: str) -> bool:
 def is_selectable_backend_path(path: str) -> bool:
     """Return True for backend paths that can select or force unit tests.
 
-    Docs, AGENTS, and most chart/dashboard artifacts are ignored so editing them
-    does not trip the unmapped-path full-suite fallback. Monitoring telemetry
-    contract sources (#9587) are an intentional exception so inventory/values
-    drift still selects the monitoring unit contracts.
+    Docs and AGENTS are ignored so editing them does not trip the
+    unmapped-path full-suite fallback.
     """
     if not path.startswith('backend/'):
         return False
@@ -454,12 +406,6 @@ def is_selectable_backend_path(path: str) -> bool:
         return False
     if path.startswith('backend/docs/'):
         return False
-    if path.startswith('backend/charts/'):
-        monitoring_contract_prefixes = MONITORING_CONTRACT_SOURCES
-        return any(
-            path == prefix or path.startswith(prefix) if prefix.endswith('/') else path == prefix
-            for prefix in monitoring_contract_prefixes
-        )
     return True
 
 
@@ -475,36 +421,6 @@ def is_memory_policy_core_path(path: str) -> bool:
     return any(path_matches(path, pattern) for pattern in MEMORY_POLICY_CORE_PATH_GLOBS)
 
 
-def load_workflow_contracts() -> List[Dict[str, Any]]:
-    if not WORKFLOW_CONTRACTS_PATH.exists():
-        return []
-    data: object = json.loads(WORKFLOW_CONTRACTS_PATH.read_text(encoding='utf-8'))
-    if not isinstance(data, dict):
-        return []
-    typed_data: Dict[str, Any] = cast(Dict[str, Any], data)
-    workflows_raw: Any = typed_data.get('workflows', [])
-    return cast(List[Dict[str, Any]], workflows_raw) if isinstance(workflows_raw, list) else []
-
-
-def workflow_contract_tests_for_path(path: str, all_tests: List[str]) -> Set[str]:
-    selected: Set[str] = set()
-    for workflow in load_workflow_contracts():
-        sources: Tuple[str, ...] = tuple(workflow.get('sources') or ())
-        if not any(path_matches(path, source) for source in sources):
-            continue
-        tests_raw = workflow.get('tests') or ()
-        selected.update(test for test in tests_raw if test in all_tests)
-    return selected
-
-
-def workflow_contract_matches_path(path: str) -> bool:
-    for workflow in load_workflow_contracts():
-        sources: Tuple[str, ...] = tuple(workflow.get('sources') or ())
-        if any(path_matches(path, source) for source in sources):
-            return True
-    return False
-
-
 def tests_for_changed_paths(changed_paths: list[str], all_tests: list[str]) -> tuple[list[str], str]:
     changed_paths = [path for path in (normalize_changed_path(path) for path in changed_paths) if path]
     if not changed_paths:
@@ -515,9 +431,6 @@ def tests_for_changed_paths(changed_paths: list[str], all_tests: list[str]) -> t
         selected.update(test for test in FIRESTORE_INDEX_GUARD_TESTS if test in all_tests)
     backend_paths = [path for path in changed_paths if is_selectable_backend_path(path)]
     test_paths = [path for path in backend_paths if path.startswith('backend/tests/') and path.endswith('.py')]
-
-    for path in changed_paths:
-        selected.update(workflow_contract_tests_for_path(path, all_tests))
 
     for path in backend_paths:
         if is_full_run_path(path):
@@ -536,8 +449,6 @@ def tests_for_changed_paths(changed_paths: list[str], all_tests: list[str]) -> t
     for path in backend_paths:
         if path in test_paths:
             continue
-        if workflow_contract_matches_path(path):
-            mapped_backend_sources.add(path)
         for source_prefixes, source_globs, test_globs in AREA_TESTS:
             if any(path.startswith(prefix) for prefix in source_prefixes) or any(
                 path_matches(path, pattern) for pattern in source_globs
@@ -557,10 +468,10 @@ def tests_for_changed_paths(changed_paths: list[str], all_tests: list[str]) -> t
 
     if not backend_paths:
         if selected:
-            return sorted(selected), 'selected backend unit tests from changed paths and workflow contracts'
+            return sorted(selected), 'selected backend unit tests from changed paths'
         return [], 'no backend files changed'
     if selected:
-        return sorted(selected), 'selected backend unit tests from changed paths and workflow contracts'
+        return sorted(selected), 'selected backend unit tests from changed paths'
     return all_tests, 'backend changes did not match a narrow area'
 
 

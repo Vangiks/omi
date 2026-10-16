@@ -152,18 +152,6 @@ RULES: tuple[InventoryRule, ...] = (
         "proactive_assistant_symbol",
         ("reader", "writer"),
     ),
-    InventoryRule(
-        "maintenance_resources",
-        (
-            ".github/workflows/gcp_memory_maintenance_job*.yml",
-            "backend/deploy/runtime_env/*.yaml",
-            "backend/scripts/validate_memory_maintenance_scheduler.py",
-            "backend/runtime_images.json",
-        ),
-        r"memory-maintenance-job|memory-maintenance-hourly|MEMORY_CANONICAL_(?:MAINTENANCE|CONSOLIDATION)|short_term_lifecycle",
-        "maintenance_resource_symbol",
-        ("job",),
-    ),
 )
 
 

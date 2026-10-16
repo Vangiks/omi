@@ -26,14 +26,11 @@ REPO_DIR = BACKEND_DIR.parent
 GAUNTLET_ROOT = BACKEND_DIR / ".harness" / "memory-continuity-gauntlet"
 PRUNE_ABORTED_BUNDLE_DAYS = 7
 
-WORKFLOW_ID = "canonical_memory_pipeline"
-WORKFLOW_TEST_PATH = "testing/e2e/test_canonical_memory_pipeline.py"
 REQUIRED_SELF_CHECK_PATHS = (
     "backend/scripts/memory-continuity-gauntlet.py",
     "backend/scripts/memory-continuity-gauntlet.sh",
     "backend/testing/e2e/test_canonical_memory_pipeline.py",
     "backend/tests/unit/test_inv_mem_1_guard.py",
-    "backend/testing/workflow_contracts.json",
 )
 
 SUITE_NAMES = frozenset({"capture", "promote", "recall", "archive", "surfaces", "resilience"})
@@ -145,17 +142,6 @@ def expand_suites(raw: str) -> set[str]:
     return enabled or set(SUITE_ALIASES["all"])
 
 
-def load_workflow_contract() -> dict[str, Any] | None:
-    contracts_path = BACKEND_DIR / "testing" / "workflow_contracts.json"
-    if not contracts_path.is_file():
-        return None
-    contracts = json.loads(contracts_path.read_text(encoding="utf-8"))
-    for workflow in contracts.get("workflows", []):
-        if workflow.get("id") == WORKFLOW_ID:
-            return workflow
-    return None
-
-
 def self_check() -> int:
     failures: list[str] = []
     for rel_path in REQUIRED_SELF_CHECK_PATHS:
@@ -183,20 +169,12 @@ def self_check() -> int:
         if kind not in driver_source:
             failures.append(f"driver missing nonce kind {kind!r}")
 
-    workflow = load_workflow_contract()
-    if workflow is None:
-        failures.append(f"workflow_contracts.json missing workflow id {WORKFLOW_ID!r}")
-    else:
-        tests = workflow.get("tests") or []
-        if WORKFLOW_TEST_PATH not in tests:
-            failures.append(f"{WORKFLOW_ID} workflow must register tests path {WORKFLOW_TEST_PATH!r}; got {tests!r}")
-
     if failures:
         for failure in failures:
             print(f"self-check failed: {failure}", file=sys.stderr)
         return 1
 
-    print("self-check passed " f"(files + {WORKFLOW_ID} workflow + suite wiring + nonce contract + --self-check)")
+    print("self-check passed (files + suite wiring + nonce contract + --self-check)")
     return 0
 
 

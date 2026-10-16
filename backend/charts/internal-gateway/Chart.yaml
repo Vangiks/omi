@@ -1,5 +1,0 @@
-apiVersion: v2
-name: internal-gateway
-description: Shared regional internal HTTP Gateway for model services
-type: application
-version: 0.1.0

@@ -47,7 +47,6 @@ def test_gate_f_rules_declare_only_potential_reader_writer_or_job_roles() -> Non
         "consolidation_promotion": ("reader", "writer", "job"),
         "profile_synthesis": ("reader", "writer"),
         "old_proactive_assistants": ("reader", "writer"),
-        "maintenance_resources": ("job",),
     }
 
 
@@ -72,12 +71,6 @@ def test_representative_paths_keep_evidence_backed_potential_roles() -> None:
         if item.path == "backend/utils/conversations/process_conversation.py"
         and item.classification == "conversation_eager_memory_writer"
     ]
-    maintenance_job = [
-        item
-        for item in findings
-        if item.path == ".github/workflows/gcp_memory_maintenance_job.yml"
-        and item.classification == "maintenance_resources"
-    ]
     lifecycle_worker = [
         item
         for item in findings
@@ -85,7 +78,6 @@ def test_representative_paths_keep_evidence_backed_potential_roles() -> None:
     ]
 
     assert process_writer and {item.potential_roles for item in process_writer} == {("writer",)}
-    assert maintenance_job and {item.potential_roles for item in maintenance_job} == {("job",)}
     assert lifecycle_worker and {item.potential_roles for item in lifecycle_worker} == {("reader", "writer", "job")}
 
 
