@@ -5,7 +5,9 @@
 
 # lefthook стоит в desktop/windows, а не в корне. Без явного пути хук его не
 # найдет, выйдет с нулем и молча пропустит все проверки.
-lefthook: desktop/windows/node_modules/.bin/lefthook
+# Путь идет от общего .git, а не от текущего worktree: в только что созданном
+# worktree node_modules еще нет, а хуки уже запускаются (post-checkout).
+lefthook: $(git rev-parse --path-format=absolute --git-common-dir)/../desktop/windows/node_modules/.bin/lefthook
 
 glob_matcher: doublestar
 
@@ -44,3 +46,10 @@ pre-push:
       run: cd desktop/windows && npx pnpm@10 -s lint
     - name: desktop-meeting-tests
       run: cd desktop/windows && npx pnpm@10 exec vitest run src/main/meeting
+
+# Новый worktree получает .env и другие файлы из .worktreeinclude.
+# Код выхода хука становится кодом `git worktree add`, поэтому стоит `|| true`.
+post-checkout:
+  jobs:
+    - name: worktree-setup
+      run: scripts/worktree-setup.sh {1} {2} {3} || true

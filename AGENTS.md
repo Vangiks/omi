@@ -23,6 +23,8 @@ omiGlass and device SDKs were removed. `CLAUDE.md` points here.
 - Git hooks come from `lefthook.yml` and install with `npx pnpm@10 install` in `desktop/windows`.
   Pre-push runs desktop typecheck, lint and the meeting tests. Keep Git identity in the user's
   configuration; temporary test identities use `git -c`.
+- A new worktree gets the ignored files matched by `.worktreeinclude` (`.env*`) from the main
+  checkout: the `post-checkout` hook runs `scripts/worktree-setup.sh`.
 - `desktop/windows/package.json` pins pnpm 10 through `packageManager`, so corepack's `pnpm`
   picks the right version; without corepack use `npx pnpm@10`. pnpm 11 ignores
   `node-linker=hoisted`. Never run `npm install` there.
