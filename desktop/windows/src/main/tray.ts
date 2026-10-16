@@ -23,8 +23,6 @@ export interface TrayDeps {
   /** "Toggle OMI Bar" menu item — toggle the companion bar (fallback for
    *  when the global hotkey can't register, e.g. native Wayland). */
   openBar: () => void
-  /** "Check for Updates" — run a manual update check (see updater.ts). */
-  checkForUpdates: () => void
   /** "Screen Analysis" checkbox — flip the screenAnalysisEnabled master. The tray
    *  checkbox is refreshed from the persisted value via setTrayScreenCapture, so
    *  this only writes the setting (the coordinator re-syncs off that write). */

@@ -60,7 +60,6 @@ describe('buildTrayMenuTemplate', () => {
     showMainWindow: vi.fn(),
     toggleListening: vi.fn(),
     openSettings: vi.fn(),
-    checkForUpdates: vi.fn(),
     toggleScreenCapture: vi.fn(),
     openBar: vi.fn(),
     quit: vi.fn()
@@ -73,18 +72,21 @@ describe('buildTrayMenuTemplate', () => {
   const byLabel = (items: Item[], label: string): Item =>
     items.find((i) => i.label === label) as Item
 
-  it('lists all items in Mac order (capture toggle first, updates before quit)', () => {
+  it('lists items and separators in order (Open Omi first, no Check for Updates)', () => {
     const items = buildTrayMenuTemplate(
       { toggleLabel: 'Pause listening', screenCaptureEnabled: true },
       noopActions()
     ) as Item[]
-    expect(labels(items)).toEqual([
-      'Screen Analysis',
+    expect(items.map((i) => (i.type === 'separator' ? '---' : i.label))).toEqual([
       'Open Omi',
-      'Toggle OMI Bar',
+      '---',
+      'Screen Analysis',
       'Pause listening',
+      '---',
+      'Toggle OMI Bar',
+      '---',
       'Settings',
-      'Check for Updates',
+      '---',
       'Quit Omi'
     ])
   })
@@ -131,14 +133,12 @@ describe('buildTrayMenuTemplate', () => {
     byLabel(items, 'Toggle OMI Bar').click?.()
     byLabel(items, 'Pause listening').click?.()
     byLabel(items, 'Settings').click?.()
-    byLabel(items, 'Check for Updates').click?.()
     byLabel(items, 'Quit Omi').click?.()
     expect(actions.toggleScreenCapture).toHaveBeenCalledOnce()
     expect(actions.showMainWindow).toHaveBeenCalledOnce()
     expect(actions.openBar).toHaveBeenCalledOnce()
     expect(actions.toggleListening).toHaveBeenCalledOnce()
     expect(actions.openSettings).toHaveBeenCalledOnce()
-    expect(actions.checkForUpdates).toHaveBeenCalledOnce()
     expect(actions.quit).toHaveBeenCalledOnce()
   })
 })
