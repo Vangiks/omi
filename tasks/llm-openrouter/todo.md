@@ -14,9 +14,9 @@
 **Что сделать:** модуль `utils/llm/openrouter.py` с `provider_route(provider)` (`openrouter`, `direct`, `none` по таблице из спеки: ключ OpenRouter важнее прямого) и `openrouter_model_id(provider, model)`.
 
 **Готово, когда:**
-- [ ] `provider_route` дает верный ответ для провайдеров `openai`, `anthropic`, `perplexity` и всех сочетаний их прямых ключей с `OPENROUTER_API_KEY` (пустая строка считается отсутствием ключа)
-- [ ] все модели из `utils/llm/model_config.py`, `llm_gateway/config/route_artifacts.yaml`, `generated_route_overrides.yaml` и псевдонимов `routers/desktop_chat.py:234-243` переводятся без исключений; тест собирает их из конфигурации, а не из списка в тесте
-- [ ] отдельные случаи: `gpt-6-luna` → `openai/gpt-6-luna`, `claude-sonnet-4-6` → `anthropic/claude-sonnet-4.6`, `claude-haiku-4-5-20251001` → `anthropic/claude-haiku-4.5`, имя с `/` не меняется
+- [x] `provider_route` дает верный ответ для провайдеров `openai`, `anthropic`, `perplexity` и всех сочетаний их прямых ключей с `OPENROUTER_API_KEY` (пустая строка считается отсутствием ключа)
+- [x] все модели из `utils/llm/model_config.py`, `llm_gateway/config/route_artifacts.yaml`, `generated_route_overrides.yaml` и псевдонимов `routers/desktop_chat.py:234-243` переводятся без исключений; тест собирает их из конфигурации, а не из списка в тесте
+- [x] отдельные случаи: `gpt-6-luna` → `openai/gpt-6-luna`, `claude-sonnet-4-6` → `anthropic/claude-sonnet-4.6`, `claude-haiku-4-5-20251001` → `anthropic/claude-haiku-4.5`, имя с `/` не меняется
 
 **Проверка:** `pytest:or`
 
