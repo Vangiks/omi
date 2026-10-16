@@ -2,7 +2,8 @@
 does and wait for the finished conversation.
 
 Runs inside a one-off backend container on the compose network (smoke.sh
---paid), so the host needs nothing but Docker. Costs one Deepgram stream of
+--paid), so the host needs nothing but Docker. Checks the transcript and the
+summary; action items are only printed, see SPEC open question 7. Costs one Deepgram stream of
 the file's length plus the OpenAI calls that process one conversation.
 """
 
@@ -150,10 +151,12 @@ def main() -> None:
     checks = [
         (bool(segments), f'transcript: {len(segments)} segments'),
         (bool(structured.get('overview')), f'summary: {structured.get("title", "")!r}'),
-        (bool(action_items), f'action items: {[item.get("description") for item in action_items]}'),
     ]
     for ok, label in checks:
         print(f'{"ok  " if ok else "FAIL"}  {label}')
+    # Not a failure: action items come only from speech attributed to the user,
+    # and the local stack has no speaker identification (SPEC open question 7).
+    print(f'info  action items: {[item.get("description") for item in action_items]}')
     if not live or not all(ok for ok, _ in checks):
         sys.exit(1)
 
