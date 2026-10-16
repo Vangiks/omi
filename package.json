@@ -23,14 +23,11 @@
     "test:memory-vector-repair-outbox-rules:emulator": "firebase emulators:exec --only firestore --project demo-memory \"node backend/scripts/firestore_rules_emulator_test.mjs\"",
     "test:memory-vector-repair-outbox-lease:emulator": "firebase emulators:exec --only firestore --project demo-memory \"python3 backend/scripts/vector_repair_outbox_lease_emulator_test.py\"",
     "test:memory-app-key-grants-rules:emulator": "firebase emulators:exec --only firestore --project demo-memory \"node backend/scripts/firestore_rules_emulator_test.mjs\"",
-    "test:memory-v3-control-reader:emulator": "firebase emulators:exec --only firestore --project demo-memory \"node backend/scripts/firestore_rules_emulator_test.mjs && PYTHONPATH=backend python3 backend/scripts/p1_3_v3_control_reader_emulator_test.py\"",
-    "test:memory-v3-projection-reader:emulator": "firebase emulators:exec --only firestore --project demo-memory \"node backend/scripts/firestore_rules_emulator_test.mjs && PYTHONPATH=backend python3 backend/scripts/p1_3_v3_projection_reader_emulator_test.py\"",
     "test:memory-v3-canary-approval-source:emulator": "firebase emulators:exec --only firestore --project demo-memory \"node backend/scripts/firestore_rules_emulator_test.mjs\"",
     "test:memory-v3-state-head:emulator": "MEMORY_ENABLED=on npx --no-install firebase emulators:exec --only firestore --project demo-memory \"node backend/scripts/firestore_rules_emulator_test.mjs && PYTHONPATH=backend backend/.venv/bin/python backend/scripts/firestore_python_apply_emulator_test.py\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.1",
-    "dotenv-cli": "^8.0.0",
     "firebase": "^12.15.0",
     "firebase-tools": "15.22.0"
   },
@@ -38,13 +35,9 @@
     "@hono/node-server": "~2.0.5",
     "hono": "~4.12.27",
     "brace-expansion": "~5.0.8",
-    "@xmldom/xmldom": "^0.9.8",
     "tar": "~7.5.21",
-    "postcss": "~8.5.18",
-    "shell-quote": ">=1.8.4",
     "uuid": ">=11.1.1",
     "ws": ">=8.17.0",
-    "@babel/core": "^7.26.0",
     "fast-uri": "~3.1.4"
   },
   "name": "omi-memory-ingestion-pipeline"

@@ -35,12 +35,6 @@ yarn.lock
 .idea/
 .next/
 .worktrees/
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-.pub-cache/
-.pub/
 build/
 dist/
 .build/
@@ -48,37 +42,6 @@ dist/
 
 # VS Code
 .vscode/*
-
-# Android specific
-**/android/**/build/
-**/android/.gradle
-**/android/gradlew
-**/android/gradlew.bat
-**/android/key.properties
-**/android/**/gradle-wrapper.jar
-**/android/**/local.properties
-**/android/**/GeneratedPluginRegistrant.java
-**/android/app/google-services.json
-**/android/app/src/dev/google-services.json
-**/android/app/src/prod/google-services.json
-**/android/app/.cxx/
-
-# iOS specific
-**/ios/**/Pods/
-**/ios/**/.symlinks/
-**/ios/**/Flutter/Flutter.framework
-**/ios/**/Flutter/Flutter.podspec
-**/ios/Flutter/Generated.xcconfig
-**/ios/Flutter/flutter_export_environment.sh
-**/ios/Flutter/RayBanMetaCredentials.xcconfig
-**/ios/.generated/
-**/ios/Runner.xcworkspace
-**/ios/**/GeneratedPluginRegistrant.*
-**/ios/**/xcuserdata
-**/ios/Runner/GoogleService-Info.plist
-**/ios/Config/*
-**/ios/Config/**/*
-**/ios/Flutter/Custom.xcconfig
 
 # macOS specific
 **/macos/**/Pods/
@@ -99,24 +62,11 @@ dist/
 **/macos/Config/**/*
 **/macos/Runner/Configs/Custom.xcconfig
 
-# Linux specific
-**/linux/.dart_tool/
-**/linux/flutter/
-**/linux/**/GeneratedPluginRegistrant.*
-
-# Windows specific
-**/windows/.dart_tool/
-**/windows/flutter/
-**/windows/**/GeneratedPluginRegistrant.*
-
 # Web specific
 **/web/**/build/
-**/web/.dart_tool/
 web/app/public/firebase-messaging-sw.js
 
 # Miscellaneous
-!app/pubspec.lock
-!app/ios/Podfile.lock
 *.lock
 # After *.lock: the last matching pattern wins, so a re-include must follow it.
 !web/app/bun.lock
@@ -129,38 +79,12 @@ hs_err_pid*
 # Servers
 src/recordings
 
-# Apps
-/app/lib/firebase_options.dart
-/app/lib/firebase_options_*.dart
-!/app/lib/firebase_options_local.dart
-/app/firebase.json
-
-# Solidworks models
-*.SLDPRT
-*.SLDASM
-**/classic_triangle/old outdated history (but gold)/
-**/classic_triangle/assembly/
-**/classic_triangle/misc/
-**/step-versions/
-
 # test output
 test/recordings
-
-# Flutter
-env.g.dart
-*/upload-keystore.jks
-*/key.properties
-*.jks
 
 # Jekyll
 docs/_site/
 .jekyll-metadata
-
-/app/lib/env/dev_env.g.dart
-/app/lib/env/prod_env.g.dart
-/app/lib/objectbox.g.dart
-*.jks
-plugins/example/tmp/
 
 backend/pretrained_models/
 backend/scripts/rag/*.json
@@ -175,12 +99,6 @@ backend/google-credentials.json
 backend/google-credentials-dev.json
 
 startup-script.sh
-/app/lib/firebase_options_dev.dart
-/app/lib/firebase_options_prod.dart
-app/lib/env/dev_env.g.dart
-app/lib/env/prod_env.g.dart
-/app/lib/libobjectbox.dylib
-/app/lib/objectbox-model.json
 
 /backend/scripts/research
 /backend/scripts/research/*.txt
@@ -196,39 +114,10 @@ app/lib/env/prod_env.g.dart
 /backend/syncing/*
 /docs/.docusaurus
 
-
-/omi/firmware/firmware/v2.7.0/
-
-# nRF Connect SDK west workspaces (downloaded on demand, ~1.5GB) + build outputs
-/omi/firmware/v2.7.0/
-/omi/firmware/v2.9.0/
-/omi/firmware/build/
-
-
-# Additional Expo/React Native specific ignores
-# `**/` is required: a bare `.expo/*` is anchored to the repo root and silently
-# misses every nested Expo app (app/react-native, and any added later). That gap
-# is why this line has been re-patched per-path three times (this one, the
-# sdks/react-native/example line below, and omiGlass/.expo further down).
-**/.expo/*
-sdks/react-native/example/.expo/*
-sdks/react-native/lib/
-web-build/
-*.orig.*
-.metro-health-check*
-.eas/
-.rn-cli.config.js
-.watchmanconfig
-web-report/
-.metro-cache/
 .aider*
-
-omiGlass/.expo
 
 # Logs
 /backend/logs/
-app/.fvm/
-app/android/.kotlin/
 .playwright-mcp/
 
 CLAUDE.md
@@ -238,10 +127,6 @@ web/app/tsconfig.tsbuildinfo
 .claude/worktrees/
 .mcp.json
 LOCAL_DEV_SETUP.md
-app/macos/Config/Prod/GoogleService-Info.plist
-app/.metadata
-app/macos/DerivedData/
-app/macos/Runner/LocalDev.entitlements
 .env.local
 .backups/
 
