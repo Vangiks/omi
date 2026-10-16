@@ -137,7 +137,6 @@ def _install_runtime_fakes(monkeypatch, runtime, stt_sockets, blocking_calls):
     async def load_base(*_args, **_kwargs):
         return ListenConnectBase(
             user_exists=True,
-            user_has_credits=True,
             transcription_prefs={'single_language_mode': False, 'uses_custom_stt': False},
             fair_use_init_stage=None,
             fair_use_track_dg_usage=False,

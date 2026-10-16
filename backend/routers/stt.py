@@ -26,7 +26,6 @@ from utils.log_sanitizer import sanitize
 from utils.other import endpoints as auth
 from utils.analytics import record_usage
 from utils.executors import db_executor, storage_executor, run_blocking
-from utils.subscription import resolve_transcription_allowance, TRANSCRIPTION_ALLOWANCE_TRANSIENT_REASONS
 from utils.observability.fallback import record_fallback
 from utils.async_tasks import create_named_task
 from utils.stt import duration_probe
@@ -103,15 +102,6 @@ async def _reap_probe(spawn: asyncio.Task[asyncio.subprocess.Process]) -> None:
     await process.wait()
 
 
-async def _admit(uid: str, source: str | None, seconds: int) -> None:
-    # This route calls Omi-paid Parakeet; Deepgram BYOK cannot exempt it.
-    allowance = await run_blocking(db_executor, resolve_transcription_allowance, uid, source=source, byok_active=False)
-    if allowance.reason in TRANSCRIPTION_ALLOWANCE_TRANSIENT_REASONS:
-        raise HTTPException(status_code=503, detail='Transcription allowance temporarily unavailable')
-    if not allowance.managed or (allowance.remaining_seconds is not None and seconds > allowance.remaining_seconds):
-        raise HTTPException(status_code=402, detail='Transcription allowance exhausted')
-
-
 def _safe_upstream_filename(filename) -> str:
     """Parakeet builds its temp file path from the client-supplied filename —
     never forward path separators, dot-prefixed names, or overlong names.
@@ -173,8 +163,6 @@ async def stt_transcribe(
     except OSError:
         raise HTTPException(status_code=503, detail='Audio duration probe unavailable') from None
     await file.seek(0)
-    source = request.headers.get('x-app-platform')
-    await _admit(uid, source, seconds)
 
     upstream_url = api_url.rstrip('/') + '/v2/transcribe'
     client = get_stt_proxy_client()
@@ -187,10 +175,6 @@ async def stt_transcribe(
         raise HTTPException(status_code=503, detail='Transcription service busy — try again shortly')
 
     try:
-        # Initial admission precedes the slot. Recheck after queueing so
-        # stale admissions cannot escape the in-flight accounting bound.
-        await _admit(uid, source, seconds)
-
         # Buffer only after holding a slot, so at most 4 request bodies are
         # resident in RAM at once — waiters keep theirs in the disk spool.
         # The bounded read is defense-in-depth should file.size be absent.

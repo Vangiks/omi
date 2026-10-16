@@ -25,12 +25,12 @@ def test_bootstrap_offloads_firestore_reads():
                 awaited_targets.append(call.args[1].id)
     for required in (
         "is_exists_user",
-        "has_transcription_credits",
         "get_user_transcription_preferences",
         "get_enforcement_stage",
         "is_dg_budget_exhausted",
     ):
         assert required in awaited_targets
+    assert "has_transcription_credits" not in awaited_targets
 
 
 def test_runtime_uses_listen_connect_bootstrap():
@@ -75,7 +75,6 @@ async def test_load_listen_connect_context_returns_offloaded_state():
         new=AsyncMock(
             side_effect=[
                 True,
-                True,
                 prefs,
                 "none",
                 False,
@@ -85,22 +84,20 @@ async def test_load_listen_connect_context_returns_offloaded_state():
         ctx = await load_listen_connect_context(
             "uid-bootstrap",
             language="en",
-            source="omi",
-            use_custom_stt=False,
             onboarding_mode=False,
             stt_language="en",
         )
 
     assert ctx.user_exists is True
-    assert ctx.user_has_credits is True
+    assert not hasattr(ctx, "user_has_credits")
     assert ctx.transcription_prefs == prefs
     assert ctx.language == "en"
-    assert mock_run_blocking.await_count >= 3
+    assert mock_run_blocking.await_count == 2
 
 
 @pytest.mark.asyncio
-async def test_custom_stt_skips_stt_credits_but_still_admits(monkeypatch):
-    """#7690: custom-STT never asks has_transcription_credits; connect still admits."""
+async def test_connect_never_asks_for_transcription_credits(monkeypatch):
+    """The fork has no plans (#3): connect admits every session without a credit lookup."""
     from utils import listen_session_bootstrap as bootstrap
 
     called: list[str] = []
@@ -108,26 +105,21 @@ async def test_custom_stt_skips_stt_credits_but_still_admits(monkeypatch):
     async def fake_run_blocking(_executor, fn, *args, **kwargs):
         name = getattr(fn, "__name__", "")
         called.append(name)
-        if name == "has_transcription_credits":
-            raise AssertionError("custom-STT must skip STT credits")
         if name == "is_exists_user":
             return True
         if name == "get_user_transcription_preferences":
-            return {"single_language_mode": True, "vocabulary": [], "language": "en", "uses_custom_stt": True}
+            return {"single_language_mode": True, "vocabulary": [], "language": "en", "uses_custom_stt": False}
         raise AssertionError(f"unexpected offload {name}")
 
     monkeypatch.setattr(bootstrap, "FAIR_USE_ENABLED", False)
     monkeypatch.setattr(bootstrap, "run_blocking", fake_run_blocking)
 
     ctx = await bootstrap.load_listen_connect_context(
-        "uid-custom-stt",
+        "uid-bootstrap",
         language="en",
-        source="omi",
-        use_custom_stt=True,
         onboarding_mode=False,
         stt_language="en",
     )
 
-    assert ctx.user_has_credits is True
-    assert "has_transcription_credits" not in called
-    assert "is_exists_user" in called
+    assert ctx.user_exists is True
+    assert called == ["is_exists_user", "get_user_transcription_preferences"]

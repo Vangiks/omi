@@ -132,12 +132,12 @@ def _runtime_for_periodic_usage(*, tracking, exhausted):
         assert final is False
         return 0
 
-    async def refresh_credits(*, transcription_seconds):
-        assert transcription_seconds == 0
+    async def check_silent_user():
+        return None
 
     runtime.wait = wait
     runtime._flush_usage = flush_usage
-    runtime._refresh_credits = refresh_credits
+    runtime._check_silent_user = check_silent_user
     return runtime
 
 
@@ -210,7 +210,6 @@ async def test_bootstrap_forces_single_language_before_selecting_stt_for_onboard
 
     base = ListenConnectBase(
         user_exists=True,
-        user_has_credits=True,
         transcription_prefs={'single_language_mode': False, 'uses_custom_stt': False},
         fair_use_init_stage=None,
         fair_use_track_dg_usage=False,
@@ -280,7 +279,6 @@ async def test_bootstrap_sends_first_onboarding_question_before_any_audio(monkey
 
     base = ListenConnectBase(
         user_exists=True,
-        user_has_credits=True,
         transcription_prefs={'single_language_mode': False, 'uses_custom_stt': False},
         fair_use_init_stage=None,
         fair_use_track_dg_usage=False,
@@ -353,7 +351,6 @@ async def test_bootstrap_admits_speech_profile_redo_despite_completed_onboarding
 
     base = ListenConnectBase(
         user_exists=True,
-        user_has_credits=True,
         transcription_prefs={'single_language_mode': False, 'uses_custom_stt': False},
         fair_use_init_stage=None,
         fair_use_track_dg_usage=False,
@@ -479,7 +476,6 @@ async def test_bootstrap_redo_without_persisted_profile_goes_through_provenance_
 
     base = ListenConnectBase(
         user_exists=True,
-        user_has_credits=True,
         transcription_prefs={'single_language_mode': False, 'uses_custom_stt': False},
         fair_use_init_stage=None,
         fair_use_track_dg_usage=False,
@@ -554,7 +550,6 @@ async def test_bootstrap_still_rejects_completed_account_without_speech_profile_
 
     base = ListenConnectBase(
         user_exists=True,
-        user_has_credits=True,
         transcription_prefs={'single_language_mode': False, 'uses_custom_stt': False},
         fair_use_init_stage=None,
         fair_use_track_dg_usage=False,
@@ -618,7 +613,6 @@ async def test_bootstrap_passes_explicit_parakeet_through_capability_aware_selec
 
     base = ListenConnectBase(
         user_exists=True,
-        user_has_credits=True,
         transcription_prefs={'single_language_mode': False, 'uses_custom_stt': False},
         fair_use_init_stage=None,
         fair_use_track_dg_usage=False,
@@ -888,7 +882,6 @@ def _transcript_processor_for_delivery(monkeypatch, websocket):
         wait=wait,
         request=SimpleNamespace(uid='user-1', onboarding_mode=False, websocket=websocket),
         transcript_send=None,
-        user_has_credits=True,
         pusher_enabled=True,
         onboarding_handler=None,
         send_event=lambda _event: None,
@@ -979,6 +972,26 @@ async def test_transcript_delivery_marks_live_transcription_success_only_after_a
     assert websocket.sent == [[{'id': 'segment-1', 'text': 'Hello'}]]
     assert delivered == [True]
     assert flushed == ['conversation-1']
+
+
+@pytest.mark.anyio
+async def test_transcripts_reach_the_pusher_without_any_credit_check(monkeypatch):
+    """The fork has no plans (#3): a session forwards every batch to the pusher, no minutes involved."""
+
+    class WebSocket:
+        async def send_json(self, _payload):
+            return None
+
+    processor, _delivered, _flushed = _transcript_processor_for_delivery(monkeypatch, WebSocket())
+    pushed = []
+    processor.host.transcript_send = pushed.append
+    monkeypatch.setattr(
+        'routers.listen.transcripts.transcript_segment_for_client', lambda segment: {'id': segment['id']}
+    )
+
+    await processor.process_loop()
+
+    assert pushed == [[{'id': 'segment-1'}]]
 
 
 @pytest.mark.anyio

@@ -3,19 +3,9 @@
 import pytest
 
 from models.users import PlanType
-from routers.listen.contracts import ListenLimits, ListenSessionState
+from routers.listen.contracts import ListenSessionState
 from routers.listen.persistence import ListenPersistence
 from routers.listen import runtime as listen_runtime
-
-
-def test_should_emit_plus_meter_warning_is_plus_only():
-    from types import SimpleNamespace
-
-    assert listen_runtime.should_emit_plus_meter_warning(None) is False
-    assert listen_runtime.should_emit_plus_meter_warning(SimpleNamespace(plan=PlanType.basic)) is False
-    assert listen_runtime.should_emit_plus_meter_warning(SimpleNamespace(plan=PlanType.unlimited)) is False
-    assert listen_runtime.should_emit_plus_meter_warning(SimpleNamespace()) is False
-    assert listen_runtime.should_emit_plus_meter_warning(SimpleNamespace(plan=PlanType.plus)) is True
 
 
 @pytest.fixture
@@ -44,113 +34,31 @@ async def test_listen_persistence_offloads_and_preserves_call_arguments(monkeypa
     assert captured['kwargs'] == {'value': 'stored'}
 
 
+@pytest.mark.parametrize('plan,notified', [(None, True), (PlanType.basic, True), (PlanType.architect, False)])
 @pytest.mark.anyio
-async def test_credit_refresh_decrements_cached_credits_and_preserves_source(monkeypatch):
+async def test_silent_user_check_reads_only_the_subscription(monkeypatch, plan, notified):
+    """The periodic check left after the credit refresh was removed (#30): no transcription minutes are read."""
     from types import SimpleNamespace
 
     runtime = object.__new__(listen_runtime.ListenSessionRuntime)
     runtime.request = SimpleNamespace(uid='user-1', source='desktop')
-    runtime.limits = ListenLimits(credits_refresh_seconds=900)
-    runtime.state = ListenSessionState(
-        remaining_seconds_cache=300,
-        remaining_seconds_cache_ts=100.0,
-        remaining_seconds_cache_initialized=True,
-    )
-    runtime.user_has_credits = True
+    runtime.state = ListenSessionState(last_audio_received_time=2000.0, first_audio_byte_timestamp=1000.0)
     calls = []
+    sent = []
 
     async def call(function, *args, **kwargs):
-        calls.append((function, args, kwargs))
-        if function is listen_runtime.check_credits_invalidation:
-            return False
+        calls.append(function)
         if function is listen_runtime.user_db.get_user_valid_subscription:
-            return None
+            return SimpleNamespace(plan=plan) if plan else None
         raise AssertionError(f'unexpected persistence call: {function}')
 
-    runtime.persistence = SimpleNamespace(call=call)
-    runtime.asend_event = lambda _event: None
-    monkeypatch.setattr(listen_runtime.time, 'time', lambda: 101.0)
-
-    await runtime._refresh_credits(transcription_seconds=15)
-
-    assert runtime.state.remaining_seconds_cache == 285
-    assert runtime.user_has_credits is True
-    assert not any(function is listen_runtime.get_remaining_transcription_seconds for function, _, _ in calls)
-
-
-@pytest.mark.anyio
-async def test_credit_refresh_fetches_with_source_and_skips_threshold_for_basic(monkeypatch):
-    from types import SimpleNamespace
-
-    runtime = object.__new__(listen_runtime.ListenSessionRuntime)
-    runtime.request = SimpleNamespace(uid='user-1', source='desktop')
-    runtime.limits = ListenLimits(credits_refresh_seconds=900)
-    runtime.state = ListenSessionState()
-    runtime.user_has_credits = True
-    events = []
-    calls = []
-
-    async def call(function, *args, **kwargs):
-        calls.append((function, args, kwargs))
-        if function is listen_runtime.check_credits_invalidation:
-            return False
-        if function is listen_runtime.get_remaining_transcription_seconds:
-            return 120
-        if function is listen_runtime.user_db.get_user_valid_subscription:
-            return None
-        raise AssertionError(f'unexpected persistence call: {function}')
-
-    async def asend_event(event):
-        events.append(event)
+    async def notify(uid):
+        sent.append(uid)
 
     runtime.persistence = SimpleNamespace(call=call)
-    runtime.asend_event = asend_event
-    monkeypatch.setattr(listen_runtime, 'send_credit_limit_notification', lambda _uid: _completed())
+    monkeypatch.setattr(listen_runtime, 'send_silent_user_notification', notify)
 
-    await runtime._refresh_credits()
+    await runtime._check_silent_user()
 
-    assert runtime.state.freemium_threshold_sent is False
-    assert events == []
-    assert (listen_runtime.get_remaining_transcription_seconds, ('user-1',), {'source': 'desktop'}) in calls
-
-
-@pytest.mark.anyio
-async def test_credit_refresh_emits_threshold_event_for_plus(monkeypatch):
-    from types import SimpleNamespace
-
-    from models.users import PlanType
-
-    runtime = object.__new__(listen_runtime.ListenSessionRuntime)
-    runtime.request = SimpleNamespace(uid='user-1', source='desktop')
-    runtime.limits = ListenLimits(credits_refresh_seconds=900)
-    runtime.state = ListenSessionState()
-    runtime.user_has_credits = True
-    events = []
-    calls = []
-
-    async def call(function, *args, **kwargs):
-        calls.append((function, args, kwargs))
-        if function is listen_runtime.check_credits_invalidation:
-            return False
-        if function is listen_runtime.get_remaining_transcription_seconds:
-            return 120
-        if function is listen_runtime.user_db.get_user_valid_subscription:
-            return SimpleNamespace(plan=PlanType.plus)
-        raise AssertionError(f'unexpected persistence call: {function}')
-
-    async def asend_event(event):
-        events.append(event)
-
-    runtime.persistence = SimpleNamespace(call=call)
-    runtime.asend_event = asend_event
-    monkeypatch.setattr(listen_runtime, 'send_credit_limit_notification', lambda _uid: _completed())
-
-    await runtime._refresh_credits()
-
-    assert runtime.state.freemium_threshold_sent is True
-    assert events[0].remaining_seconds == 120
-    assert (listen_runtime.get_remaining_transcription_seconds, ('user-1',), {'source': 'desktop'}) in calls
-
-
-async def _completed():
-    return None
+    assert calls == [listen_runtime.user_db.get_user_valid_subscription]
+    assert sent == (['user-1'] if notified else [])

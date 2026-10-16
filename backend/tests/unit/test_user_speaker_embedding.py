@@ -336,7 +336,7 @@ def live_owner_profile(monkeypatch):
     async def start(*, private_sync=False, **request_options):
         request = ListenRequest(websocket=SimpleNamespace(headers={}), uid='synthetic-owner', **request_options)
         runtime = runtime_module.ListenSessionRuntime(request)
-        base = ListenConnectBase(True, True, {'uses_custom_stt': runtime.use_custom_stt}, None, False, False)
+        base = ListenConnectBase(True, {'uses_custom_stt': runtime.use_custom_stt}, None, False, False)
         monkeypatch.setattr(runtime_module, 'load_listen_connect_base', AsyncMock(return_value=base))
         monkeypatch.setattr(runtime_module.user_db, 'get_user_private_cloud_sync_enabled', lambda uid: private_sync)
 

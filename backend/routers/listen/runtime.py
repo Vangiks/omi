@@ -51,7 +51,7 @@ from utils.listen_pusher_session import ListenPusherSession, ListenPusherSession
 from utils.listen_session_bootstrap import finalize_listen_connect_context, load_listen_connect_base
 from utils.listen_reconnect_budget import listen_reconnect_budget
 from utils.metrics import BACKEND_LISTEN_ACTIVE_WS_CONNECTIONS
-from utils.notifications import send_credit_limit_notification, send_silent_user_notification
+from utils.notifications import send_silent_user_notification
 from utils.onboarding import OnboardingHandler
 from utils.observability.journeys import ClientJourneyAttempt
 from utils.observability.routing_cohort import RoutingCohort, current_routing_cohort
@@ -78,7 +78,7 @@ from utils.stt.live_metrics import (
 from config.live_stt_registry import routing_on
 from config.live_stt_recovery import current_recovery_enabled, recovery_enabled, session_recovery_enabled
 from utils.stt.language_policy import LiveLanguageObservations, LiveLanguageProfile
-from utils.subscription import get_remaining_transcription_seconds, is_trial_paywalled
+from utils.subscription import is_trial_paywalled
 from utils.transcribe_decisions import (
     effective_conversation_timeout,
     normalize_codec_frame,
@@ -89,7 +89,7 @@ from utils.transcribe_decisions import (
     should_load_speech_profile,
     validate_audio_format,
 )
-from utils.transcribe_store import check_credits_invalidation, conversations_db, redis_db, user_db
+from utils.transcribe_store import conversations_db, redis_db, user_db
 from database.account_deletion_policy import account_deletion_blocks_access
 from utils.webhooks import get_audio_bytes_webhook_seconds
 from utils.audio import AudioRingBuffer
@@ -111,16 +111,6 @@ from utils.observability.transcription import record_listen_no_audio_teardown, r
 logger = logging.getLogger(__name__)
 
 PUSHER_ENABLED = bool(os.getenv('HOSTED_PUSHER_API_URL'))
-FREEMIUM_THRESHOLD_SECONDS = 180
-
-
-def should_emit_plus_meter_warning(subscription: Any) -> bool:
-    """S18: the listen threshold event is the Plus (1,500-min) meter warning only.
-
-    Basic no longer enters on-device through this event (S17). Inactive or
-    missing subscriptions must not emit it.
-    """
-    return getattr(subscription, 'plan', None) == PlanType.plus
 
 
 def _account_deletion_blocks_owner_persistence(uid: str) -> bool:
@@ -167,7 +157,6 @@ class ListenSessionRuntime:
         self.language_observations: LiveLanguageObservations | None = None
         self.vocabulary: List[str] = []
         self.translation_language: Optional[str] = None
-        self.user_has_credits = True
         self.private_cloud_sync_enabled = False
         self.has_speech_profile = False
         self.conversation_creation_timeout = request.conversation_timeout
@@ -484,7 +473,7 @@ class ListenSessionRuntime:
 
     async def _bootstrap(self) -> bool:
         request = self.request
-        base = await load_listen_connect_base(request.uid, source=request.source, use_custom_stt=self.use_custom_stt)
+        base = await load_listen_connect_base(request.uid)
         if not base.user_exists:
             await request.websocket.close(code=1008, reason='Bad user')
             return False
@@ -533,7 +522,6 @@ class ListenSessionRuntime:
                 else None
             )
             self.onboarding_admitted = isinstance(self.onboarding_session_id, str)
-        self.user_has_credits = base.user_has_credits
         self.language = normalize_language(request.language)
         single_language_mode = should_force_single_language(
             request.onboarding_mode,
@@ -651,19 +639,6 @@ class ListenSessionRuntime:
         self.request = replace(request, codec=decision.codec)
         self.lc3_frame_duration_us = decision.lc3_frame_duration_us
         self._build_components()
-        if not self.user_has_credits:
-            try:
-                subscription = await self.persistence.call(user_db.get_user_valid_subscription, request.uid)
-                if should_emit_plus_meter_warning(subscription):
-                    await send_credit_limit_notification(request.uid)
-                    await request.websocket.send_json(
-                        FreemiumThresholdReachedEvent(
-                            remaining_seconds=0, action=FREEMIUM_ACTION_SETUP_ON_DEVICE_STT
-                        ).to_json()
-                    )
-                    self.state.freemium_threshold_sent = True
-            except Exception as error:
-                logger.error('Credit-limit notification failed type=%s', type(error).__name__)
         if FAIR_USE_ENABLED:
             self.state.fair_use_track_dg_usage = context.fair_use_track_dg_usage
             self.state.fair_use_dg_budget_exhausted = context.fair_use_dg_budget_exhausted
@@ -726,7 +701,7 @@ class ListenSessionRuntime:
         while self.state.active:
             if await self.wait(60):
                 break
-            transcription_seconds = await self._flush_usage(final=False)
+            await self._flush_usage(final=False)
             if self.use_custom_stt:
                 continue
             now = time.time()
@@ -771,46 +746,10 @@ class ListenSessionRuntime:
                         self.state.fair_use_dg_budget_exhausted = True
                 except Exception as error:
                     logger.error('Fair-use listen check failed type=%s', type(error).__name__)
-            await self._refresh_credits(transcription_seconds=transcription_seconds)
+            await self._check_silent_user()
 
-    async def _refresh_credits(self, *, transcription_seconds: int = 0) -> None:
-        now = time.time()
-        invalidated = await self.persistence.call(check_credits_invalidation, self.request.uid)
-        needs_refresh = (
-            not self.state.remaining_seconds_cache_initialized
-            or invalidated
-            or now - self.state.remaining_seconds_cache_ts >= self.limits.credits_refresh_seconds
-            or (
-                self.state.remaining_seconds_cache is not None
-                and self.state.remaining_seconds_cache <= 0
-                and now - self.state.remaining_seconds_cache_ts >= 60
-            )
-        )
-        if needs_refresh:
-            self.state.remaining_seconds_cache = await self.persistence.call(
-                get_remaining_transcription_seconds, self.request.uid, source=self.request.source
-            )
-            self.state.remaining_seconds_cache_ts = now
-            self.state.remaining_seconds_cache_initialized = True
-        elif self.state.remaining_seconds_cache is not None and transcription_seconds > 0:
-            self.state.remaining_seconds_cache = max(0, self.state.remaining_seconds_cache - transcription_seconds)
-        remaining = self.state.remaining_seconds_cache
+    async def _check_silent_user(self) -> None:
         subscription = await self.persistence.call(user_db.get_user_valid_subscription, self.request.uid)
-        if remaining is not None and remaining <= FREEMIUM_THRESHOLD_SECONDS and not self.state.freemium_threshold_sent:
-            if should_emit_plus_meter_warning(subscription):
-                await self.asend_event(
-                    FreemiumThresholdReachedEvent(
-                        remaining_seconds=remaining, action=FREEMIUM_ACTION_SETUP_ON_DEVICE_STT
-                    )
-                )
-                self.state.freemium_threshold_sent = True
-                try:
-                    await send_credit_limit_notification(self.request.uid)
-                except Exception as error:
-                    logger.error('Credit-limit notification refresh failed type=%s', type(error).__name__)
-        self.user_has_credits = remaining is None or remaining > 0
-        if self.user_has_credits and (remaining is None or remaining > FREEMIUM_THRESHOLD_SECONDS):
-            self.state.freemium_threshold_sent = False
         if not subscription or subscription.plan == PlanType.basic:
             last_words = self.state.last_transcript_time or self.state.first_audio_byte_timestamp
             if (

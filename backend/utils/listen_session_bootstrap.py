@@ -13,7 +13,6 @@ from utils.fair_use import (
     get_enforcement_stage,
     is_dg_budget_exhausted,
 )
-from utils.subscription import has_transcription_credits
 from utils.transcribe_decisions import (
     normalize_language,
     select_translation_language,
@@ -25,7 +24,6 @@ from utils.transcribe_store import get_user_transcription_preferences
 @dataclass(frozen=True)
 class ListenConnectBase:
     user_exists: bool
-    user_has_credits: bool
     transcription_prefs: Dict[str, Any]
     fair_use_init_stage: Optional[str]
     fair_use_track_dg_usage: bool
@@ -35,7 +33,6 @@ class ListenConnectBase:
 @dataclass(frozen=True)
 class ListenConnectContext:
     user_exists: bool
-    user_has_credits: bool
     transcription_prefs: Dict[str, Any]
     single_language_mode: bool
     vocabulary: List[str]
@@ -72,22 +69,9 @@ def project_listen_connect_decisions(
     return single_language_mode, vocabulary, normalized_language, translation_language
 
 
-async def load_listen_connect_base(
-    uid: str,
-    *,
-    source: Optional[str],
-    use_custom_stt: bool,
-) -> ListenConnectBase:
+async def load_listen_connect_base(uid: str) -> ListenConnectBase:
     """Load connect-time Firestore state off the event loop."""
     user_exists = await run_blocking(db_executor, user_db.is_exists_user, uid)
-
-    if use_custom_stt:
-        # Custom-STT skips managed-STT credits only. Conversation post-processing
-        # still hits has_conversation_processing_credits (#7690).
-        user_has_credits = True
-    else:
-        user_has_credits = await run_blocking(db_executor, has_transcription_credits, uid, source=source)
-
     transcription_prefs = await run_blocking(db_executor, get_user_transcription_preferences, uid)
 
     fair_use_init_stage: Optional[str] = None
@@ -101,7 +85,6 @@ async def load_listen_connect_base(
 
     return ListenConnectBase(
         user_exists=user_exists,
-        user_has_credits=user_has_credits,
         transcription_prefs=transcription_prefs,
         fair_use_init_stage=fair_use_init_stage,
         fair_use_track_dg_usage=fair_use_track_dg_usage,
@@ -124,7 +107,6 @@ def finalize_listen_connect_context(
     )
     return ListenConnectContext(
         user_exists=base.user_exists,
-        user_has_credits=base.user_has_credits,
         transcription_prefs=base.transcription_prefs,
         single_language_mode=single_language_mode,
         vocabulary=vocabulary,
@@ -141,12 +123,10 @@ async def load_listen_connect_context(
     uid: str,
     *,
     language: str,
-    source: Optional[str],
-    use_custom_stt: bool,
     onboarding_mode: bool,
     stt_language: str,
 ) -> ListenConnectContext:
-    base = await load_listen_connect_base(uid, source=source, use_custom_stt=use_custom_stt)
+    base = await load_listen_connect_base(uid)
     return finalize_listen_connect_context(
         base,
         language=language,
