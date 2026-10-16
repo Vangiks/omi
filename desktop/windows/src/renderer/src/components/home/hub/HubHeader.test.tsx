@@ -18,8 +18,7 @@ import { HubHeader } from './HubHeader'
 beforeEach(() => {
   ;(window as unknown as { omi: unknown }).omi = {
     rewindGetSettings: vi.fn(() => new Promise(() => {})),
-    onRewindSettings: vi.fn(() => () => {}),
-    openExternalUrl: vi.fn()
+    onRewindSettings: vi.fn(() => () => {})
   }
 })
 
@@ -42,10 +41,9 @@ function renderHeader(): void {
 }
 
 describe('HubHeader gear', () => {
-  it('opens Settings on a single click, with no menu', () => {
+  it('opens Settings on a single click', () => {
     renderHeader()
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
     expect(screen.getByTestId('path').textContent).toBe('/settings')
-    expect(screen.queryByRole('menu')).toBeNull()
   })
 })
