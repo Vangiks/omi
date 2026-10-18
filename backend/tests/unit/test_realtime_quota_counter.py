@@ -333,10 +333,6 @@ def _no_quota_read(*_a, **_k):
     raise AssertionError('the relay read a chat quota')
 
 
-async def _passthrough(_executor, fn, *args, **kwargs):
-    return fn(*args, **kwargs)
-
-
 def _created(response_id: str) -> str:
     return json.dumps({'type': 'response.created', 'response': {'id': response_id}})
 

@@ -531,10 +531,6 @@ def _client_socket(
     return Socket()
 
 
-async def _passthrough(_executor, fn, *args, **kwargs):
-    return fn(*args, **kwargs)
-
-
 async def _run_relay(
     monkeypatch,
     *,

@@ -403,8 +403,6 @@ async def test_reconnect_budget_returns_terminal_backoff_before_entitlement_work
     runtime.request = request
     runtime.state = SimpleNamespace(active=True, stt_terminal_failure=False, close_code=1001)
     monkeypatch.setattr(runtime_module.listen_reconnect_budget, 'admit', lambda *_args: (False, 17))
-    paywall = AsyncMock()
-    monkeypatch.setattr(runtime_module, 'run_blocking', paywall)
     before = OMI_LISTEN_STT_UNAVAILABLE_TOTAL.labels(reason='reconnect_budget')._value.get()
 
     assert not await runtime._admit()
@@ -415,7 +413,6 @@ async def test_reconnect_budget_returns_terminal_backoff_before_entitlement_work
     assert payload['reason'] == 'reconnect_budget'
     assert payload['retry_after'] == 17
     assert websocket.close.await_args.kwargs['code'] == 1011
-    assert paywall.await_count == 0
     assert OMI_LISTEN_STT_UNAVAILABLE_TOTAL.labels(reason='reconnect_budget')._value.get() == before + 1
 
 

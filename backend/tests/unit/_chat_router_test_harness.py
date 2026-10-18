@@ -252,7 +252,6 @@ def wire_common_stubs(install) -> SimpleNamespace:
     rate_limit = install('utils.rate_limit_config', ModuleType('utils.rate_limit_config'))
     rate_limit.get_effective_limit = MagicMock(return_value=(100, 60))
     rate_limit.RATE_LIMIT_SHADOW = False
-    subscription = install('utils.subscription', ModuleType('utils.subscription'))
 
     auth = install('utils.other.endpoints', ModuleType('utils.other.endpoints'))
 

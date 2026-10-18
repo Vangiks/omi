@@ -6,7 +6,7 @@
 //       openai: token 'ek_…'          (Bearer / client secret for WebRTC)
 //       gemini: token 'auth_tokens/…' (used as the SDK apiKey, v1alpha)
 //   → 4xx/5xx { error, reason, retryable, provider?, code?, upstream_status_code? }
-//   → 402 / 403 byok mismatch from the auth extractor.
+//   → 402 (refused) / 403 (byok mismatch) from the auth extractor.
 // The server locks the model at mint (gpt-realtime-2 / gemini-3.1-flash-live);
 // clients configure everything else on connect.
 

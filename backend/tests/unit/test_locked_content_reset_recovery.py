@@ -130,7 +130,6 @@ def test_idempotent_same_period_and_next_reset(env):
     assert env.calls == ['memories', 'actions', 'conversations']
     env.signal.assert_called_once_with('test-user')
     env.cache.assert_called_once_with('test-user')
-    env.fakes['utils.fair_use'].invalidate_enforcement_cache.assert_called_once_with('test-user')
     # Content locked later in this period is held until its next reset.
     env.locks['conversations'] = 1
     env.redis.next_request()
@@ -168,7 +167,6 @@ def test_partial_child_failure_resumes_without_repeating_committed_writes(env):
     assert not env.state_data
     env.signal.assert_called_once_with('test-user')
     env.cache.assert_called_once_with('test-user')
-    env.fakes['utils.fair_use'].invalidate_enforcement_cache.assert_called_once_with('test-user')
     assert not any(k.endswith(':lease') for k in env.redis.values)
     env.fakes['database.action_items'].unlock_all_action_items = original
     env.redis.next_request()
@@ -254,7 +252,6 @@ def test_allowance_recheck_repairs_caches_after_committed_pages(env, committed_c
     assert env.calls == ['memories', 'actions'][:committed_collections]
     env.signal.assert_called_once_with('test-user')
     env.cache.assert_called_once_with('test-user')
-    env.fakes['utils.fair_use'].invalidate_enforcement_cache.assert_called_once_with('test-user')
     assert not env.state_data
     assert not any(':done:' in key or key.endswith(':lease') for key in env.redis.values)
     env.allowance.side_effect = None

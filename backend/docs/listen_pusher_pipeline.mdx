@@ -4590,7 +4590,7 @@ same period return 409. A new period logically expires the old choice and
 replaces the same document, avoiding unbounded history. Delayed older-period
 writes cannot overwrite a newer choice. `upgrade` records intent only; managed
 processing still requires a positive answer from the existing allowance resolver.
-A lookup failure or platform trial paywall is `unavailable`, never a cap hit.
+A lookup failure is `unavailable`, never a cap hit.
 `X-App-Platform` reaches the allowance resolver. Drifted BYOK recovery clears
 invalid keys before this route; it cannot grant managed access. GET and PUT share
 a boost-exempt six-per-minute UID limit, failing closed before monthly usage

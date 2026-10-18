@@ -879,7 +879,6 @@ def _stub_router_deps():
     limiter_stub.record_actual_duration = MagicMock()
     limiter_stub.MAX_SESSION_DURATION_S = 120
     sys.modules['utils.voice_duration_limiter'] = limiter_stub
-    subscription_stub = sys.modules.setdefault('utils.subscription', MagicMock())
     # Ensure redis_db.check_rate_limit returns (True, 99, 0)
     rdb = sys.modules.get('database.redis_db')
     if rdb:
