@@ -1,5 +1,4 @@
 import os
-from dataclasses import dataclass
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -8,7 +7,6 @@ import stripe
 
 import database.users as users_db
 import database.user_usage as user_usage_db
-from database._client import get_customer_firestore_client
 from database.announcements import compare_versions
 from config.plan_catalog import (
     DESKTOP_ENTITLED_PLAN_TYPES,
@@ -97,75 +95,6 @@ def neo_grandfather_until(subscription: Optional[Subscription]) -> Optional[int]
     return subscription.current_period_end
 
 
-# Cloud screen-activity vectors are a paid desktop capability.
-#
-# Screen rows themselves are cheap; the vector is not. Embedding and storing a 3,072-dim vector
-# per delivered row is the large majority of what a synced screen row costs, and the vector's
-# only purpose server-side is semantic screen search. Free-tier desktop users keep their rows in
-# Firestore (so cloud chat can still read screen history by time and app) and keep on-device
-# semantic search, which reads embeddings from the local store and never needs Pinecone.
-#
-# Because the rows are retained, a user who upgrades can have their vectors backfilled from the
-# stored OCR text: this gate defers the cost, it does not destroy the ability to recover.
-_SCREEN_VECTOR_ENTITLEMENT_CACHE_TTL_SECONDS = 300
-_screen_vector_entitlement_cache: Dict[str, Tuple[bool, float]] = {}
-
-
-def grants_cloud_screen_vectors(uid: str) -> bool:
-    """True when this user's synced screen rows should also be written to the vector store.
-
-    Uses the desktop access tier rather than `is_paid_plan`, because screen activity is a
-    desktop capability: a mobile-only paid plan did not buy it. BYOK does NOT grant it either
-    — BYOK means the user supplies their own LLM keys, but the vector store is ours and the
-    cost being avoided here is ours.
-
-    Fails OPEN (writes the vector) on any lookup error, matching
-    `should_defer_desktop_processing`: a Firestore blip must never silently strip a paying
-    user's screen search. The failure mode is a small overspend, not a lost capability.
-    """
-    cached = _screen_vector_entitlement_cache.get(uid)
-    if cached is not None and time.monotonic() - cached[1] < _SCREEN_VECTOR_ENTITLEMENT_CACHE_TTL_SECONDS:
-        return cached[0]
-    try:
-        subscription = users_db.get_user_valid_subscription(
-            uid, firestore_client=get_customer_firestore_client(), provision=False
-        )
-        plan = subscription.plan if subscription else PlanType.basic
-        entitled = effective_desktop_access_tier(plan, subscription) != DESKTOP_ACCESS_TIER_FREE
-    except Exception as e:
-        logger.warning("grants_cloud_screen_vectors lookup failed for uid=%s: %s", uid, e)
-        return True
-    _screen_vector_entitlement_cache[uid] = (entitled, time.monotonic())
-    return entitled
-
-
-def clear_cloud_screen_vector_entitlement_cache(uid: str) -> None:
-    _screen_vector_entitlement_cache.pop(uid, None)
-
-
-def should_defer_desktop_processing(uid: str) -> bool:
-    """True for Desktop users on the Free effective tier without active BYOK.
-
-    Free and non-grandfathered Neo users store a raw transcript on capture and
-    defer expensive LLM enrichment until the first open. This cost policy must
-    not be interpreted as a no-Desktop-access policy.
-
-    Operator / Architect (desktop-entitled) and BYOK users (who pay their own LLM bill) are
-    processed normally. The caller restricts this to `source == desktop`. Fails safe to False
-    (process normally) on any error so a Firestore blip never silently strips a paid user's
-    summaries.
-    """
-    try:
-        if users_db.is_byok_active(uid) and get_byok_key('openai'):
-            return False
-        subscription = users_db.get_user_valid_subscription(uid)
-        plan = subscription.plan if subscription else PlanType.basic
-        return effective_desktop_access_tier(plan, subscription) == DESKTOP_ACCESS_TIER_FREE
-    except Exception as e:
-        logger.warning("should_defer_desktop_processing lookup failed for uid=%s: %s", uid, e)
-        return False
-
-
 # Length of the former desktop trial. `/v1/users/me/trial` still reports it until
 # the subscription endpoints go; the fork has no trial, so it never expires.
 TRIAL_LENGTH_SECONDS = 3 * 24 * 60 * 60  # 3 days
@@ -195,9 +124,6 @@ def request_has_llm_byok_key() -> bool:
         provider in fingerprints and bool(get_byok_key(provider))
         for provider in ('openrouter', 'openai', 'anthropic', 'gemini')
     )
-
-
-_request_has_llm_byok_key = request_has_llm_byok_key
 
 
 def request_has_byok_provider(provider: str) -> bool:
@@ -1265,151 +1191,6 @@ def has_transcription_credits(uid: str, source: Optional[str] = None) -> bool:
     :func:`resolve_transcription_allowance`).
     """
     return resolve_transcription_allowance(uid, source).managed
-
-
-CONVERSATION_PROCESSING_MODE_ALLOWED = 'allowed'
-CONVERSATION_PROCESSING_MODE_SKIPPED = 'skipped'
-
-
-@dataclass(frozen=True)
-class ConversationProcessingAllowance:
-    """The one answer to "may Omi run paid structuring/summary/memory right now?".
-
-    Independent of managed-STT credits. Custom-STT users skip
-    :func:`has_transcription_credits` at listen connect; they still hit this
-    gate before Omi-paid post-processing (#7690). ``remaining_seconds`` is
-    ``None`` when the processing budget is unlimited (unlimited plans, LLM
-    BYOK, reviewers).
-    """
-
-    mode: str
-    remaining_seconds: Optional[int]
-    reason: str
-
-    @property
-    def allowed(self) -> bool:
-        return self.mode == CONVERSATION_PROCESSING_MODE_ALLOWED
-
-
-def _processing_closed(reason: str) -> ConversationProcessingAllowance:
-    return ConversationProcessingAllowance(CONVERSATION_PROCESSING_MODE_SKIPPED, 0, reason)
-
-
-def _usage_speech_seconds(usage: Any) -> Optional[int]:
-    """Speech seconds attributed this month, or ``None`` when the record is not trustworthy.
-
-    Custom-STT sessions record ``speech_seconds`` without ``transcription_seconds``
-    so the LLM processing budget can move independently of STT billing.
-    """
-    if not isinstance(usage, dict):
-        return None
-    value = usage.get('speech_seconds', 0)
-    if value is None:
-        return 0
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        return None
-    return value
-
-
-def resolve_conversation_processing_allowance(
-    uid: str,
-    source: Optional[str] = None,
-    *,
-    subscription: Any = _UNRESOLVED,
-    usage: Any = _UNRESOLVED,
-    byok_active: Any = _UNRESOLVED,
-) -> ConversationProcessingAllowance:
-    """Resolve the Omi-paid conversation-processing budget for one uid. Never raises.
-
-    Uses the catalog's monthly listening allowance as the processing budget and
-    meters it from ``speech_seconds`` (not ``transcription_seconds``). Lookup
-    failures fail open so a Firestore blip cannot strip summaries from fair
-    paid use (#12663).
-    """
-    try:
-        _ = source  # plan-wide budget; signature matches the transcription resolver
-        if is_marketplace_reviewer(uid):
-            return ConversationProcessingAllowance(CONVERSATION_PROCESSING_MODE_ALLOWED, None, 'marketplace_reviewer')
-        if byok_active is _UNRESOLVED:
-            byok_active = users_db.is_byok_active(uid)
-        if byok_active and _request_has_llm_byok_key():
-            return ConversationProcessingAllowance(CONVERSATION_PROCESSING_MODE_ALLOWED, None, 'llm_byok')
-        if subscription is _UNRESOLVED:
-            subscription = users_db.get_user_valid_subscription(uid)
-        if not subscription:
-            return _processing_closed('subscription_inactive')
-        allowance = transcription_allowance_seconds(subscription.plan)
-        if allowance is None:
-            return ConversationProcessingAllowance(CONVERSATION_PROCESSING_MODE_ALLOWED, None, 'plan_unlimited')
-        if usage is _UNRESOLVED:
-            usage = get_monthly_usage_for_subscription(uid)
-        used = _usage_speech_seconds(usage)
-        if used is None:
-            logger.warning('conversation processing allowance: untrusted usage record for uid=%s', uid)
-            record_fallback(
-                component='conversation_finalization',
-                from_mode='processing_gate',
-                to_mode='fail_open',
-                reason='malformed_doc',
-                outcome='degraded',
-                log=logger,
-            )
-            return ConversationProcessingAllowance(CONVERSATION_PROCESSING_MODE_ALLOWED, None, 'usage_invalid')
-        remaining = max(0, allowance - used)
-        if remaining > 0:
-            return ConversationProcessingAllowance(
-                CONVERSATION_PROCESSING_MODE_ALLOWED, remaining, 'plan_within_allowance'
-            )
-        return _processing_closed('plan_allowance_exhausted')
-    except Exception as exc:
-        logger.warning('conversation processing allowance unavailable for uid=%s: %s', uid, type(exc).__name__)
-        record_fallback(
-            component='conversation_finalization',
-            from_mode='processing_gate',
-            to_mode='fail_open',
-            reason='authorization_unavailable',
-            outcome='degraded',
-            log=logger,
-        )
-        return ConversationProcessingAllowance(CONVERSATION_PROCESSING_MODE_ALLOWED, None, 'allowance_unavailable')
-
-
-def has_conversation_processing_credits(uid: str, source: Optional[str] = None) -> bool:
-    """Whether Omi may run paid structuring/summary/memory for this user right now.
-
-    Custom-STT does not skip this check. See :func:`resolve_conversation_processing_allowance`.
-    """
-    return resolve_conversation_processing_allowance(uid, source).allowed
-
-
-def should_skip_omi_paid_postprocessing(
-    uid: str,
-    *,
-    uses_custom_stt: bool,
-    source: Optional[str] = None,
-) -> bool:
-    """Skip Omi-paid structuring/summary/memory for an exhausted custom-STT session.
-
-    Regular conversations stay bounded by transcription credits at listen
-    time and are never skipped here. Custom-STT skips those credits, so this
-    is the remaining cap. Fail-open on errors so a lookup blip cannot strip
-    summaries (#12663).
-    """
-    if not uses_custom_stt:
-        return False
-    try:
-        return not has_conversation_processing_credits(uid, source)
-    except Exception as exc:
-        logger.warning('custom-STT LLM gate unavailable for uid=%s: %s', uid, type(exc).__name__)
-        record_fallback(
-            component='conversation_finalization',
-            from_mode='processing_gate',
-            to_mode='fail_open',
-            reason='authorization_unavailable',
-            outcome='degraded',
-            log=logger,
-        )
-        return False
 
 
 def get_remaining_transcription_seconds(uid: str, source: Optional[str] = None) -> int | None:

@@ -1,4 +1,4 @@
-"""The §1.7 deterministic minimum — the exact no-LLM state a free conversation lands in.
+"""The §1.7 deterministic minimum — a conversation's no-LLM title and structured row.
 
 Spec: `omi-knowledge-base/projects/local-models-free-tier/implementation/`
 `10-backend-plumbing.md` §1.7. Referenced by W1/W2/W3/W4 and by the desktop
@@ -7,8 +7,7 @@ client's own copy (`desktop/macos/Desktop/Sources/LocalInference/`
 
 Everything here is pure: same input, same output, and the only clock read is
 ``started_at``. Nothing in this module may import a model client, and the
-guardrail test asserts that. This is what makes the minimum usable as the
-deny-fallback for ``authorize_managed_compute``: it cannot itself spend.
+guardrail test asserts that: the fallback title must not itself spend.
 """
 
 from __future__ import annotations

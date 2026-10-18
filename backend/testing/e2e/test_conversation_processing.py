@@ -26,7 +26,6 @@ def _patch_process_conversation_boundaries(monkeypatch):
 
         return DoneFuture()
 
-    monkeypatch.setattr(process_module, "should_defer_desktop_processing", lambda uid: False)
     monkeypatch.setattr(process_module, "get_user_name", lambda uid, use_default=True: "David")
     monkeypatch.setattr(process_module.notification_db, "get_user_time_zone", lambda uid: "UTC")
     monkeypatch.setattr(process_module.users_db, "get_user_language_preference", lambda uid: "en")

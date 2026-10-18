@@ -140,7 +140,6 @@ from utils.observability import log_langsmith_status
 from utils.subscription import validate_stripe_price_ids
 from utils.http_client import close_all_clients
 from utils.jit_rollout import close_posthog_control_plane
-from utils.free_tier_cohort import close_free_tier_control_plane
 from utils.metrics import start_metrics_sidecar_server, stop_metrics_sidecar_server
 from utils.observability.sync_phases import shutdown_sync_metrics
 from utils.executors import (
@@ -555,7 +554,6 @@ async def shutdown_event():
     await shutdown_sync_metrics()
     await close_all_clients()
     close_posthog_control_plane()
-    close_free_tier_control_plane()
     stop_metrics_sidecar_server()
 
 

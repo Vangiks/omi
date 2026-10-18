@@ -18,7 +18,6 @@ from utils.jit_rollout import JITDecisionStage
 from utils.other.endpoints import get_current_user_uid, with_rate_limit
 from utils.observability.fallback import record_fallback
 from utils.retrieval.frame_request_authority import resolve_frame_request_authority
-from utils.subscription import grants_cloud_screen_vectors
 from services.conversation_keyframes import reconcile_conversation_keyframe_jobs
 
 logger = logging.getLogger(__name__)
@@ -116,7 +115,7 @@ async def sync_screen_activity(
     if not request.rows:
         return ScreenActivitySyncResponse(synced=0, last_id=0)
     started = time.perf_counter()
-    phase_ms = {"upsert": 0, "entitlement": 0, "vector": 0, "frame_requests": 0}
+    phase_ms = {"upsert": 0, "vector": 0, "frame_requests": 0}
     rows = [
         {
             **row.model_dump(by_alias=True),
@@ -144,15 +143,7 @@ async def sync_screen_activity(
         except Exception as exc:
             logger.exception("Screen activity Firestore write failed for uid=%s", uid)
             raise HTTPException(status_code=500, detail="Firestore write failed") from exc
-        # The vector is the expensive half of a synced row and its only server-side purpose is
-        # semantic screen search, which is a paid desktop capability. Gate it here rather than on
-        # the client: the client cannot be trusted to know its own entitlement, and the row is
-        # still stored either way, so a later upgrade can backfill vectors from the stored text.
-        embedded_rows = (
-            [row for row in rows if row.get("embedding")]
-            if await _timed_phase(phase_ms, "entitlement", run_blocking(db_executor, grants_cloud_screen_vectors, uid))
-            else []
-        )
+        embedded_rows = [row for row in rows if row.get("embedding")]
         if embedded_rows:
             try:
                 await _timed_phase(
@@ -247,11 +238,10 @@ async def sync_screen_activity(
         total_ms = round((time.perf_counter() - started) * 1000)
         if total_ms > 2000:
             logger.info(
-                "screen_activity_sync_slow total_ms=%d row_count=%d upsert_ms=%d entitlement_ms=%d vector_ms=%d frame_requests_ms=%d",
+                "screen_activity_sync_slow total_ms=%d row_count=%d upsert_ms=%d vector_ms=%d frame_requests_ms=%d",
                 total_ms,
                 len(request.rows),
                 phase_ms["upsert"],
-                phase_ms["entitlement"],
                 phase_ms["vector"],
                 phase_ms["frame_requests"],
             )

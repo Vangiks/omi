@@ -567,7 +567,7 @@ surfaces:
   gateway_lane_capability_needed: generated conv_* lanes
   migration_status: S6 FREE_TIER_LOCAL_PROCESSING gates desktop sources only; phone is non-desktop so process_normally today
     (follow-up)
-  test_guardrail_coverage: backend/tests/unit/test_free_tier_entrypoint_matrix.py
+  test_guardrail_coverage: backend/tests/unit/test_llm_gateway_coverage_guardrails.py
 - surface: external_integrations
   code_path: backend/utils/llm/external_integrations.py:get_message_structure
   entrypoint: developer create-from-text / external integration structuring
@@ -583,7 +583,7 @@ surfaces:
   request_shape: parser chain and plain chat
   gateway_lane_capability_needed: generated omi:auto:external-structure lane
   migration_status: get_llm_routed; developer create-from-text is non-desktop process_normally (S6); this helper is not authorize_managed_compute-gated
-  test_guardrail_coverage: backend/tests/unit/test_free_tier_entrypoint_matrix.py
+  test_guardrail_coverage: backend/tests/unit/test_llm_gateway_coverage_guardrails.py
 - surface: sync_limitless
   code_path: backend/utils/sync/pipeline.py:_reprocess_conversation_after_update
   entrypoint: sync / Limitless create+reprocess
@@ -596,7 +596,7 @@ surfaces:
   request_shape: conversation processing bundle
   gateway_lane_capability_needed: generated conv_* lanes
   migration_status: S6 matrix covers this entry; flag-on basic desktop lands at the minimum; non-desktop sync process_normally
-  test_guardrail_coverage: backend/tests/unit/test_free_tier_entrypoint_matrix.py
+  test_guardrail_coverage: backend/tests/unit/test_llm_gateway_coverage_guardrails.py
 - surface: conversation_merge
   code_path: backend/utils/conversations/merge_conversations.py:perform_merge_async
   entrypoint: POST /v1/conversations/merge
@@ -609,7 +609,7 @@ surfaces:
   request_shape: conversation processing bundle
   gateway_lane_capability_needed: generated conv_* lanes
   migration_status: S6 matrix covers this entry; flag-on basic desktop merge lands at the minimum
-  test_guardrail_coverage: backend/tests/unit/test_free_tier_entrypoint_matrix.py
+  test_guardrail_coverage: backend/tests/unit/test_llm_gateway_coverage_guardrails.py
 - surface: conversation_reprocess
   code_path: backend/routers/conversations.py:reprocess_conversation
   entrypoint: POST /v1/conversations/{id}/reprocess
@@ -622,4 +622,4 @@ surfaces:
   request_shape: conversation processing bundle
   gateway_lane_capability_needed: generated conv_* lanes
   migration_status: S6 matrix covers this entry; flag-on identified-basic reprocess is the minimum even with force_process
-  test_guardrail_coverage: backend/tests/unit/test_free_tier_entrypoint_matrix.py
+  test_guardrail_coverage: backend/tests/unit/test_llm_gateway_coverage_guardrails.py

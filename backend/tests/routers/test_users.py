@@ -585,7 +585,6 @@ def test_usage_quota_endpoint_reads_customer_firestore_like_desktop_enforcement(
 def _mock_desktop_quota_storage(monkeypatch, *, enrolled, questions):
     customer_client = object()
     monkeypatch.setattr(users_router, 'get_customer_firestore_client', lambda: customer_client)
-    monkeypatch.setattr(subscription_utils, 'get_customer_firestore_client', lambda: customer_client)
 
     def is_byok_active(uid, *, firestore_client=None):
         assert firestore_client is customer_client

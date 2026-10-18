@@ -1,12 +1,10 @@
-"""S4 Worker B: from-segments hash acceptance and projection storage.
+"""S4 Worker B: from-segments hash acceptance and projection ownership.
 
-Named proofs: (a) matching projection on basic ⇒ zero managed LLM calls, stored
-as display-only ``client_processing`` with deterministic-minimum ``structured``;
-(c) hash mismatch ⇒ projection dropped, one content-free warning, deterministic
-minimum, still no managed call.
+A matching projection is display-only ``client_processing`` written by the
+ingest mutation, never by the processor persist; a hash mismatch or malformed
+projection is dropped with one content-free warning.
 
-Isolation: stub_modules + load_module_fresh (same pattern as
-test_process_conversation_free_tier_branch). ``utils.cloud_tasks`` is stubbed so
+Isolation: stub_modules + load_module_fresh. ``utils.cloud_tasks`` is stubbed so
 protobufs do not double-register.
 """
 
@@ -27,7 +25,6 @@ import pytest
 os.environ.setdefault('ENCRYPTION_SECRET', 'omi_ZwB2ZNqB2HHpMK6wStk7sTpavJiPTFg7gXUHnc4tFABPU6pZ2c2DKgehtfgi4RZv')
 os.environ.setdefault('OPENAI_API_KEY', 'test-openai-key-not-real')
 
-from config.plan_catalog import PlanType
 from models.client_processing import (
     CLIENT_PROCESSING_SCHEMA_VERSION,
     ClientProcessing,
@@ -36,14 +33,16 @@ from models.client_processing import (
     ProjectionProvenance,
 )
 from models.conversation import Conversation, CreateConversation
-from models.conversation_enums import ConversationProcessingState, ConversationSource, ConversationStatus
+from models.conversation_enums import ConversationSource, ConversationStatus
 from models.structured import Structured
 from models.transcript_segment import TranscriptSegment
-from utils.conversations.projection_payload import PROVENANCE_LOG_MAX_CHARS
+from utils.conversations.projection_payload import (
+    PROVENANCE_LOG_MAX_CHARS,
+    client_processing_mutation,
+    omit_null_processing_state,
+)
 from testing.import_isolation import AutoMockModule, load_module_fresh, stub_modules
 from utils.conversations.transcript_hash import transcript_sha256
-import utils.managed_compute as managed_compute
-from utils.managed_compute import Decision
 
 _BACKEND = Path(__file__).resolve().parents[2]
 _UID = 's4-acceptance-uid'
@@ -169,8 +168,6 @@ def _build_fakes() -> dict[str, ModuleType]:
     )
 
     subscription = add('utils.subscription', AutoMockModule('utils.subscription'))
-    subscription.should_skip_omi_paid_postprocessing = MagicMock(return_value=False)
-    subscription.should_defer_desktop_processing = MagicMock(return_value=False)
     subscription.request_has_llm_byok_key = MagicMock(return_value=False)
 
     byok = ModuleType('utils.byok')
@@ -308,37 +305,6 @@ def _projection(digest: str | None = None, *, title: str = PROJECTION_TITLE) -> 
     )
 
 
-def _basic_decision() -> Decision:
-    return Decision(
-        allowed=False,
-        reason='basic_not_entitled',
-        feature='conv_structure',
-        funding_owner='omi',
-        plan=PlanType.basic,
-        plan_resolved=True,
-    )
-
-
-def _paid_decision() -> Decision:
-    return Decision(
-        allowed=True,
-        reason='plan_paid',
-        feature='conv_structure',
-        funding_owner='omi',
-        plan=PlanType.plus,
-        plan_resolved=True,
-    )
-
-
-def _enable_flag(monkeypatch, pc) -> None:
-    monkeypatch.setattr(pc, 'free_tier_local_processing_enabled', lambda *_: True)
-
-
-def _authorize(monkeypatch, pc, decision: Decision) -> None:
-    monkeypatch.setattr(managed_compute, 'authorize_managed_compute', lambda *_args, **_kwargs: decision)
-    monkeypatch.setattr(managed_compute, 'request_carries_validated_byok_key', lambda _feature: False)
-
-
 def _spy_managed_effects(monkeypatch, pc) -> dict[str, MagicMock]:
     spies = {
         'get_structured': MagicMock(return_value=(Structured(title='llm-title'), False)),
@@ -347,7 +313,6 @@ def _spy_managed_effects(monkeypatch, pc) -> dict[str, MagicMock]:
         'trigger_apps': MagicMock(),
         'assign_folder': MagicMock(return_value=(None, 0.0, '')),
         'init_first_open': MagicMock(return_value=True),
-        'should_defer': MagicMock(return_value=True),
     }
     monkeypatch.setattr(pc, '_get_structured', spies['get_structured'])
     monkeypatch.setattr(pc, 'extract_memories', spies['extract_memories'])
@@ -355,7 +320,6 @@ def _spy_managed_effects(monkeypatch, pc) -> dict[str, MagicMock]:
     monkeypatch.setattr(pc, 'trigger_conversation_apps', spies['trigger_apps'])
     monkeypatch.setattr(pc, 'assign_conversation_to_folder', spies['assign_folder'])
     monkeypatch.setattr(pc.conversations_db, 'initialize_first_open_work', spies['init_first_open'])
-    monkeypatch.setattr(pc, 'should_defer_desktop_processing', spies['should_defer'])
     monkeypatch.setattr(pc, '_enrich_meeting_context', lambda *args, **kwargs: None)
     monkeypatch.setattr(
         pc,
@@ -364,15 +328,6 @@ def _spy_managed_effects(monkeypatch, pc) -> dict[str, MagicMock]:
     )
     monkeypatch.setattr(pc, 'record_jit_first_open', MagicMock())
     return spies
-
-
-def _assert_no_managed(spies: dict[str, MagicMock]) -> None:
-    spies['get_structured'].assert_not_called()
-    spies['extract_memories'].assert_not_called()
-    spies['extract_memories_inner'].assert_not_called()
-    spies['trigger_apps'].assert_not_called()
-    spies['assign_folder'].assert_not_called()
-    spies['init_first_open'].assert_not_called()
 
 
 def _persisted_payload(mock: MagicMock) -> dict[str, Any]:
@@ -430,7 +385,7 @@ def _canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True, default=str)
 
 
-def _stored_minimum(conversation_id: str) -> dict[str, Any]:
+def _stored_conversation(conversation_id: str) -> dict[str, Any]:
     return {
         'id': conversation_id,
         'status': 'completed',
@@ -469,54 +424,10 @@ def _firestore_merge(store: dict[str, Any], payload: dict[str, Any]) -> None:
     store['doc'] = merged
 
 
-def _capture_has_projection(monkeypatch, pc) -> dict[str, Any]:
-    captured: dict[str, Any] = {}
-    real = pc.resolve_free_tier_processing_plan
-
-    def wrap(**kwargs: Any):
-        captured.update(kwargs)
-        return real(**kwargs)
-
-    monkeypatch.setattr(pc, 'resolve_free_tier_processing_plan', wrap)
-    return captured
-
-
-# red-proof: `has_projection=False` in the S6 plan call (basic matching projection would skip store_projection and not persist client_processing)
-def test_basic_matching_projection_persists_display_skips_managed(monkeypatch, stack) -> None:
-    pc, _dev = stack
-    _enable_flag(monkeypatch, pc)
-    spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
-    captured = _capture_has_projection(monkeypatch, pc)
-    created = pc.lifecycle_service.create_completed_conversation
-    created.reset_mock()
-
-    projection = _projection()
-    result = pc.process_conversation(_UID, 'en', _desktop_create(), client_projection=projection)
-
-    assert captured.get('has_projection') is True
-    assert result.deferred is False
-    assert result.status == ConversationStatus.completed
-    assert result.client_processing is projection
-    assert result.structured.title == _SEGMENT_TEXT
-    assert result.structured.overview == ''
-    assert result.structured.title != PROJECTION_TITLE
-    payload = _persisted_payload(created)
-    assert _nested(payload, 'client_processing', 'structure', 'title') == PROJECTION_TITLE
-    assert _nested(payload, 'client_processing', 'structure', 'overview') == CANARY
-    assert _nested(payload, 'structured', 'title') == _SEGMENT_TEXT
-    assert _nested(payload, 'structured', 'overview') == ''
-    _assert_no_managed(spies)
-    spies['should_defer'].assert_not_called()
-
-
 # red-proof: skip the hash compare (`if False and expected != ...`) so a mismatch is stored and no warning fires
-def test_hash_mismatch_rejects_projection_stores_minimum_no_managed(monkeypatch, stack, caplog) -> None:
+def test_hash_mismatch_rejects_projection_with_content_free_warning(monkeypatch, stack, caplog) -> None:
     pc, dev = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
-    captured = _capture_has_projection(monkeypatch, pc)
     created = pc.lifecycle_service.create_completed_conversation
     created.reset_mock()
     mismatched = _projection(_MISMATCH_HASH)
@@ -524,11 +435,9 @@ def test_hash_mismatch_rejects_projection_stores_minimum_no_managed(monkeypatch,
     with caplog.at_level(logging.WARNING, logger=dev.__name__):
         dev._create_conversation_from_segments(_UID, _from_segments_request(dev, mismatched))
 
-    assert captured.get('has_projection') is False
     payload = _persisted_payload(created)
     assert payload.get('client_processing') is None
-    assert _nested(payload, 'structured', 'title') == _SEGMENT_TEXT
-    assert _nested(payload, 'structured', 'overview') == ''
+    assert _nested(payload, 'structured', 'title') == 'llm-title'
     warnings = [record for record in caplog.records if 'hash_mismatch' in record.getMessage()]
     assert len(warnings) == 1
     message = warnings[0].getMessage()
@@ -538,15 +447,13 @@ def test_hash_mismatch_rejects_projection_stores_minimum_no_managed(monkeypatch,
     assert 'local-test-model' in message
     assert 'mlx' in message
     assert 'apple_silicon' in message
-    _assert_no_managed(spies)
+    spies['get_structured'].assert_called_once()
 
 
 # red-proof: re-add client_processing to `_normal_persist_payload` (generic persist would overwrite a newer ingest write)
-def test_paid_plan_generic_persist_omits_projection_keeps_it_in_memory(monkeypatch, stack) -> None:
+def test_generic_persist_omits_projection_keeps_it_in_memory(monkeypatch, stack) -> None:
     pc, _dev = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _paid_decision())
     created = pc.lifecycle_service.create_completed_conversation
     created.reset_mock()
     projection = _projection()
@@ -558,31 +465,6 @@ def test_paid_plan_generic_persist_omits_projection_keeps_it_in_memory(monkeypat
     payload = _persisted_payload(created)
     assert 'client_processing' not in payload
     assert _nested(payload, 'structured', 'title') == 'llm-title'
-
-
-# red-proof: re-add client_processing to the deferred persist (generic persist would overwrite a newer ingest write)
-# Rule change: deferred is a generic processor persist, not the projection's owner.
-# In-memory attach still happens; the field is written only by ingest mutation.
-def test_flag_off_deferred_persist_omits_projection_keeps_it_in_memory(monkeypatch, stack) -> None:
-    pc, _dev = stack
-    monkeypatch.setattr(pc, 'free_tier_local_processing_enabled', lambda *_: False)
-    spies = _spy_managed_effects(monkeypatch, pc)
-    resolve = MagicMock(side_effect=AssertionError('policy must not run when flag is off'))
-    monkeypatch.setattr(pc, 'resolve_free_tier_processing_plan', resolve)
-    processing = pc.lifecycle_service.create_processing_conversation
-    processing.reset_mock()
-    projection = _projection()
-
-    result = pc.process_conversation(_UID, 'en', _desktop_create(), client_projection=projection)
-
-    assert result.deferred is True
-    assert result.status == ConversationStatus.processing
-    assert result.client_processing is projection
-    spies['should_defer'].assert_called_once_with(_UID)
-    resolve.assert_not_called()
-    _assert_no_managed(spies)
-    payload = _persisted_payload(processing)
-    assert 'client_processing' not in payload
 
 
 # red-proof: pass `client_projection=request.client_processing` without the hash check (mismatch would still reach the coordinator)
@@ -632,9 +514,7 @@ def test_malformed_projection_stores_conversation_without_projection(
     monkeypatch, stack, caplog, raw_projection: Any
 ) -> None:
     pc, dev = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
     created = pc.lifecycle_service.create_completed_conversation
     created.reset_mock()
 
@@ -647,22 +527,20 @@ def test_malformed_projection_stores_conversation_without_projection(
     created.assert_called()
     payload = _persisted_payload(created)
     assert payload.get('client_processing') is None
-    assert _nested(payload, 'structured', 'title') == _SEGMENT_TEXT
+    assert _nested(payload, 'structured', 'title') == 'llm-title'
     warnings = [record for record in caplog.records if 'schema_invalid' in record.getMessage()]
     assert len(warnings) == 1
     message = warnings[0].getMessage()
     assert CANARY not in message
     assert PROJECTION_TITLE not in message
     assert _SEGMENT_TEXT not in message
-    _assert_no_managed(spies)
+    spies['get_structured'].assert_called_once()
 
 
 # red-proof: return existing conversation on idempotency hit before examining the new projection
 def test_idempotent_retry_binds_late_projection_without_rewriting_structured(monkeypatch, stack) -> None:
     pc, dev = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
 
     session = 'late-proj-session'
     conv_id = dev._from_segments_conversation_id(_UID, session)
@@ -714,7 +592,7 @@ def test_idempotent_retry_binds_late_projection_without_rewriting_structured(mon
     assert stored['update'].keys() == {'client_processing'}
     assert 'structured' not in stored['update']
     assert stored['doc']['client_processing']['structure']['title'] == PROJECTION_TITLE
-    spies['get_structured'].assert_not_called()
+    spies['get_structured'].assert_called_once()
 
 
 # red-proof: bind the late projection without checking the stored transcript digest
@@ -722,7 +600,7 @@ def test_idempotent_retry_mismatched_digest_leaves_conversation_unchanged(monkey
     _pc, dev = stack
     session = 'late-proj-mismatch'
     conv_id = dev._from_segments_conversation_id(_UID, session)
-    existing = _stored_minimum(conv_id)
+    existing = _stored_conversation(conv_id)
     snapshot = copy.deepcopy(existing)
     update = MagicMock()
     bind = MagicMock()
@@ -753,7 +631,7 @@ def test_idempotent_retry_malformed_projection_leaves_conversation_unchanged(mon
     _pc, dev = stack
     session = 'late-proj-malformed'
     conv_id = dev._from_segments_conversation_id(_UID, session)
-    existing = _stored_minimum(conv_id)
+    existing = _stored_conversation(conv_id)
     snapshot = copy.deepcopy(existing)
     update = MagicMock()
     bind = MagicMock()
@@ -784,92 +662,30 @@ def test_idempotent_retry_malformed_projection_leaves_conversation_unchanged(mon
 def test_persist_without_projection_omits_client_processing_key(stack) -> None:
     pc, _dev = stack
     conv = _conversation()
-    terminal = pc._terminal_persist_payload(conv)
-    normal = pc._normal_persist_payload(conv, clear_terminal_marker=False)
-    cleared = pc._normal_persist_payload(conv, clear_terminal_marker=True)
-    assert 'client_processing' not in terminal
+    normal = pc._normal_persist_payload(conv)
     assert 'client_processing' not in normal
-    assert 'client_processing' not in cleared
     omitted = pc.strip_client_processing({'client_processing': None, 'structured': {'title': 't'}})
     assert 'client_processing' not in omitted
     assert omitted['structured'] == {'title': 't'}
 
 
-# red-proof: keep a present client_processing key in `_terminal_persist_payload` / `_normal_persist_payload`
+# red-proof: keep a present client_processing key in `_normal_persist_payload`
 def test_generic_persist_strips_even_when_in_memory_projection_is_present(stack) -> None:
     pc, _dev = stack
     conv = _conversation(projection=_projection())
-    terminal = pc._terminal_persist_payload(conv)
-    normal = pc._normal_persist_payload(conv, clear_terminal_marker=False)
-    assert 'client_processing' not in terminal
+    normal = pc._normal_persist_payload(conv)
     assert 'client_processing' not in normal
     stripped = pc.strip_client_processing(
         {'client_processing': {'structure': {'title': PROJECTION_TITLE}}, 'structured': {'title': 't'}}
     )
     assert 'client_processing' not in stripped
     assert stripped['structured'] == {'title': 't'}
-    owned = pc.client_processing_mutation(_projection())
+    owned = client_processing_mutation(_projection())
     assert owned.keys() == {'client_processing'}
     assert owned['client_processing']['structure']['title'] == PROJECTION_TITLE
 
 
-def _projection_plan(pc) -> Any:
-    return pc.FreeTierProcessingPlan(
-        mode='store_projection',
-        reason='basic_has_projection',
-        decision=_basic_decision(),
-    )
-
-
-def _minimum_plan(pc) -> Any:
-    return pc.FreeTierProcessingPlan(
-        mode='deterministic_minimum',
-        reason='basic_no_projection',
-        decision=_basic_decision(),
-    )
-
-
-# red-proof: skip `payload.update(client_processing_mutation(client_projection))` on the ingress-create branch
-def test_store_projected_conversation_persists_owned_projection(stack) -> None:
-    pc, _dev = stack
-    created = pc.lifecycle_service.create_completed_conversation
-    created.reset_mock()
-    projection = _projection()
-    stored, persisted = pc._store_projected_conversation(
-        _UID, _desktop_create(), _projection_plan(pc), client_projection=projection
-    )
-    assert persisted is True
-    assert stored.client_processing is projection
-    payload = _persisted_payload(created)
-    assert _nested(payload, 'client_processing', 'structure', 'title') == PROJECTION_TITLE
-    assert _nested(payload, 'structured', 'title') == _SEGMENT_TEXT
-    assert _nested(payload, 'structured', 'overview') == ''
-
-
-# red-proof: `payload.update(client_processing_mutation(client_projection))` without `_is_ingress_create`
-# Rule change: an existing-conversation processor persist always omits the field.
-# Ingress is the sole writer; `_store_projected_conversation` is a writer only when
-# this persist is the document create.
-def test_processor_projected_store_on_existing_conversation_omits_field(stack) -> None:
-    pc, _dev = stack
-    persisted = pc.lifecycle_service.persist_processed_conversation
-    persisted.reset_mock()
-    created = pc.lifecycle_service.create_completed_conversation
-    created.reset_mock()
-    projection = _projection()
-    stored, ok = pc._store_projected_conversation(
-        _UID, _conversation(), _projection_plan(pc), client_projection=projection
-    )
-    assert ok is True
-    assert stored.client_processing is projection
-    created.assert_not_called()
-    payload = _persisted_payload(persisted)
-    assert 'client_processing' not in payload
-    assert _nested(payload, 'structured', 'title') == _SEGMENT_TEXT
-    assert _nested(payload, 'structured', 'overview') == ''
-
-
-# red-proof: return the payload without `clear_summary_retryable` from either processing persist
+# red-proof: return the payload without `clear_summary_retryable` from the processing persist
 def test_processing_persists_clear_a_dead_letter_retry_marker_with_an_explicit_null(stack) -> None:
     """A new processing pass answers the dead-letter's retry affordance.
 
@@ -879,124 +695,17 @@ def test_processing_persists_clear_a_dead_letter_retry_marker_with_an_explicit_n
     pc, _dev = stack
     retried = _conversation()
     retried.summary_retryable = True
-    assert pc._normal_persist_payload(retried, clear_terminal_marker=False)['summary_retryable'] is None
-    assert 'summary_retryable' in pc._normal_persist_payload(retried, clear_terminal_marker=False)
-    assert pc._terminal_persist_payload(retried)['summary_retryable'] is None
-    assert 'summary_retryable' in pc._terminal_persist_payload(retried)
+    assert pc._normal_persist_payload(retried)['summary_retryable'] is None
+    assert 'summary_retryable' in pc._normal_persist_payload(retried)
     untouched = _conversation()
-    assert 'summary_retryable' not in pc._normal_persist_payload(untouched, clear_terminal_marker=False)
-    assert 'summary_retryable' not in pc._terminal_persist_payload(untouched)
-    assert 'summary_retryable' not in pc.omit_null_processing_state(untouched.dict())
-
-
-# red-proof: drop `conversation.summary_retryable = None` after `_terminal_persist_payload`
-def test_free_tier_retry_answers_the_dead_letter_marker_in_payload_and_response(stack) -> None:
-    pc, _dev = stack
-    persisted = pc.lifecycle_service.persist_processed_conversation
-    persisted.reset_mock()
-    conversation = _conversation()
-    conversation.summary_retryable = True
-    stored, ok = pc._store_deterministic_minimum(_UID, conversation, _minimum_plan(pc))
-    assert ok is True
-    assert stored.summary_retryable is None
-    payload = _persisted_payload(persisted)
-    assert 'summary_retryable' in payload and payload['summary_retryable'] is None
-
-
-# red-proof: `payload.update(client_processing_mutation(_projection()))` on the no-projection minimum persist
-def test_store_deterministic_minimum_without_projection_omits_field(stack) -> None:
-    pc, _dev = stack
-    created = pc.lifecycle_service.create_completed_conversation
-    created.reset_mock()
-    stored, persisted = pc._store_deterministic_minimum(_UID, _desktop_create(), _minimum_plan(pc))
-    assert persisted is True
-    assert stored.client_processing is None
-    payload = _persisted_payload(created)
-    assert 'client_processing' not in payload
-    assert _nested(payload, 'structured', 'title') == _SEGMENT_TEXT
-
-
-# --- S3: §1.7 processing_state on the terminal persist ------------------------
-
-
-# red-proof: drop `conversation.processing_state = _minimum_processing_state(...)`
-def test_desktop_minimum_without_projection_is_local_pending(stack) -> None:
-    """A capable client is expected to deliver, so the client spins with a
-    timeout rather than showing a permanent empty state (§1.7 row 5)."""
-    pc, _dev = stack
-    created = pc.lifecycle_service.create_completed_conversation
-    created.reset_mock()
-    stored, persisted = pc._store_deterministic_minimum(_UID, _desktop_create(), _minimum_plan(pc))
-    assert persisted is True
-    assert stored.processing_state is ConversationProcessingState.local_pending
-    assert _persisted_payload(created)['processing_state'] == 'local_pending'
-
-
-# red-proof: return `local_pending` unconditionally from `_minimum_processing_state`
-def test_non_desktop_minimum_is_none_because_no_projection_is_coming(stack) -> None:
-    pc, _dev = stack
-    created = pc.lifecycle_service.create_completed_conversation
-    created.reset_mock()
-    create = _desktop_create()
-    create.source = ConversationSource.omi
-    stored, persisted = pc._store_deterministic_minimum(_UID, create, _minimum_plan(pc))
-    assert persisted is True
-    assert stored.processing_state is ConversationProcessingState.none
-    assert _persisted_payload(created)['processing_state'] == 'none'
-
-
-# red-proof: set a processing_state when a projection is already in hand
-def test_projected_conversation_carries_no_processing_state(stack) -> None:
-    """Nothing is pending: the projection IS the summary.
-
-    The field is absent from the persist payload, not an explicit null —
-    persist is merge=True, and a dumped null is a real Firestore key that
-    stamps every projected conversation (flip-review F-1).
-    """
-    pc, _dev = stack
-    created = pc.lifecycle_service.create_completed_conversation
-    created.reset_mock()
-    stored, persisted = pc._store_projected_conversation(
-        _UID, _desktop_create(), _projection_plan(pc), client_projection=_projection()
-    )
-    assert persisted is True
-    assert stored.processing_state is None
-    assert 'processing_state' not in _persisted_payload(created)
-
-
-# red-proof: revert `_store_deterministic_minimum` to `_build_deferred_structured`
-def test_minimum_structured_is_the_spec_row_not_the_deferred_placeholder(stack) -> None:
-    """§1.7: first *sentence*, empty overview, category `other`. The deferred
-    placeholder's first-8-words title is a different algorithm on a different
-    path and must not leak into the terminal store."""
-    pc, _dev = stack
-    created = pc.lifecycle_service.create_completed_conversation
-    created.reset_mock()
-    create = _desktop_create()
-    create.transcript_segments = [
-        TranscriptSegment(
-            text='One two three four five six seven eight nine ten. Second sentence.',
-            speaker='SPEAKER_00',
-            is_user=False,
-            start=0.0,
-            end=4.0,
-        )
-    ]
-    pc._store_deterministic_minimum(_UID, create, _minimum_plan(pc))
-    payload = _persisted_payload(created)
-    assert _nested(payload, 'structured', 'title') == 'One two three four five six seven eight nine ten.'
-    assert _nested(payload, 'structured', 'overview') == ''
-    assert _nested(payload, 'structured', 'category') == 'other'
-    assert _nested(payload, 'structured', 'action_items') == []
-    assert _nested(payload, 'structured', 'events') == []
+    assert 'summary_retryable' not in pc._normal_persist_payload(untouched)
+    assert 'summary_retryable' not in omit_null_processing_state(untouched.dict())
 
 
 # red-proof: skip the after-process `client_processing_mutation` on non-idempotent ingest (paid persist strips and never stores)
 def test_from_segments_ingest_stores_projection_via_dedicated_mutation(monkeypatch, stack) -> None:
     pc, dev = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _paid_decision())
     created = pc.lifecycle_service.create_completed_conversation
     created.reset_mock()
     updates: list[dict[str, Any]] = []
@@ -1022,7 +731,6 @@ def test_from_segments_ingest_stores_projection_via_dedicated_mutation(monkeypat
 
 def _race_store_harness(monkeypatch, stack, *, first_projection: Any, retry_title: str) -> dict[str, Any]:
     pc, dev = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
     session = 'race-late-projection'
     conv_id = dev._from_segments_conversation_id(_UID, session)
@@ -1064,7 +772,6 @@ def _race_store_harness(monkeypatch, stack, *, first_projection: Any, retry_titl
 # red-proof: skip `strip_client_processing` on A's persist (merge writes explicit null and erases B)
 def test_late_projection_survives_older_processor_persist(monkeypatch, stack) -> None:
     pc, dev = stack
-    _authorize(monkeypatch, pc, _basic_decision())
     store = _race_store_harness(monkeypatch, stack, first_projection=None, retry_title=PROJECTION_TITLE)
 
     response_a = dev._create_conversation_from_segments(_UID, store['first'])
@@ -1074,14 +781,13 @@ def test_late_projection_survives_older_processor_persist(monkeypatch, stack) ->
     assert store['b_response'].id == store['conv_id']
     assert store['update'].keys() == {'client_processing'}
     assert store['doc']['client_processing']['structure']['title'] == PROJECTION_TITLE
-    assert _nested(store['doc'], 'structured', 'title') == _SEGMENT_TEXT
-    store['spies']['get_structured'].assert_not_called()
+    assert _nested(store['doc'], 'structured', 'title') == 'llm-title'
+    store['spies']['get_structured'].assert_called_once()
 
 
 # red-proof: re-add client_processing to `_normal_persist_payload` (A's stale in-memory A would overwrite B)
 def test_stale_in_memory_projection_does_not_overwrite_later_ingest_write(monkeypatch, stack) -> None:
     pc, dev = stack
-    _authorize(monkeypatch, pc, _paid_decision())
     store = _race_store_harness(
         monkeypatch, stack, first_projection=_projection(title=PROJECTION_TITLE_A), retry_title=PROJECTION_TITLE
     )
@@ -1097,33 +803,10 @@ def test_stale_in_memory_projection_does_not_overwrite_later_ingest_write(monkey
     store['spies']['get_structured'].assert_called()
 
 
-# red-proof: stamp client_processing on the existing-conversation processor persist
-# (A's terminal `_store_projected_conversation` would resurrect stale A over B)
-def test_basic_stale_projection_does_not_overwrite_later_ingest_write(monkeypatch, stack) -> None:
-    pc, dev = stack
-    _authorize(monkeypatch, pc, _basic_decision())
-    store = _race_store_harness(
-        monkeypatch, stack, first_projection=_projection(title=PROJECTION_TITLE_A), retry_title=PROJECTION_TITLE
-    )
-
-    response_a = dev._create_conversation_from_segments(_UID, store['first'])
-
-    assert response_a.id == store['conv_id']
-    assert store.get('b_ran') is True
-    assert store['b_response'].id == store['conv_id']
-    assert store['update'].keys() == {'client_processing'}
-    assert store['doc']['client_processing']['structure']['title'] == PROJECTION_TITLE
-    assert store['doc']['client_processing']['structure']['title'] != PROJECTION_TITLE_A
-    assert _nested(store['doc'], 'structured', 'title') == _SEGMENT_TEXT
-    store['spies']['get_structured'].assert_not_called()
-
-
 # red-proof: log raw model_id/runtime/device_class without sanitize_untrusted_provenance_field
 def test_rejected_payload_provenance_is_sanitized_single_line(monkeypatch, stack, caplog) -> None:
     pc, dev = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
     created = pc.lifecycle_service.create_completed_conversation
     created.reset_mock()
 
@@ -1148,7 +831,7 @@ def test_rejected_payload_provenance_is_sanitized_single_line(monkeypatch, stack
     created.assert_called()
     payload = _persisted_payload(created)
     assert payload.get('client_processing') is None
-    assert _nested(payload, 'structured', 'title') == _SEGMENT_TEXT
+    assert _nested(payload, 'structured', 'title') == 'llm-title'
     reject_records = [record for record in caplog.records if 'client_processing rejected' in record.getMessage()]
     assert len(reject_records) == 1
     message = reject_records[0].getMessage()
@@ -1168,7 +851,7 @@ def test_rejected_payload_provenance_is_sanitized_single_line(monkeypatch, stack
     assert runtime == '<invalid>'
     assert device_class == oversize[:PROVENANCE_LOG_MAX_CHARS]
     assert len(device_class) == PROVENANCE_LOG_MAX_CHARS
-    _assert_no_managed(spies)
+    spies['get_structured'].assert_called_once()
 
 
 def test_projection_payload_imports_while_the_models_package_is_stubbed() -> None:

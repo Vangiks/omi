@@ -159,13 +159,7 @@ def _ensure_process_conversation_importable():
     )
     sys.modules["utils.task_intelligence.workstream_association"].associate_canonical_evidence = MagicMock()
 
-    # AutoMock getattr is truthy. The custom-STT LLM skip helper must fail-open
-    # here or process_conversation returns before memory/task/goal fan-out.
-    skip_helper = MagicMock(return_value=False)
-    sys.modules["utils.subscription"].should_skip_omi_paid_postprocessing = skip_helper
-
     _PROCESS_CONVERSATION_MODULE = importlib.import_module("utils.conversations.process_conversation")
-    _PROCESS_CONVERSATION_MODULE.should_skip_omi_paid_postprocessing = skip_helper
     _PROCESS_CONVERSATION_MODULE.conversation_known_spellings = lambda *_: ''
     return _PROCESS_CONVERSATION_MODULE
 
@@ -244,7 +238,6 @@ class TestExtractionSeamFanOut:
         structured = conversation.structured
 
         with (
-            patch.object(pc, "should_skip_omi_paid_postprocessing", return_value=False),
             patch.object(pc.redis_db, "get_conversation_meeting_id", return_value=None),
             patch.object(pc, "_get_structured", return_value=(structured, False)),
             patch.object(pc, "_get_conversation_obj", return_value=conversation),

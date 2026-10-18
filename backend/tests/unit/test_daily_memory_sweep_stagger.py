@@ -75,7 +75,6 @@ def _ledger_control(uid: str) -> MemoryControlState:
 
 def _install_quiet_scheduler(monkeypatch, seen: list[str]) -> None:
     monkeypatch.setattr(sweep_mod, "belief_model_enabled", lambda: False)
-    monkeypatch.setattr(sweep_mod, "free_tier_memory_suppression_enabled", lambda _uid: False)
     monkeypatch.setattr(sweep_mod, "cleanup_expired_daily_memory_sweep_stages", lambda *args, **kwargs: None)
     monkeypatch.setattr(sweep_mod, "cleanup_expired_memory_deletion_receipts", lambda *args, **kwargs: None)
     monkeypatch.setattr(

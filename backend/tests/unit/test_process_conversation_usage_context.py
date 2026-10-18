@@ -269,9 +269,7 @@ def _build_fakes() -> dict[str, ModuleType]:
     subjects = add("utils.conversations.subjects", AutoMockModule("utils.conversations.subjects"))
     subjects.infer_subject_from_segments = lambda segments: (None, None)
 
-    subscription = add("utils.subscription", AutoMockModule("utils.subscription"))
-    subscription.should_defer_desktop_processing = MagicMock(return_value=False)
-    subscription.should_skip_omi_paid_postprocessing = MagicMock(return_value=False)
+    add("utils.subscription", AutoMockModule("utils.subscription"))
 
     executors = add("utils.executors", AutoMockModule("utils.executors"))
     executors.db_executor = MagicMock()
@@ -645,58 +643,6 @@ def test_fresh_creation_uses_the_explicit_completed_lifecycle_owner(monkeypatch)
     assert 'client_processing' not in created.call_args.args[1]
     assert 'processing_state' not in created.call_args.args[1]
     persisted.assert_not_called()
-
-
-def test_deferred_fresh_creation_uses_the_explicit_processing_lifecycle_owner(monkeypatch):
-    new_request = CreateConversation(
-        started_at=datetime(2026, 7, 14, tzinfo=timezone.utc),
-        finished_at=datetime(2026, 7, 14, 0, 1, tzinfo=timezone.utc),
-        transcript_segments=[],
-        source=ConversationSource.desktop,
-    )
-    deferred_conversation = MagicMock()
-    deferred_conversation.id = 'deferred-conversation'
-    deferred_conversation.dict.return_value = {'id': 'deferred-conversation', 'status': 'processing'}
-    created = MagicMock(return_value=True)
-    persisted = MagicMock()
-    monkeypatch.setattr(process_conversation, '_build_deferred_structured', lambda *args: MagicMock())
-    monkeypatch.setattr(process_conversation, '_get_conversation_obj', lambda *args, **kwargs: deferred_conversation)
-    monkeypatch.setattr(process_conversation.lifecycle_service, 'create_processing_conversation', created)
-    monkeypatch.setattr(process_conversation.lifecycle_service, 'persist_processed_conversation', persisted)
-
-    result = process_conversation._store_deferred_conversation('uid', new_request)
-
-    assert result is deferred_conversation
-    assert deferred_conversation.deferred is True
-    created.assert_called_once_with('uid', deferred_conversation.dict(), idempotent=True)
-    persisted.assert_not_called()
-
-
-def test_deferred_desktop_filler_is_discarded_by_the_free_rules(monkeypatch):
-    """Free-tier desktop never reaches the model, but the rules still run."""
-    from models.transcript_segment import TranscriptSegment
-
-    new_request = CreateConversation(
-        started_at=datetime(2026, 7, 14, tzinfo=timezone.utc),
-        finished_at=datetime(2026, 7, 14, 0, 1, tzinfo=timezone.utc),
-        transcript_segments=[TranscriptSegment(text='Mm-hmm.', speaker='SPEAKER_00', is_user=False, start=0, end=1)],
-        source=ConversationSource.desktop,
-    )
-    deferred_conversation = MagicMock()
-    deferred_conversation.id = 'deferred-filler'
-    deferred_conversation.dict.return_value = {'id': 'deferred-filler', 'status': 'processing'}
-    created = MagicMock(return_value=True)
-    monkeypatch.setattr(process_conversation, '_build_deferred_structured', lambda *args: MagicMock())
-    monkeypatch.setattr(process_conversation, '_get_conversation_obj', lambda *args, **kwargs: deferred_conversation)
-    monkeypatch.setattr(process_conversation, '_calendar_overlap_retains_conversation', lambda *args: False)
-    monkeypatch.setattr(process_conversation.lifecycle_service, 'create_processing_conversation', created)
-
-    process_conversation._store_deferred_conversation('uid', new_request)
-
-    payload = created.call_args.args[1]
-    assert payload['discarded'] is True
-    assert deferred_conversation.discarded is True
-    assert payload[process_conversation.RELEVANCE_DECISION_FIELD]['reason'] == 'filler_only'
 
 
 def _segments_saying(text):
@@ -1457,9 +1403,6 @@ def test_custom_stt_conversation_without_llm_byok_key_runs_llm_work(monkeypatch)
     process_conversation.process_conversation('uid', 'en', completed_conversation)
 
     assert structured_calls, 'LLM structuring was skipped for a custom-STT conversation'
-    process_conversation.should_skip_omi_paid_postprocessing.assert_called()
-    _, kwargs = process_conversation.should_skip_omi_paid_postprocessing.call_args
-    assert kwargs.get('uses_custom_stt') is True
 
 
 def test_custom_stt_conversation_with_llm_byok_key_runs_llm_work(monkeypatch):
@@ -1494,35 +1437,6 @@ def test_custom_stt_conversation_with_llm_byok_key_runs_llm_work(monkeypatch):
     process_conversation.process_conversation('uid', 'en', input_conversation)
 
     assert structured_calls, 'LLM structuring was skipped despite an LLM BYOK key'
-
-
-def test_custom_stt_exhausted_processing_budget_skips_llm_work(monkeypatch):
-    """#7690 residual: custom-STT still hits the LLM processing gate. When that
-    budget is exhausted, Omi-paid structuring must not run — without the
-    #10962 blanket skip that removed summaries for every custom-STT user."""
-    completed_conversation = Conversation(
-        id='conversation-custom-stt-exhausted',
-        created_at=datetime(2026, 7, 21, tzinfo=timezone.utc),
-        started_at=datetime(2026, 7, 21, tzinfo=timezone.utc),
-        finished_at=datetime(2026, 7, 21, 0, 1, tzinfo=timezone.utc),
-        source=ConversationSource.omi,
-        structured=Structured(title='Title', overview='Overview'),
-        transcript_segments=[],
-        status=ConversationStatus.processing,
-        discarded=False,
-        uses_custom_stt=True,
-    )
-
-    structured_calls = []
-    monkeypatch.setattr(
-        process_conversation, '_get_structured', lambda *a, **k: structured_calls.append(1) or (MagicMock(), False)
-    )
-    monkeypatch.setattr(process_conversation, 'should_skip_omi_paid_postprocessing', lambda *a, **k: True)
-
-    result = process_conversation.process_conversation('uid', 'en', completed_conversation)
-
-    assert not structured_calls, 'LLM structuring ran after the processing budget was exhausted'
-    assert result.status == ConversationStatus.completed
 
 
 def _ledger_gate_conversation(conversation_id: str) -> Conversation:

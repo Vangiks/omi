@@ -32,15 +32,6 @@ def test_crisp_unread_route_is_removed():
     assert make_client().get("/v1/crisp/unread").status_code == 404
 
 
-def _entitle(monkeypatch, entitled: bool = True) -> None:
-    """Pin the screen-vector entitlement.
-
-    Without this the gate performs a real subscription lookup: it fails open, so assertions
-    still hold, but each test pays a live Firestore timeout.
-    """
-    monkeypatch.setattr(desktop_screen_crisp, "grants_cloud_screen_vectors", lambda uid: entitled)
-
-
 def _enable_frame_requests(monkeypatch, generation: int = 7) -> None:
     async def enabled(*_args, **_kwargs):
         return FrameRequestAuthorityDecision(enabled=True, account_generation=generation)
@@ -49,7 +40,6 @@ def _enable_frame_requests(monkeypatch, generation: int = 7) -> None:
 
 
 def test_screen_activity_sync_writes_rows_and_embeddings(monkeypatch):
-    _entitle(monkeypatch)
     writes = []
     monkeypatch.setattr(
         desktop_screen_crisp, "upsert_screen_activity", lambda uid, rows: writes.append((uid, rows)) or 2
@@ -134,9 +124,8 @@ def test_screen_activity_sync_writes_rows_and_embeddings(monkeypatch):
 
 
 def test_slow_sync_logs_phase_durations_without_uid(monkeypatch, caplog):
-    ticks = iter(range(12))
+    ticks = iter(range(10))
     monkeypatch.setattr(desktop_screen_crisp, "time", SimpleNamespace(perf_counter=lambda: next(ticks)))
-    _entitle(monkeypatch)
     _enable_frame_requests(monkeypatch)
     monkeypatch.setattr(desktop_screen_crisp, "upsert_screen_activity", lambda uid, rows: len(rows))
     monkeypatch.setattr(desktop_screen_crisp, "upsert_screen_activity_vectors", lambda uid, rows: None)
@@ -162,15 +151,11 @@ def test_slow_sync_logs_phase_durations_without_uid(monkeypatch, caplog):
     assert response.status_code == 200
     lines = [record.message for record in caplog.records if "screen_activity_sync_slow" in record.message]
     assert len(lines) == 1
-    assert (
-        "total_ms=11000 row_count=1 upsert_ms=1000 entitlement_ms=1000 vector_ms=1000 frame_requests_ms=2000"
-        in lines[0]
-    )
+    assert "total_ms=9000 row_count=1 upsert_ms=1000 vector_ms=1000 frame_requests_ms=2000" in lines[0]
     assert "user-1" not in lines[0]
 
 
 def test_enabled_screen_sync_returns_only_device_routed_frame_metadata(monkeypatch):
-    _entitle(monkeypatch)
     _enable_frame_requests(monkeypatch)
     monkeypatch.setattr(desktop_screen_crisp, "upsert_screen_activity", lambda uid, rows: len(rows))
     monkeypatch.setattr(desktop_screen_crisp, "upsert_screen_activity_vectors", lambda uid, rows: None)
@@ -225,7 +210,6 @@ def test_screen_activity_sync_rejects_batches_larger_than_rust_contract():
 
 
 def test_screen_activity_sync_normalizes_iso_timestamp_before_firestore_write(monkeypatch):
-    _entitle(monkeypatch)
     writes = []
     monkeypatch.setattr(
         desktop_screen_crisp, "upsert_screen_activity", lambda uid, rows: writes.extend(rows) or len(rows)
@@ -273,36 +257,12 @@ def test_screen_activity_vector_treats_canonical_naive_timestamp_as_utc(monkeypa
     assert upserts[0]["vectors"][0]["metadata"]["timestamp"] == 1785024000
 
 
-def test_a_free_desktop_user_syncs_rows_but_no_vectors(monkeypatch):
-    """The row is the cheap half and stays; the vector is the expensive half and is withheld."""
-    writes: list = []
-    vectors: list = []
-    monkeypatch.setattr(
-        desktop_screen_crisp, "upsert_screen_activity", lambda uid, rows: writes.extend(rows) or len(rows)
-    )
-    monkeypatch.setattr(
-        desktop_screen_crisp, "upsert_screen_activity_vectors", lambda uid, rows: vectors.extend(rows) or len(rows)
-    )
-    _entitle(monkeypatch, entitled=False)
-
-    response = make_client().post(
-        "/v1/screen-activity/sync",
-        json={"rows": [{"id": 1, "timestamp": "2026-07-26T00:00:00.000Z", "ocrText": "text", "embedding": [0.1]}]},
-    )
-
-    assert response.status_code == 200
-    assert [row["id"] for row in writes] == [1], "the row must still be stored"
-    assert writes[0]["ocrText"] == "text", "the text is retained so vectors can be backfilled on upgrade"
-    assert vectors == [], "no vector is written for an unentitled user"
-
-
-def test_an_entitled_user_still_gets_vectors(monkeypatch):
+def test_every_user_gets_screen_vectors(monkeypatch):
     vectors: list = []
     monkeypatch.setattr(desktop_screen_crisp, "upsert_screen_activity", lambda uid, rows: len(rows))
     monkeypatch.setattr(
         desktop_screen_crisp, "upsert_screen_activity_vectors", lambda uid, rows: vectors.extend(rows) or len(rows)
     )
-    _entitle(monkeypatch, entitled=True)
 
     response = make_client().post(
         "/v1/screen-activity/sync",
@@ -311,18 +271,3 @@ def test_an_entitled_user_still_gets_vectors(monkeypatch):
 
     assert response.status_code == 200
     assert [row["id"] for row in vectors] == [1]
-
-
-def test_the_entitlement_gate_fails_open(monkeypatch):
-    """A subscription-lookup blip must overspend slightly, never silently strip paid search."""
-    import utils.subscription as subscription
-
-    subscription.clear_cloud_screen_vector_entitlement_cache("uid-under-test")
-    monkeypatch.setattr(subscription, "get_customer_firestore_client", lambda: object())
-    monkeypatch.setattr(
-        subscription.users_db,
-        "get_user_valid_subscription",
-        lambda uid, **_kwargs: (_ for _ in ()).throw(RuntimeError("firestore unavailable")),
-    )
-
-    assert subscription.grants_cloud_screen_vectors("uid-under-test") is True

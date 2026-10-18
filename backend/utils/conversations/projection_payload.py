@@ -113,9 +113,8 @@ def client_processing_mutation(projection: Any) -> dict[str, Any]:
 
     1. Merge into a document-create payload (``create_processing_conversation``
        / ``create_completed_conversation`` when this persist IS the conversation's
-       first write). ``_store_projected_conversation`` /
-       ``_store_deterministic_minimum`` do this only for
-       ``CreateConversation`` / ``ExternalIntegrationCreateConversation``.
+       first write), only for ``CreateConversation`` /
+       ``ExternalIntegrationCreateConversation``.
     2. Pass to ``update_conversation`` after the coordinator returns. This is
        the working way for a route whose conversation already exists (from-segments
        post-create stamp, late-bind, synchronous finalize): the coordinator's

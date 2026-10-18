@@ -444,7 +444,6 @@ def test_recovery_minimum_structure_raises_before_persist_or_fanout(capsys):
         try:
             with (
                 patch.object(pc, 'is_release_probe_uid', MagicMock(return_value=False)),
-                patch.object(pc, 'should_skip_omi_paid_postprocessing', MagicMock(return_value=False)),
                 patch.object(pc, '_enrich_meeting_context', MagicMock()),
                 patch.object(pc, '_get_structured', MagicMock(return_value=(Structured(), False))),
                 patch.object(pc, '_get_conversation_obj', MagicMock(return_value=conversation)),
@@ -478,7 +477,6 @@ def test_recovery_minimum_structure_raises_before_persist_or_fanout(capsys):
             persisted = MagicMock(return_value=True)
             with (
                 patch.object(pc, 'is_release_probe_uid', return_value=False),
-                patch.object(pc, 'should_skip_omi_paid_postprocessing', return_value=False),
                 patch.object(pc, '_enrich_meeting_context'),
                 patch.object(pc, 'resolve_speakers_for_processing'),
                 patch.object(pc, '_get_structured', side_effect=discard_structure),

@@ -32,7 +32,7 @@ import pytest
 # `utils.llm.gateway_client`) and then evicts the chain breaks the NEXT such
 # fixture in the same pytest process. Importing here, at collection time, keeps
 # the chain inside every fixture's snapshot. Same family of hazard as the
-# prometheus/Cloud Tasks warm-ups in `test_process_conversation_free_tier_branch`.
+# prometheus/Cloud Tasks warm-ups below.
 import jsonschema  # noqa: F401
 import pydantic.root_model  # noqa: F401
 
@@ -147,8 +147,7 @@ def _loaded_process_conversation():
     # `utils.metrics` and `utils.observability.*` register Prometheus collectors at
     # import. Fresh-loading and then evicting them leaves the process-wide
     # CollectorRegistry populated, so the NEXT fixture in this pytest process that
-    # fresh-loads `process_conversation` dies on a duplicated timeseries. Stub them
-    # here for the same reason `test_process_conversation_free_tier_branch` does.
+    # fresh-loads `process_conversation` dies on a duplicated timeseries. Stub them.
     fakes['utils.metrics'] = AutoMockModule('utils.metrics')
     for name, module in package_submodule_stubs('utils.observability').items():
         fakes[name] = module

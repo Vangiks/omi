@@ -451,9 +451,9 @@ def record_jit_first_open(*, event: str, effect: str) -> None:
 #     per-conversation one: a failed enrichment re-arms `deferred`, so the next
 #     open counts a second `enrich_started`, and a retried deferred persist can
 #     count `stored` (or `fenced`) more than once for a single conversation.
-#  3. The ratio is undefined while `FREE_TIER_LOCAL_PROCESSING` is on: the
-#     deferred-store path stops emitting `stored` while the already-stored
-#     backlog keeps emitting `enrich_*`, so the ratio drifts above 100%.
+#  3. The fork no longer defers at capture (#17): `stored` stops while the
+#     already-stored backlog keeps emitting `enrich_*`, so the ratio drifts
+#     above 100%.
 LAZY_DESKTOP_DEFERRAL_EVENTS = frozenset(
     {
         'stored',
@@ -473,8 +473,7 @@ LAZY_DESKTOP_DEFERRAL_TOTAL = Counter(
         'never labeled by UID. Aggregate as sum by (event) across BOTH backend and pusher: '
         'stored/fenced are emitted by every host running the finalizer, enrich_* only by the '
         'backend first-open route. enrich_complete/stored is an attempt/persist ratio, not a '
-        'per-conversation one (a re-armed retry counts again). The ratio is undefined while '
-        'FREE_TIER_LOCAL_PROCESSING is on: stored stops while the enrich_* backlog drains.'
+        'per-conversation one (a re-armed retry counts again).'
     ),
     ['event'],
 )

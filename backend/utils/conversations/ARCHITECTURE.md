@@ -18,11 +18,7 @@ and background processing.
   request authentication and response shaping.
 - `process_conversation.py` is the synchronous enrichment coordinator. It
   persists the completed conversation and delegates expensive child work to the
-  named executor lanes. Custom-STT conversations skip managed-STT credits but
-  still consult `should_skip_omi_paid_postprocessing` before Omi-paid
-  structuring, summary, and memory work (#7690). That gate sits after the
-  unpaid desktop on-device / `store_projection` path (#14513) so it cannot
-  strip a local summary.
+  named executor lanes.
 - `processing_trigger.py` owns *why* a conversation is processed. Every caller
   of `process_conversation` (and every finalization job) names a
   `ProcessingTrigger`; its `PROCESSING_MODES` row fixes run-now, reprocess,
