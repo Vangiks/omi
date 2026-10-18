@@ -122,12 +122,9 @@ class Subscription(BaseModel):
     plan: PlanType = PlanType.basic
     status: SubscriptionStatus = SubscriptionStatus.active
     current_period_end: Optional[int] = None
-    # Period start is used by the Neo desktop-grandfather check. Populated by the
-    # Stripe webhook on every subscription event going forward; existing subs
-    # have None until their first post-deploy webhook fires (renewal/cancel/etc.)
-    # and are treated as pre-cutoff (grandfathered) until then.
+    # Period start is used by the Neo desktop-grandfather check. Subscriptions
+    # stored without it are treated as pre-cutoff (grandfathered).
     current_period_start: Optional[int] = None
-    stripe_subscription_id: Optional[str] = None
     current_price_id: Optional[str] = None
     features: List[str] = []
     cancel_at_period_end: bool = False

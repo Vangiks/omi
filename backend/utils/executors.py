@@ -8,8 +8,6 @@ Provides shared executors with strict separation (bulkhead pattern):
   to prevent slow LLM retries from blocking DB or auth operations.
 - jev_shadow_executor: lazy ten-worker pool for best-effort EXP-004 measurements,
   isolated from foreground LLM work even during dependency outages.
-- stripe_executor: Stripe API calls (Subscription.retrieve, etc.). External network I/O
-  with unpredictable latency, isolated from everything else.
 - sync_executor: sync pipeline VAD/STT/segment processing.
 - postprocess_executor: best-effort post-processing (memories, trends, vectors,
   action items, goals, conversation processing, webhook delivery).
@@ -106,7 +104,6 @@ critical_executor = MonitoredThreadPoolExecutor(
 )
 db_executor = MonitoredThreadPoolExecutor(name="db", max_workers=24, thread_name_prefix="db")
 llm_executor = MonitoredThreadPoolExecutor(name="llm", max_workers=6, thread_name_prefix="llm")
-stripe_executor = MonitoredThreadPoolExecutor(name="stripe", max_workers=4, thread_name_prefix="stripe")
 sync_executor = MonitoredThreadPoolExecutor(name="sync", max_workers=16, thread_name_prefix="sync")
 postprocess_executor = MonitoredThreadPoolExecutor(name="postprocess", max_workers=24, thread_name_prefix="postproc")
 cleanup_executor = MonitoredThreadPoolExecutor(name="cleanup", max_workers=4, thread_name_prefix="cleanup")
@@ -127,7 +124,6 @@ _ALL_EXECUTORS = [
     critical_executor,
     db_executor,
     llm_executor,
-    stripe_executor,
     sync_executor,
     postprocess_executor,
     cleanup_executor,

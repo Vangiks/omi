@@ -20,7 +20,6 @@ from database.auth import get_user_from_uid
 from utils.integration_telemetry import emit_posthog_event
 from utils.notification_text import to_plain_text
 from .llm.notifications import (
-    generate_notification_message,
     generate_credit_limit_notification,
     generate_silent_user_notification,
 )
@@ -450,27 +449,6 @@ async def send_client_displayed_notification_async(
         display_title=title,
         display_body=body,
     )
-
-
-async def send_subscription_paid_personalized_notification(user_id: str, data: Optional[Dict[str, Any]] = None) -> None:
-    """Send a personalized notification to all user's devices when unlimited subscription is purchased"""
-    # Get user name from Firebase Auth
-    name: str = "there"
-    try:
-        user = await run_blocking(postprocess_executor, _get_user, user_id)
-        name = user.display_name
-        if not name and user.email:
-            name = user.email.split('@')[0].capitalize()
-        if not name:
-            name = "there"
-    except Exception as e:
-        logger.error(f"Error getting user info from Firebase Auth: {e}")
-        name = "there"
-
-    # Generate welcome message for unlimited plan with user context
-    title, body = await generate_notification_message(user_id, name, "unlimited")
-
-    await send_notification_async(user_id, title, body, data)
 
 
 async def send_credit_limit_notification(user_id: str) -> None:

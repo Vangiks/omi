@@ -201,7 +201,6 @@ def test_get_executor_metrics_returns_all_pools():
         'critical',
         'db',
         'llm',
-        'stripe',
         'sync',
         'postprocess',
         'cleanup',

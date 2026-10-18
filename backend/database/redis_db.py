@@ -1501,7 +1501,7 @@ def release_notifications_job_run_lock(token: str) -> None:
 def set_credits_invalidation_signal(uid: str, ttl: int = 120) -> None:
     """Signal active WebSocket sessions to refresh credits immediately.
 
-    Called when subscription changes (Stripe webhook, upgrade, etc.).
+    Called when the user's allowance changes (for example, the monthly quota reset).
     Active transcribe loops check this on each 60s tick and force a Firestore refresh.
     TTL is 2 min — long enough for all streams to see it on their next 60s tick.
     Uses GET (not GETDEL) so multiple concurrent streams all see the signal.

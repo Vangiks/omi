@@ -72,15 +72,11 @@ def _loaded_notifications() -> Iterator[tuple[ModuleType, ModuleType, ModuleType
     )
     database_auth = _module('database.auth', get_user_from_uid=lambda _uid: None)
 
-    async def generate_notification_message(_uid: str, _name: str, _plan: str) -> tuple[str, str]:
-        return 'Welcome', 'Subscription active'
-
     async def generate_credit_limit_notification(_uid: str, _name: str) -> tuple[str, str]:
         return 'Limit reached', 'Upgrade to continue'
 
     llm_notifications = _module(
         'utils.llm.notifications',
-        generate_notification_message=generate_notification_message,
         generate_credit_limit_notification=generate_credit_limit_notification,
         generate_silent_user_notification=lambda _name: ('We miss you', 'Capture something today'),
     )
@@ -123,7 +119,7 @@ def _success_response() -> SimpleNamespace:
     return SimpleNamespace(responses=[SimpleNamespace(success=True, exception=None)])
 
 
-def test_subscription_notification_offloads_token_read_and_preserves_sync_api() -> None:
+def test_notification_send_offloads_token_read_and_preserves_sync_api() -> None:
     with _loaded_notifications() as (notifications, notification_db, messaging, _cache_writes):
         assert not inspect.iscoroutinefunction(notifications.send_notification)
         assert inspect.iscoroutinefunction(notifications.send_notification_async)
@@ -142,7 +138,7 @@ def test_subscription_notification_offloads_token_read_and_preserves_sync_api() 
             messaging.send_each = lambda _messages: _success_response()
 
             await _assert_loop_responsive_while_worker_waits(
-                notifications.send_subscription_paid_personalized_notification('user-1', {'source': 'test'}),
+                notifications.send_notification_async('user-1', 'Title', 'Body', {'source': 'test'}),
                 entered,
                 release,
             )
@@ -226,10 +222,12 @@ def test_notification_enrichment_uses_auth_and_fcm_pool_without_consuming_db_poo
         notifications.run_blocking = tracking_run_blocking
         messaging.send_each = lambda _messages: _success_response()
 
-        asyncio.run(notifications.send_subscription_paid_personalized_notification('user-5'))
+        asyncio.run(notifications.send_credit_limit_notification('user-5'))
 
         assert calls == [
+            (notifications.db_executor, notifications.has_credit_limit_notification_been_sent),
             (notifications.postprocess_executor, notifications._get_user),
             (notifications.db_executor, notification_db.get_all_tokens),
             (notifications.postprocess_executor, notifications._send_messages),
+            (notifications.db_executor, notifications.set_credit_limit_notification_sent),
         ]

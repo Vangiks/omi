@@ -1452,34 +1452,8 @@ def set_chat_message_rating_score(
 
 
 # **************************************
-# ************** Payments **************
+# ************ Subscriptions ***********
 # **************************************
-
-
-def get_stripe_customer_id(uid: str) -> Optional[str]:
-    """Get the Stripe customer ID for a user."""
-    user_ref = db.collection('users').document(uid)
-    user_doc = user_ref.get()
-    if user_doc.exists:
-        user_data = user_doc.to_dict()
-        return user_data.get('stripe_customer_id')
-    return None
-
-
-def set_stripe_customer_id(uid: str, customer_id: str):
-    user_ref = db.collection('users').document(uid)
-    user_ref.update({'stripe_customer_id': customer_id})
-
-
-def get_user_by_stripe_customer_id(customer_id: str):
-    users_ref = db.collection('users')
-    query = users_ref.where(filter=FieldFilter('stripe_customer_id', '==', customer_id)).limit(1)
-    docs = list(query.stream())
-    if docs:
-        user_dict = docs[0].to_dict()
-        user_dict['uid'] = docs[0].id
-        return user_dict
-    return None
 
 
 def update_user_subscription(uid: str, subscription_data: dict):
