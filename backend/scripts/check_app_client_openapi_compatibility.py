@@ -43,6 +43,10 @@ DELIBERATELY_REMOVED_ENDPOINTS: frozenset[str] = frozenset(
         # Desktop Crisp client removed in macOS 0.12.162+; endpoint had no other
         # callers. Screen-activity sync stays on the same router (#11429).
         '/v1/crisp/unread',
+        # Held-content budget choice removed with the transcription allowance
+        # (#32): dark behind HELD_CONTENT_ENABLED plus a capability header, so
+        # no released client ever called it.
+        '/v1/users/budget-choice',
     }
 )
 

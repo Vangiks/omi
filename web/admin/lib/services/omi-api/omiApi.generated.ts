@@ -794,31 +794,6 @@ export interface Body_upload_profile_v3_upload_audio_post {
   file: string;
 }
 
-export interface BudgetChoiceRecord {
-  choice: "on_device" | "upgrade";
-  dont_ask_again?: boolean;
-  period: string;
-}
-
-export interface BudgetChoiceRequest {
-  choice: "on_device" | "upgrade";
-  dont_ask_again?: boolean;
-  period: string;
-}
-
-export interface BudgetChoiceResponse {
-  ask: boolean;
-  choice: BudgetChoiceRecord | null;
-  period: string;
-  state: "managed" | "unavailable" | "on_device" | "held_pending_choice";
-}
-
-export interface BudgetChoiceWriteResponse {
-  ask?: false;
-  choice: BudgetChoiceRecord;
-  period: string;
-}
-
 export interface BulkAssignSegmentsRequest {
   assign_type: string;
   segment_ids: Array<string>;
@@ -3912,7 +3887,6 @@ export interface PlanIdentityUserSubscriptionResponse {
   phone_call_quota?: PhoneCallQuota | null;
   show_subscription_ui?: boolean;
   subscription: PlanIdentitySubscription;
-  transcription_allowance?: TranscriptionAllowanceSnapshot | null;
   transcription_seconds_limit: number;
   transcription_seconds_used: number;
   words_transcribed_limit: number;
@@ -5546,12 +5520,6 @@ export interface TranscriptSegment {
   translations?: Array<Translation> | null;
 }
 
-export interface TranscriptionAllowanceSnapshot {
-  mode: string;
-  reason?: string;
-  remaining_seconds?: number | null;
-}
-
 export interface TranscriptionErrorDetail {
   error: string;
   message: string;
@@ -5850,7 +5818,6 @@ export interface UserSubscriptionResponse {
   phone_call_quota?: PhoneCallQuota | null;
   show_subscription_ui?: boolean;
   subscription: Subscription;
-  transcription_allowance?: TranscriptionAllowanceSnapshot | null;
   transcription_seconds_limit: number;
   transcription_seconds_used: number;
   words_transcribed_limit: number;
@@ -6195,10 +6162,6 @@ export interface OmiApiSchemas {
   "Body_upload_file_chat_v2_files_post": Body_upload_file_chat_v2_files_post;
   "Body_upload_frame_request_v1_frame_requests__request_id__upload_post": Body_upload_frame_request_v1_frame_requests__request_id__upload_post;
   "Body_upload_profile_v3_upload_audio_post": Body_upload_profile_v3_upload_audio_post;
-  "BudgetChoiceRecord": BudgetChoiceRecord;
-  "BudgetChoiceRequest": BudgetChoiceRequest;
-  "BudgetChoiceResponse": BudgetChoiceResponse;
-  "BudgetChoiceWriteResponse": BudgetChoiceWriteResponse;
   "BulkAssignSegmentsRequest": BulkAssignSegmentsRequest;
   "BulkMoveConversationsRequest": BulkMoveConversationsRequest;
   "BulkMoveConversationsResponse": BulkMoveConversationsResponse;
@@ -6826,7 +6789,6 @@ export interface OmiApiSchemas {
   "TranscriptLine": TranscriptLine;
   "TranscriptMatchSnippet": TranscriptMatchSnippet;
   "TranscriptSegment": TranscriptSegment;
-  "TranscriptionAllowanceSnapshot": TranscriptionAllowanceSnapshot;
   "TranscriptionErrorDetail": TranscriptionErrorDetail;
   "TranscriptionErrorResponse": TranscriptionErrorResponse;
   "TranscriptionOutcome": TranscriptionOutcome;
@@ -10630,24 +10592,6 @@ export interface OmiApiPaths {
       operationId: "get_available_languages_v1_users_available_languages_get";
       responses: {
         "200": AvailableLanguagesResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/users/budget-choice": {
-    get: {
-      operationId: "get_budget_choice_v1_users_budget_choice_get";
-      responses: {
-        "200": BudgetChoiceResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-    put: {
-      operationId: "put_budget_choice_v1_users_budget_choice_put";
-      responses: {
-        "200": BudgetChoiceWriteResponse;
         "401": void;
         "422": HTTPValidationError;
       };
@@ -19229,48 +19173,6 @@ export async function get_available_languages_v1_users_available_languages_get(h
   return _res.status === 204 ? (undefined as any) : await _res.json();
 }
 
-export async function get_budget_choice_v1_users_budget_choice_get(header: { X_App_Platform?: string, X_Omi_Held_Content?: string | null, authorization?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, init?: OmiApiClientInit): Promise<BudgetChoiceResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/users/budget-choice`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "GET",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Omi_Held_Content !== undefined ? { "X-Omi-Held-Content": String(header.X_Omi_Held_Content) } : {}),
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function put_budget_choice_v1_users_budget_choice_put(header: { X_App_Platform?: string, X_Omi_Held_Content?: string | null, authorization?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, body: BudgetChoiceRequest, init?: OmiApiClientInit): Promise<BudgetChoiceWriteResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/users/budget-choice`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "PUT",
-    headers: {
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Omi_Held_Content !== undefined ? { "X-Omi-Held-Content": String(header.X_Omi_Held_Content) } : {}),
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
 export async function get_daily_summaries_v1_users_daily_summaries_get(query: { limit?: number, offset?: number }, header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, init?: OmiApiClientInit): Promise<DailySummariesResponse> {
   const _base = init?.baseURL ?? "";
   const _path = `/v1/users/daily-summaries`;
@@ -22200,4 +22102,4 @@ export async function get_speech_profile_v4_speech_profile_get(header: { authori
   return _res.status === 204 ? (undefined as any) : await _res.json();
 }
 
-// Total: 507 client methods generated.
+// Total: 505 client methods generated.
