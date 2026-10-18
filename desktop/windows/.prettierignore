@@ -4,3 +4,5 @@ pnpm-lock.yaml
 LICENSE.md
 tsconfig.json
 tsconfig.*.json
+# Generated API contract; regenerate with backend/scripts/generate_ts_openapi_types.py.
+src/renderer/src/lib/omiApi.generated.ts
