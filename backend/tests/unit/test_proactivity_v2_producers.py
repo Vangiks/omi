@@ -222,8 +222,8 @@ async def test_safety_structured_output_guard(lane, guard, delivered):
 
 
 @pytest.mark.asyncio
-async def test_claim_denial_free_user_makes_zero_model_calls(lane):
-    lane.claim.side_effect = ProactivityDenied('not_paid')
+async def test_claim_denial_makes_zero_model_calls(lane):
+    lane.claim.side_effect = ProactivityDenied('disabled')
     assert await mentor(lane) is None
     lane.model.assert_not_awaited()
     lane.publish.assert_not_awaited()
@@ -426,14 +426,14 @@ async def test_mentor_failure_logs_only_metadata(lane, caplog):
 
 
 @pytest.mark.asyncio
-async def test_followup_free_user_zero_calls(lane):
+async def test_followup_claim_denial_zero_calls(lane):
     due = datetime.now(timezone.utc) - timedelta(minutes=1)
     lane.monkeypatch.setattr(
         producers.tasks,
         'get_action_item',
         MagicMock(return_value={'conversation_id': 'c', 'due_at': due, 'completed': False}),
     )
-    lane.claim.side_effect = ProactivityDenied('not_paid')
+    lane.claim.side_effect = ProactivityDenied('disabled')
     await producers.produce_followup('u', 't', due.isoformat())
     lane.model.assert_not_awaited()
     lane.publish.assert_not_awaited()

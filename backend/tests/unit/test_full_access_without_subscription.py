@@ -48,14 +48,6 @@ def test_transcription_credits_are_unlimited(firestore_without_user, monkeypatch
     assert subscription_utils.has_transcription_credits('local-dev-user')
 
 
-def test_proactivity_sees_full_access_plan():
-    from datetime import datetime, timezone
-
-    from config.proactivity_v2 import active_plan
-
-    assert active_plan({}, datetime.now(timezone.utc)) == FULL_ACCESS_PLAN.value
-
-
 def test_usage_accounting_attributes_full_access_plan():
     from database.llm_gateway_accounting import _subscription_tier
     from database.llm_usage import resolve_usage_plan_id

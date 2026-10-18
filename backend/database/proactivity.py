@@ -14,7 +14,7 @@ from typing import Any
 from google.cloud import firestore
 from google.cloud.firestore_v1.base_query import FieldFilter
 
-from config.proactivity_v2 import ProactivityDenied, Producer, active_plan, daily_cap, producer_for, utc_now
+from config.proactivity_v2 import DAILY_CAP_MICRO_USD, ProactivityDenied, Producer, producer_for, utc_now
 from database._client import get_customer_firestore_client
 from database import proactivity_redis
 from database.account_deletion_policy import account_deletion_blocks_access, normalize_account_deletion_status
@@ -91,10 +91,7 @@ def admission_records(client: Any, uid: str, producer: Producer, tx: Any, now: d
         raise ProactivityDenied('health_unavailable')
     if producer.name == 'conversation_mentor_v2' and user.get('mentor_notification_frequency', 0) <= 0:
         raise ProactivityDenied('disabled')
-    cap, _ = daily_cap(active_plan(user, now))
-    if cap <= 0:
-        raise ProactivityDenied('not_paid')
-    return generation, cap
+    return generation, DAILY_CAP_MICRO_USD
 
 
 def claim_item(
