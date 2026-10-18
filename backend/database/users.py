@@ -12,7 +12,6 @@ from database.account_deletion_marker import (
     account_deletion_firestore_client,
     get_user_deletion_wipe_status,
 )
-from database.account_deletion_policy import deletion_billing_error_is_already_gone
 from database.account_deletion_transitions import (
     adopt_legacy_late_agent_vm_cleanup as _adopt_legacy_late_agent_vm_cleanup_txn,
     mark_wipe_completed as _mark_user_deletion_wipe_completed_txn,
@@ -607,39 +606,6 @@ def resolve_deletion_wipe_job_id(wipe_job_id: str) -> DeletionWipeTaskResolution
     return {'outcome': 'resolved', 'uid': doc.id}
 
 
-@transactional
-def _mark_user_deletion_billing_failed_txn(transaction, doc_ref, uid: str, subscription_id: str | None, error: str):
-    snapshot = doc_ref.get(transaction=transaction)
-    if snapshot.exists:
-        data = snapshot.to_dict() or {}
-        if data.get('wipe_status') in ('cancelled', 'completed') or data.get('wipe_auth_deleted_at'):
-            return False
-
-    transaction.set(
-        doc_ref,
-        {
-            'wipe_status': 'billing_failed',
-            'billing_failed_at': datetime.now(timezone.utc),
-            'billing_subscription_id': subscription_id or '',
-            'billing_error': error,
-        },
-        merge=True,
-    )
-    return True
-
-
-def mark_user_deletion_billing_failed(uid: str, subscription_id: str | None, error: str) -> bool:
-    """Record that account deletion is blocked on Stripe cancellation.
-
-    The worker must first verify Firebase Auth still exists. Started wipes may
-    park here before Auth deletion; a post-Auth or terminal marker stays fenced.
-    """
-    client = account_deletion_firestore_client()
-    doc_ref = account_deletion_document(uid, firestore_client=client)
-    transaction = client.transaction()
-    return _mark_user_deletion_billing_failed_txn(transaction, doc_ref, uid, subscription_id, error)
-
-
 def cancel_user_deletion_wipe(uid: str):
     """Cancel a pending deletion-wipe marker.
 
@@ -674,10 +640,8 @@ def get_pending_deletion_wipes(
 ) -> list[dict]:
     """Return account_deletions documents whose wipe needs retry.
 
-    Queries ``failed`` records whose per-attempt backoff has elapsed,
-    ``billing_failed`` records with historical already-gone billing errors,
-    stale ``pending`` records
-    (queued more than ``stale_after`` ago), stale ``deleting_auth`` records
+    Queries ``failed`` records whose per-attempt backoff has elapsed, stale
+    ``pending`` records (queued more than ``stale_after`` ago), stale ``deleting_auth`` records
     (intent written but never transitioned to ``pending`` — usually a crash
     after ``auth.delete_account()`` succeeded), stale ``running`` records (worker
     started but hasn't finished within ``running_stale_after`` — probably
@@ -713,15 +677,6 @@ def get_pending_deletion_wipes(
         if failed_at and failed_at + deletion_wipe_retry_delay(data.get('wipe_attempts') or 1) > now:
             continue
         result.append(data | {'uid': doc.id})
-
-    if len(result) < limit:
-        billing_docs = account_deletion_collection().where('wipe_status', '==', 'billing_failed').stream()
-        for doc in billing_docs:
-            if len(result) >= limit:
-                break
-            data = doc.to_dict()
-            if deletion_billing_error_is_already_gone(data.get('billing_error')):
-                result.append(data | {'uid': doc.id})
 
     if len(result) < limit:
         # Over-fetch *all* pending docs and age-filter in Python. A tight
@@ -791,8 +746,7 @@ def _claim_deletion_wipe_txn(
 ) -> str | None:
     """Atomically claim a wipe for re-enqueueing inside a Firestore transaction.
 
-    Transitions ``wipe_status`` from ``failed``, already-gone ``billing_failed``,
-    stale ``pending``, stale
+    Transitions ``wipe_status`` from ``failed``, stale ``pending``, stale
     ``deleting_auth`` (auth user verified gone by caller), stale ``running``
     (worker crashed mid-execution), or stale ``retrying`` to ``retrying`` so
     concurrent workers cannot re-enqueue the same wipe. Fresh ``pending``,
@@ -807,11 +761,6 @@ def _claim_deletion_wipe_txn(
     data = snapshot.to_dict()
     status = data.get('wipe_status')
     now = datetime.now(timezone.utc)
-    if status == 'billing_failed':
-        if not deletion_billing_error_is_already_gone(data.get('billing_error')):
-            return None
-        transaction.update(doc_ref, {'wipe_status': 'retrying', 'wipe_claimed_at': now})
-        return snapshot.id
     if status == 'deleting_auth':
         # Recoverable only after the caller verified the Firebase auth user is
         # gone. Re-validate the age inside the transaction so a fresh intent
@@ -902,9 +851,7 @@ def _claim_deletion_wipe_task_txn(transaction, doc_ref, running_stale_after: tim
         if running_at and running_at >= now - running_stale_after:
             return 'running'
 
-    # A queued task retries transient pre-Auth billing failures. The reconciler
-    # only recovers historical already-gone billing errors, never an outage.
-    if status in ('pending', 'retrying', 'failed', 'running', 'billing_failed'):
+    if status in ('pending', 'retrying', 'failed', 'running'):
         transaction.update(doc_ref, {'wipe_status': 'retrying', 'wipe_claimed_at': now})
         return 'claimed'
 

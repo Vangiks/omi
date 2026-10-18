@@ -8,7 +8,6 @@ from threading import Event
 import time
 from typing import Any, Callable, Literal, TypedDict, cast
 
-from firebase_admin import auth as firebase_auth
 
 from database import vector_db
 from database.sync_jobs import renew_job_run_lock
@@ -33,7 +32,6 @@ from database.vector_db import (
     delete_screen_activity_vectors,
     delete_transcript_chunk_vectors_batch,
 )
-from utils import stripe as stripe_utils
 from utils.cloud_tasks import (
     assert_inline_account_deletion_permitted,
     enqueue_account_deletion_wipe,
@@ -298,12 +296,6 @@ def _emit_deletion_telemetry(uid: str, event: str, properties: dict[str, object]
     emit_posthog_event(_ACCOUNT_DELETION_TELEMETRY_DISTINCT_ID, event, safe_properties)
 
 
-class DeletionBillingError(RuntimeError):
-    def __init__(self, subscription_id: str | None, error: Exception):
-        super().__init__(str(error))
-        self.subscription_id = subscription_id
-
-
 _DELETION_HEARTBEAT_INTERVAL_SECONDS = 60
 
 
@@ -379,12 +371,9 @@ def background_wipe_user_data(
         # could be duplicate-claimed after the short ``pending`` stale window.
         users_db.mark_user_deletion_wipe_running(uid)
         # The durable marker and queue claim are the authority for every
-        # irreversible step below. In particular, do not cancel billing or
-        # remove Firebase Auth from the request thread: a queue NotFound must
-        # leave an account usable and recoverable.
-        current_operation = 'billing_subscription'
-        heartbeat()
-        _cancel_subscription_for_account_deletion(uid)
+        # irreversible step below. In particular, do not remove Firebase Auth
+        # from the request thread: a queue NotFound must leave an account
+        # usable and recoverable.
         current_operation = 'agent_vm'
         heartbeat()
         delete_agent_vm_for_account(uid)
@@ -456,30 +445,10 @@ def background_wipe_user_data(
                 # never pretend a hold can be placed while deletion outcome is
                 # unknown.
                 logger.error(f'delete_account legal-hold gate finalization failed for {uid}: {sanitize(str(gate_err))}')
-        # Billing can restore access only while Auth is confirmed present.
-        # A post-Auth failure retains the existing fenced reconciliation path.
-        billing_parked = False
-        if isinstance(e, DeletionBillingError):
-            try:
-                firebase_auth.get_user(uid)
-                billing_parked = (
-                    _retry_firestore_write(
-                        lambda: users_db.mark_user_deletion_billing_failed(uid, e.subscription_id, sanitize(str(e))),
-                        uid=uid,
-                        fail_msg='delete_account billing failure status persist failed',
-                        on_failure='raise',
-                    )
-                    is True
-                )
-            except firebase_auth.UserNotFoundError:
-                pass
-            except Exception as persist_err:
-                logger.error(f'delete_account billing status persist failed for {uid}: {sanitize(str(persist_err))}')
-        if not billing_parked:
-            try:
-                users_db.mark_user_deletion_wipe_failed(uid)
-            except Exception as persist_err:
-                logger.error(f'delete_account wipe status persist failed for {uid}: {sanitize(str(persist_err))}')
+        try:
+            users_db.mark_user_deletion_wipe_failed(uid)
+        except Exception as persist_err:
+            logger.error(f'delete_account wipe status persist failed for {uid}: {sanitize(str(persist_err))}')
         required_failures, best_effort_failures = _purge_failures(purge_result)
         failed_operations = [failure['operation'] for failure in required_failures + best_effort_failures] or [
             current_operation
@@ -576,20 +545,6 @@ def _retry_firestore_write(
     logger.critical(msg)
 
 
-def _cancel_subscription_for_account_deletion(uid: str) -> None:
-    subscription_id = None
-    try:
-        sub = users_db.get_existing_user_subscription(uid)
-        app_subscription_ids = stripe_utils.find_billable_app_subscription_ids(uid)
-        for subscription_id in app_subscription_ids:
-            stripe_utils.cancel_subscription_for_account_deletion(subscription_id)
-        subscription_id = getattr(sub, 'stripe_subscription_id', None) if sub else None
-        if subscription_id and subscription_id not in app_subscription_ids:
-            stripe_utils.cancel_subscription_for_account_deletion(subscription_id)
-    except Exception as error:
-        raise DeletionBillingError(subscription_id, error) from error
-
-
 def start_account_deletion(uid: str, reason: str | None = None, reason_details: str | None = None) -> dict[str, str]:
     # Admission is also fenced before creating a durable deletion intent. This
     # keeps a newly-held account from entering the destructive queue at all;
@@ -598,7 +553,7 @@ def start_account_deletion(uid: str, reason: str | None = None, reason_details: 
     # Persist the authoritative, actionable intent before dispatch. This state
     # is enough for reconciliation to recover a failed queue handoff, while the
     # Cloud Tasks handler claim fences all destructive work. If either write or
-    # dispatch fails, no Firebase Auth or billing mutation has happened.
+    # dispatch fails, no Firebase Auth mutation has happened.
     wipe_intent = _retry_firestore_write(
         lambda: users_db.mark_user_deletion_wipe_intent(uid),
         uid=uid,
