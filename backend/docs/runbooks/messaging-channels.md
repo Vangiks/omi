@@ -1,12 +1,12 @@
 # Messaging channels rollout
 
-Telegram paid-user launch and David-only iMessage without a seat cap. New channel policies override
-the legacy global switch/cohort below; both modes keep the valid paid-plan gate. This runbook
+Telegram launch and David-only iMessage without a seat cap. New channel policies override
+the legacy global switch/cohort below. Neither mode checks a plan: this fork has no billing. This runbook
 does not deploy, merge, or read secret payloads.
 
 The mobile entry is a separate PostHog flag, `mobile-chat-apps`. The server
 does not trust that flag. In legacy env-only mode, a uid outside `OMI_MESSAGING_CHANNELS_UIDS`, or a
-backend with the switch off, gets 403 on mint and no channel turns. See paid launch
+backend with the switch off, gets 403 on mint and no channel turns. See launch
 preparation below before configuring the new policy.
 
 ## Legacy uid-only cohort
@@ -56,13 +56,11 @@ addresses in the payload as a fallback:
 }
 ```
 
-Admission requires a valid paid subscription: legacy Unlimited, Plus, Unlimited v2,
-Operator or Architect (including the legacy `pro` alias). Basic/free and expired
-subscriptions are rejected. The app uses its existing `plan.isPaid` helper for eligibility;
-its existing localized "Omi Pro" marketing copy is unchanged by this logic-only rollout.
+Admission does not read a subscription. The switch, the cohort, the operator kill switch,
+account deletion and, for a numeric iMessage cap, a free seat decide it.
 
 The committed prod configuration scopes these settings and the four secret bindings to
-Cloud Run `backend` in `based-hardware`, `us-central1`. Telegram admits all valid paid
+Cloud Run `backend` in `based-hardware`, `us-central1`. Telegram admits all
 users; iMessage retains only `vi7SA9ckQCe4ccobWNxlbdcNdC23`. Adapter wakeups and pending recovery execute in
 that process; no GKE listen/pusher or other worker needs these settings. Prebind
 `TELEGRAM_BOT_TOKEN=TELEGRAM_BOT_TOKEN:latest`,
@@ -121,7 +119,7 @@ Useful queries, after the log labels that the process actually emits:
 
 - `Messaging recovery paused` — pending drain is failing for a provider.
 - `Invalid webhook signature` / status 401 on `/v1/messaging/webhooks/` — secret mismatch or replay outside the Linq timestamp window.
-- status 403 on `POST /v1/messaging/link-proofs` — flag, allowlist, deletion, or plan rejected the uid.
+- status 403 on `POST /v1/messaging/link-proofs` — flag, allowlist, or deletion rejected the uid.
 - status 202 on the webhook with no following reply — worker still running, or the surface lease is held. Do not reset a `running` inbox row or a lease until the worker is confirmed stopped.
 
 There is no new dashboard in this change. Use the existing backend request logs
@@ -271,17 +269,15 @@ real shared tool projection. `test_messaging_adapters_firestore.py` exercises en
 per-action receipts, expiry, cross-session scope, multiwrite text-undo ambiguity and
 concurrent once-only claims against the loopback Firestore emulator.
 
-## Paid launch preparation and seat operations
+## Launch preparation and seat operations
 
 This source supports a channel policy; it does not change live configuration.
 Without `OMI_MESSAGING_CHANNEL_POLICY`, the original global switch/exact-uid cohort
-and all-paid plan gate remain unchanged. A malformed new policy denies admission.
-With the new policy, iMessage defaults to Operator and Architect, and 180 linked
-users. Legacy Unlimited is not included automatically; edit `plans` deliberately.
-The catalog's Operator plan is the $49 tier. Telegram has no seat cap.
+remains unchanged. A malformed new policy denies admission.
+With the new policy, iMessage defaults to 180 linked users. Telegram has no seat cap.
 
 ```json
-{"telegram":{"enabled":true,"cohort":"*"},"imessage":{"enabled":true,"cohort":"*","plans":["operator","architect"],"seat_cap":180}}
+{"telegram":{"enabled":true,"cohort":"*"},"imessage":{"enabled":true,"cohort":"*","seat_cap":180}}
 ```
 
 An exact uid array can replace either `cohort`. Adapter enable flags and provider
@@ -436,7 +432,7 @@ admission refusal rather than being treated as a Redis outage. Streaming `none`
 reduces preview traffic while preserving final replies.
 
 
-## Approved all-paid Telegram configuration (Brief S)
+## Approved all-user Telegram configuration (Brief S)
 
 The prod overlay and composed manifest contain this exact policy:
 
@@ -444,10 +440,9 @@ The prod overlay and composed manifest contain this exact policy:
 {"telegram":{"enabled":true,"cohort":"*"},"imessage":{"enabled":true,"cohort":["vi7SA9ckQCe4ccobWNxlbdcNdC23"],"seat_cap":"off"}}
 ```
 
-`seat_cap:"off"` is the only accepted explicit disable spelling. With this setting,
-omitted `plans` means every valid paid plan, preserving legacy admission. Other
+`seat_cap:"off"` is the only accepted explicit disable spelling. Other
 spellings, null caps, invalid types and malformed policy deny admission. Numeric
-caps still default to Operator/Architect and require initialized capacity. Mint,
+caps require initialized capacity. Mint,
 redemption and turn guards perform no capacity reads in no-cap mode. If a previously
 capped environment changes to no-cap, reconcile again before re-enabling its numeric
 cap; do not reuse counts collected while accounting was off.
@@ -464,7 +459,7 @@ Manual operator steps (not executed by this change):
 1. Deploy the reviewed backend image/config through the existing release path.
    Verify the existing FIFO/recovery indexes are READY before widening admission;
    this is an operational prerequisite, not a request to run seat preparation.
-2. Expand the existing PostHog `mobile-chat-apps` entry to the intended paid Telegram
+2. Expand the existing PostHog `mobile-chat-apps` entry to the intended Telegram
    audience so users can discover/link the bot. The backend remains authoritative:
    non-cohort iMessage mint is denied. No client binary change is needed.
 3. Confirm shared Redis connectivity and provider webhook registration with the
