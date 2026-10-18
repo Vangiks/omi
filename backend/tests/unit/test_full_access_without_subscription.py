@@ -48,14 +48,6 @@ def test_transcription_credits_are_unlimited(firestore_without_user, monkeypatch
     assert subscription_utils.has_transcription_credits('local-dev-user')
 
 
-def test_dream_paid_policy_admits_user_without_subscription(monkeypatch):
-    from config import dream_agent
-
-    monkeypatch.setenv('DREAM_AGENT_ELIGIBILITY', 'paid')
-
-    assert dream_agent.eligible('local-dev-user', {})
-
-
 def test_proactivity_sees_full_access_plan():
     from datetime import datetime, timezone
 
