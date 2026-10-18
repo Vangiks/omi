@@ -53,7 +53,7 @@ non-production Firebase project: either Application Default Credentials plus
 `FIREBASE_PROJECT_ID`, or `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and
 `FIREBASE_PRIVATE_KEY` together. Production mounts no key: Cloud Run runs as
 `omi-admin-dashboard-runtime@` and the SDK uses that identity through ADC. Pages that use an external system need only that system's
-credential from `.env.example` (for example Stripe, PostHog, Typesense, or
+credential from `.env.example` (for example PostHog, Typesense, or
 GoAffPro). LLM-backed routes require `OMI_LLM_GATEWAY_URL` and the server-only
 `OMI_LLM_GATEWAY_SERVICE_TOKEN`; they never receive provider credentials.
 Firebase client variables are needed when testing the real login flow instead
