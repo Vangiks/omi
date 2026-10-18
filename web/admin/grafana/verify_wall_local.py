@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Local-only Grafana 13.1.3 wall verification. Never reads Firebase/Stripe keys.
+"""Local-only Grafana 13.1.3 wall verification. Never reads Firebase keys.
 
 Select ro-prod ADC and the managed Docker socket in the calling shell first.
-The serve command injects only the explicitly authorized PostHog/Shopify fields.
+The serve command injects only the explicitly authorized PostHog field.
 """
 from __future__ import annotations
 import argparse
@@ -25,7 +25,6 @@ def serve(replay: str | None):
     env = os.environ.copy()
     for path, names in [
         (Path.home()/'.hermes/.env', {'POSTHOG_PERSONAL_API_KEY'}),
-        (Path.home()/'.local/share/hostctl/secrets/omi-shopify-data.env', {'SHOPIFY_STORE','SHOPIFY_ACCESS_TOKEN','SHOPIFY_CLIENT_ID','SHOPIFY_CLIENT_SECRET','SHOPIFY_API_VERSION'}),
     ]:
         for raw in path.read_text().splitlines():
             key, sep, value = raw.partition('=')
@@ -33,10 +32,9 @@ def serve(replay: str | None):
             if sep and key in names:
                 env[key] = value.strip().strip('"').strip("'")
     for key in list(env):
-        if key.startswith('FIREBASE_') or key in {'STRIPE_SECRET_KEY','GCP_BILLING_SA_JSON'}:
+        if key.startswith('FIREBASE_') or key == 'GCP_BILLING_SA_JSON':
             env.pop(key, None)
-    env.update(DEV_BYPASS_AUTH='1', POSTHOG_PROJECT_ID='302298', GRAFANA_ORIGIN='http://127.0.0.1:3207',
-               OMI_TV_LOCAL_STRIPE_FIXTURE_PATH=str(ADMIN/'lib/__fixtures__/wall-stripe.json'))
+    env.update(DEV_BYPASS_AUTH='1', POSTHOG_PROJECT_ID='302298', GRAFANA_ORIGIN='http://127.0.0.1:3207')
     if replay:
         env['OMI_TV_LOCAL_FIXTURE_PATH'] = str(Path(replay).resolve())
     run('npm','run','dev','--','--hostname','127.0.0.1','--port','3107','--webpack',cwd=ADMIN,env=env)

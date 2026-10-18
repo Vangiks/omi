@@ -5,8 +5,8 @@ All / macOS / Mobile switcher at the top of each:
 | uid | scope |
 |---|---|
 | `omi-tv` | all platforms combined (source of truth, edit this one) |
-| `omi-tv-macos` | the same board scoped to macOS (`platform=macos` on the PostHog routes; desktop series of `profitability`) |
-| `omi-tv-mobile` | the same board scoped to iOS/Android/iPadOS (`platform=mobile`; mobile series of `profitability`). Mobile is fully instrumented in PostHog for usage metrics (iOS since 2025-03, Android since 2026-05) but emits no `Sign In Completed`, so its cohorts anchor on first-seen-any-event. Desktop-only surfaces (floating bar, crash telemetry, the desktop notifications toggle) are explicit placeholders. |
+| `omi-tv-macos` | the same board scoped to macOS (`platform=macos` on the PostHog routes) |
+| `omi-tv-mobile` | the same board scoped to iOS/Android/iPadOS (`platform=mobile` on the PostHog routes). Mobile is fully instrumented in PostHog for usage metrics (iOS since 2025-03, Android since 2026-05) but emits no `Sign In Completed`, so its cohorts anchor on first-seen-any-event. Desktop-only surfaces (floating bar, crash telemetry, the desktop notifications toggle) are explicit placeholders. |
 
 Account-level metrics with no platform dimension (mentor "Omi says" volumes,
 the notifications-enabled gauge) live on the All board only — see
@@ -43,8 +43,7 @@ which derives `omi-tv-macos.json` / `omi-tv-mobile.json` and re-applies the
 shared contract to all three: timezone pinned to `America/New_York`, hourly
 auto-refresh, switcher links, `platform=` pinned on every PostHog-backed
 query (viral-metrics, dau-trends, retention, k-factor — behavioral coverage
-in `web/admin/lib/__tests__/platform-scope-routes.test.ts`), exact-attribution
-revenue fields on the platform boards, and every daily/weekly/monthly date
+in `web/admin/lib/__tests__/platform-scope-routes.test.ts`), and every daily/weekly/monthly date
 column routed through the proxy's `_tzdates` rewrite (bare `YYYY-MM-DD`
 strings parse as UTC midnight, which renders as 8 pm the previous NYC day and
 hides the latest day). The builder is idempotent; commit all three outputs.
@@ -63,47 +62,6 @@ Activation sources differ by board:
 PostHog coverage for the macOS telemetry path stays on viral-metrics as
 `summary.activationTelemetryCoverage`; the Firestore compat overlay applies
 only to the macOS scope.
-
-## Plan cost and per-user economics
-
-The All platforms board has three account-level panels backed by the admin-authenticated
-`/api/omi/stats/plan-economics` route. They read only aggregate tables in
-`based-hardware.omi_finops`; the cost producer and allocation contract are documented in
-`backend/scripts/finops/README.md`. They are deliberately absent from the platform boards:
-the producer does not attribute every request to a platform.
-
-- Cost is the mean of seven consecutive settled usage days, multiplied by 30. The table
-  separates allocated billed cost (including fixed Vertex PT) from estimated vendor STT.
-  Margin includes the low STT estimate; the high-STT sensitivity appears alongside it.
-  One-time charges and SaaS without a feed are excluded, so this is an estimated contribution
-  view, not complete accounting profit.
-- Revenue and paying-subscription counts come from the producer's Stripe snapshot for the
-  last cost day. The coverage panel shows the actual snapshot date separately. These can
-  differ from the live product MRR donut (different timestamp, coupon treatment, and grouping).
-- Subscriber units divide by active/past-due subscriptions, not unique people. Active-user
-  cost divides total window cost by the sum of daily cost-active users, not WAU or MAU.
-  Free users keep their cost row; subscriber units and margin are N/A with no denominator.
-  The per-user table puts active-user cost first and explains the subscriber basis per row,
-  distinguishing Free's lack of paid subscriptions from an unavailable revenue mapping.
-- The producer joins on the backend plan, so Omi Unlimited and Neo are one row. Unmapped
-  plans remain visible with unavailable revenue; the reader never invents a split or $0.
-- Latest usage must be D−2 or D−3 (one daily-job scheduling grace day), with all seven days,
-  complete plan components, matching run IDs, plan/total conservation and all reconciliation
-  checks within 0.5%. Otherwise monetary figures are N/A and the coverage panel explains why.
-  Missing/stale revenue leaves valid costs visible but removes revenue and margins.
-- A 30-minute in-process cache coalesces panel reads. It has no stale-on-error fallback and
-  expires at UTC midnight. Queries are capped at 100 MB and never read user-level tables.
-
-Deployment prerequisite: the existing `GCP_BILLING_SA_JSON` identity (or explicitly selected
-ADC identity) needs BigQuery jobUser and read access to the three aggregate tables
-`omi_finops.unit_cost_daily`, `omi_finops.unit_cost_reconciliation`, and
-`omi_finops.plan_revenue_daily`, in addition to its existing billing-export access.
-Prefer table-scoped `roles/bigquery.dataViewer`; it needs neither write access nor access
-to `unit_cost_user_day`. The daily FinOps producer must also be
-running and current; a dashboard deployment cannot refresh its source tables.
-
-Validation: `npm test` and `npm run typecheck` in `web/admin`, plus
-`python3 web/admin/grafana/test_build_dashboards.py` from the repository root.
 
 ## Apply dashboards
 
@@ -166,7 +124,7 @@ first-seen proxies, with a bounded 180-day history check, not Firebase signups.
 MCP, Windows/web foreground coverage and strict saved-state/source joins remain
 incomplete and are disclosed. A bare MCP marker never qualifies.
 
-Local verification (no production Firebase/Stripe key, token minting or Grafana):
+Local verification (no production Firebase key, token minting or Grafana):
 
 ```bash
 hostctl context
@@ -180,14 +138,12 @@ python3 web/admin/grafana/verify_wall_local.py provision  # another terminal, sa
 python3 web/admin/grafana/verify_wall_local.py screens
 ```
 
-`serve` reads only the authorized PostHog key and Shopify fields from the supplied
-local files, uses the existing development admin bypass, binds localhost:3107,
-and disables Firebase and real Stripe credentials. Stripe uses the clearly
-labeled synthetic fixture at `lib/__fixtures__/wall-stripe.json`. Fixture dates
-are fixed; when old, they correctly dim. `--replay /absolute/aggregate.json`
+`serve` reads only the authorized PostHog key from the supplied local file, uses
+the existing development admin bypass, binds localhost:3107, and disables
+Firebase credentials. `--replay /absolute/aggregate.json`
 replays a locally saved wall response without changing its source timestamps;
 this requires non-production mode and `DEV_BYPASS_AUTH=1`. Production rejects
-both fixture modes. Local Grafana binds localhost:3207; the helper intentionally
+fixture mode. Local Grafana binds localhost:3207; the helper intentionally
 fails if its container name exists rather than replacing an unrelated instance.
 The provisioned board rewrites the proxy URL only in its local copy.
 
@@ -202,30 +158,13 @@ Deploy prerequisites and limits:
 - Existing admin auth/proxy and Infinity datasource `omi-admin-api` must reach the
   new route. PostHog needs `POSTHOG_PERSONAL_API_KEY`, `POSTHOG_PROJECT_ID` and
   optionally `POSTHOG_HOST`. No production Firebase key is needed by the wall.
-- Shopify reuses `SHOPIFY_STORE` and `SHOPIFY_ACCESS_TOKEN`; alternatively supply
-  `SHOPIFY_CLIENT_ID`/`SHOPIFY_CLIENT_SECRET` for a client-credentials exchange.
-  The app needs **read_orders**. Older history beyond 60 days needs the separate
-  approved history scope. Order/line/refund pagination is checked; truncation
-  returns null. USD shop-money is required until an approved FX mapping exists.
-  `OMI_TV_DEVICE_SKUS` adds approved device SKUs; conservative audited titles are
-  a proxy until the SKU/bundle mapping is signed off. Refunds restate sale weeks.
-- Stripe uses the existing library's active/past-due status pagination, excludes
-  marketplace apps, and includes every price of allowed Omi products. Explicit
-  extra enterprise product IDs use `OMI_TV_PLAN_PRODUCT_IDS`; unknown products and
-  tiered prices remain coverage gaps. JPY is zero-decimal and never treated as
-  USD cents. Non-USD amounts need approved FX; otherwise they are excluded and
-  the book is partial. The live book has no fabricated prior/trend. **Production
-  ARPMAU stays null until a corrected same-cutoff MRR snapshot source is wired**;
-  corrupt historic FinOps aggregates cannot repair their dropped products/JPY
-  from totals alone. Synthetic same-cutoff fixtures exercise the arithmetic.
 - Billing reuses `infra-costs` billing mode with aggregate-only reads, skipping
   Firestore/ledger diagnostics and the estimated fallback. Select ro-prod ADC
   locally; the runtime billing identity needs its existing BigQuery read/job
   permissions and provider invoice bindings. Missing provider/STT coverage is
-  partial and dim; gross margin is null until recognized revenue and complete
-  variable cost coverage are available. Cost/MAU uses the matching 30 days through D−2.
-- Payer churn, activated-to-paid, message ratings and trustworthy crash coverage
-  need their missing aggregate sources. Zero crash events never produce 100%.
+  partial and dim. Cost/MAU uses the matching 30 days through D−2.
+- Message ratings and trustworthy crash coverage need their missing aggregate
+  sources. Zero crash events never produce 100%.
 
 Validation: `npm test`, `npm run typecheck`, `npm run lint` in `web/admin`,
 `python3 web/admin/grafana/test_build_dashboards.py`, and `make preflight`.

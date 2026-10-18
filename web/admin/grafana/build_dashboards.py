@@ -10,8 +10,7 @@ then:
      All / macOS / Mobile switcher links.
   2. Writes dashboards/omi-tv-macos.json and dashboards/omi-tv-mobile.json —
      the SAME board scoped per platform (`platform=macos` / `platform=mobile`
-     on viral-metrics, dau-trends, retention and k-factor; per-platform series
-     of /api/omi/stats/profitability for signups/revenue/cost/conversion).
+     on viral-metrics, dau-trends, retention and k-factor).
      The mobile board mirrors the macOS board panel-for-panel except the
      desktop-only product surfaces (floating bar, desktop notifications,
      desktop crash rate, macOS version pies), which have no mobile analog,
@@ -36,7 +35,6 @@ HERE = Path(__file__).resolve().parent
 DASH_DIR = HERE / "dashboards"
 BASE_PATH = DASH_DIR / "omi-tv.json"
 
-PROFIT_PATH = "/api/omi/stats/profitability?days=30"
 VIRAL_PATH = "/api/omi/stats/viral-metrics?days=60"
 PROXY = "http://127.0.0.1:8899"
 RFC3339 = "2006-01-02T15:04:05Z07:00"
@@ -60,8 +58,6 @@ DESKTOP_ONLY_TITLES = {
 # "Notifications enabled" counts all user docs and defaults missing fields to
 # enabled, so scoping it to a platform would silently lie.
 ACCOUNT_LEVEL_TITLES = {
-    "Plan economics — data coverage", "Cost and margin by plan — 30-day run rate",
-    "Per-user economics by plan", "Cost by plan — 30-day run rate",
     "Daily notifications sent", "Notifications sent — last 168 hours",
     "Weekly notification reach", "Notifications enabled",
 }
@@ -154,26 +150,6 @@ def set_stat_query(panel, path: str, root: str, selector: str, text: str) -> Non
     target["url"] = f"{PROXY}{path}"
     target["root_selector"] = root
     target["columns"] = [{"selector": selector, "text": text, "type": "number"}]
-
-
-def platform_series(panel, path: str, root: str, field: str, series_name: str) -> None:
-    """Point a time-series panel at one platform field of a profitability root."""
-    target = panel["targets"][0]
-    target["url"] = add_query_param(f"{PROXY}{path}", "_tzdates", "date")
-    target["root_selector"] = root
-    target["columns"] = [
-        {"selector": "date", "text": "time", "type": "timestamp", "timestampFormat": RFC3339},
-        {"selector": field, "text": series_name, "type": "number"},
-    ]
-    panel["timeFrom"] = "30d"
-
-
-def keep_series(panel, keep: set[str]) -> None:
-    target = panel["targets"][0]
-    target["columns"] = [
-        c for c in target.get("columns", [])
-        if c.get("type") == "timestamp" or c.get("text") in keep
-    ]
 
 
 def prune_vars_and_titles(dash) -> None:
@@ -524,7 +500,6 @@ def build_platform_board(base, scope: str) -> dict:
     """One pipeline for both platform boards, so they stay mirrors of each
     other: same panels, same layout, per-platform data. `scope` is "macos"
     or "mobile"."""
-    profit_field = "desktop" if scope == "macos" else "mobile"
     label = "macOS" if scope == "macos" else "Mobile"
 
     dash = copy.deepcopy(base)
@@ -535,9 +510,7 @@ def build_platform_board(base, scope: str) -> dict:
     # to every device a user has, so notification volume cannot be split by
     # platform either — those panels live on the All-platforms board only.
     drop_panels(dash, ACCOUNT_LEVEL_TITLES | {
-        "1M goal", "ARR", "Active subscriptions", "Trialing",
-        "Conversations", "MRR by product", "MRR over time",
-        "New subscriptions / month", "Message ratings",
+        "1M goal", "Conversations", "Message ratings",
         "Infra cost by service — last 30 days",
     })
     if scope == "mobile":
@@ -564,11 +537,6 @@ def build_platform_board(base, scope: str) -> dict:
         "summary", "allTimeUsers", f"{label} users",
     )
 
-    mrr = panel_by_title(dash, "MRR")
-    mrr["title"] = f"MRR ({label})"
-    set_stat_query(mrr, PROFIT_PATH, "summary",
-                   "mrrDesktop" if scope == "macos" else "mrrMobile", "MRR")
-
     # Signups / daily-new / cumulative all use viral-metrics userGrowth —
     # the same person-deduped PostHog population as the all-time ticker, so
     # the cumulative chart ends exactly at the ticker value.
@@ -592,30 +560,6 @@ def build_platform_board(base, scope: str) -> dict:
     kfactor_idx = next(i for i, p in enumerate(dash["panels"])
                        if base_title(p).startswith("K-factor") and p.get("type") == "stat")
     dash["panels"].insert(kfactor_idx + 1, latest_release_stat(990, scope))
-
-    series_label = "Desktop" if scope == "macos" else "Mobile"
-    for title, new_title, series in [
-        ("New users / day by platform", f"New users / day ({profit_field})  ·  ${{d_pusers}}", series_label),
-        ("Revenue / day by platform (est.)", f"Revenue / day ({profit_field}, est.)  ·  ${{d_prev}}", series_label),
-        ("Infra cost / day by platform", f"Infra cost / day ({profit_field})  ·  ${{d_cost}}", series_label),
-        ("Cost / user / day", f"Cost / user / day ({profit_field})  ·  ${{d_cpu}}", f"{series_label} $/user"),
-        ("Free → paid conversion", f"Free → paid conversion ({profit_field})  ·  ${{d_conv}}", series_label),
-    ]:
-        panel = panel_by_title(dash, title)
-        panel["title"] = new_title
-        keep_series(panel, {series})
-    for var in ["d_pusers", "d_prev", "d_cost", "d_cpu", "d_conv"]:
-        retarget_var(dash, var, fields=profit_field)
-
-    # Revenue must be exact-attribution only: the plain desktop/mobile revenue
-    # series smears unknown-platform subscription MRR proportionally (fine for
-    # the All board's stack, wrong on a platform board).
-    exact_field = f"{profit_field}Exact"
-    revenue_panel = panel_by_title(dash, f"Revenue / day ({profit_field}, est.)")
-    for col in revenue_panel["targets"][0]["columns"]:
-        if col.get("type") != "timestamp":
-            col["selector"] = exact_field
-    retarget_var(dash, "d_prev", fields=exact_field)
 
     if scope == "macos":
         # The stat tile is already platform-neutral ("Activation"); board

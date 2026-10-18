@@ -111,22 +111,6 @@ class NycTimeContractTests(unittest.TestCase):
 
 
 class PlatformScopeTests(unittest.TestCase):
-    def test_plan_economics_is_account_scoped_and_discloses_coverage(self) -> None:
-        titles = {
-            "Plan economics — data coverage", "Cost and margin by plan — 30-day run rate",
-            "Per-user economics by plan", "Cost by plan — 30-day run rate",
-        }
-        for uid in BOARDS:
-            panels = [p for p in load(uid)["panels"] if p["title"] in titles]
-            self.assertEqual(len(panels), 4 if uid == "omi-tv" else 0)
-            for panel in panels:
-                self.assertTrue(panel["targets"][0]["url"].endswith("/api/omi/stats/plan-economics"))
-                self.assertEqual(panel["fieldConfig"]["defaults"]["noValue"], "N/A")
-        panels = {p["title"]: p for p in load("omi-tv")["panels"] if p["title"] in titles}
-        self.assertEqual(panels["Plan economics — data coverage"]["targets"][0]["root_selector"], "status")
-        unit_fields = {c["selector"] for c in panels["Per-user economics by plan"]["targets"][0]["columns"]}
-        self.assertTrue({"subscribers", "activeUsersPerDay", "costPerSubscriber", "costPerActiveDay", "unitBasis"} <= unit_fields)
-
     def test_every_posthog_query_pins_its_board_platform(self) -> None:
         """The 'same DAU on every board' bug: an unscoped viral-metrics /
         dau-trends / retention / k-factor URL reports macOS-only numbers
@@ -408,24 +392,6 @@ class KFactorTests(unittest.TestCase):
                                  f"{uid} {title}")
 
 
-class ExactRevenueTests(unittest.TestCase):
-    def test_platform_revenue_never_includes_unknown_attribution(self) -> None:
-        """profitability's plain desktop/mobile revenue fields smear
-        unknown-platform subscription MRR proportionally; platform boards must
-        chart only the exact-attribution fields."""
-        for uid, field in [("omi-tv-macos", "desktopExact"), ("omi-tv-mobile", "mobileExact")]:
-            dash = load(uid)
-            panel = next(p for p in dash["panels"]
-                         if build_dashboards.base_title(p).startswith("Revenue / day"))
-            selectors = [c["selector"] for c in panel["targets"][0]["columns"]
-                         if c.get("type") != "timestamp"]
-            self.assertEqual(selectors, [field], uid)
-            var = next(v for v in dash["templating"]["list"] if v["name"] == "d_prev")
-            url = var["query"]["infinityQuery"]["url"]
-            params = urllib.parse.parse_qs(urllib.parse.urlparse(url).query)
-            self.assertEqual(params["fields"], [field], uid)
-
-
 class BuilderIdempotencyTests(unittest.TestCase):
     def test_rebuild_is_idempotent(self) -> None:
         base = load("omi-tv")
@@ -499,32 +465,6 @@ class ApplyPreservesLayoutTests(unittest.TestCase):
         self.assertEqual(incoming[0]["gridPos"], {"h": 6, "w": 4, "x": 0, "y": 0})
 
 
-class CanonicalProfitabilityKeyTests(unittest.TestCase):
-    """Boards must read the profitability key the precompute cron writes.
-
-    The cache key embeds desktop_cost/mobile_cost and the cron precomputes
-    only the default (0.2/0.2) params, so a URL carrying its own cost params
-    reads a legacy doc no writer maintains. That doc was served frozen for
-    ~4 weeks (Aug 25) while a fresh one sat under the default key — this
-    static tripwire keeps every board surface on the canonical key.
-    """
-
-    def test_profit_path_carries_no_cost_params(self) -> None:
-        parsed = urllib.parse.urlparse(build_dashboards.PROFIT_PATH)
-        params = urllib.parse.parse_qs(parsed.query)
-        self.assertNotIn("desktop_cost", params)
-        self.assertNotIn("mobile_cost", params)
-
-    def test_no_board_profitability_url_carries_cost_params(self) -> None:
-        for uid in BOARDS:
-            for where, url in all_urls(load(uid)):
-                haystack = urllib.parse.unquote(url)
-                if "profitability" not in haystack:
-                    continue
-                self.assertNotIn("desktop_cost", haystack, f"{uid} {where}")
-                self.assertNotIn("mobile_cost", haystack, f"{uid} {where}")
-
-
 class WallV2Contract(unittest.TestCase):
     def test_checked_in_wall_matches_builder(self):
         from build_wall_dashboard import build_wall_board
@@ -543,7 +483,7 @@ class WallV2Contract(unittest.TestCase):
         from build_wall_dashboard import COLUMNS
         board = load("omi-tv-v2")
         self.assertEqual(board["timezone"], "utc")
-        self.assertEqual([c[0] for c in COLUMNS], ["Growth", "Activation", "Retention", "Revenue", "Health"])
+        self.assertEqual([c[0] for c in COLUMNS], ["Growth", "Activation", "Retention", "Health"])
         self.assertTrue(all(p["type"] in {"text", "canvas", "table"} for p in board["panels"]))
         for panel in board["panels"]:
             self.assertLessEqual(panel["gridPos"]["x"] + panel["gridPos"]["w"], 24)
@@ -571,7 +511,6 @@ class WallV2Contract(unittest.TestCase):
         self.assertGreaterEqual(spacer["gridPos"]["h"], 4)
         self.assertEqual(board["panels"][-1]["gridPos"]["y"], spacer["gridPos"]["y"] + spacer["gridPos"]["h"])
         self.assertGreater(geometry("growth.wau")[0], geometry("engagement.dau")[0])
-        self.assertLess(geometry("revenue.plan_prepay_usd_week")[0], geometry("revenue.arpmau")[0])
 
     def test_apply_accepts_new_uid_without_changing_legacy_layout_policy(self):
         import apply_omi_tv_dashboard as apply_module

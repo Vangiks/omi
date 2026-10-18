@@ -166,7 +166,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -507,7 +509,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -587,7 +591,9 @@
         "displayMode": "lcd",
         "orientation": "horizontal",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -693,7 +699,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -814,7 +822,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -900,7 +910,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -981,7 +993,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1062,7 +1076,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1407,296 +1423,6 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "fixedColor": "#22c55e",
-            "mode": "fixed"
-          },
-          "decimals": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#22c55e",
-                "value": null
-              }
-            ]
-          },
-          "unit": "currencyUSD"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 3,
-        "x": 0,
-        "y": 14
-      },
-      "id": 11,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "columns": [
-            {
-              "selector": "mrr",
-              "text": "MRR",
-              "type": "number"
-            }
-          ],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "omi-admin-api"
-          },
-          "format": "table",
-          "parser": "backend",
-          "refId": "A",
-          "root_selector": "",
-          "source": "url",
-          "type": "json",
-          "url": "http://127.0.0.1:8899/api/omi/stats/revenue",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "title": "MRR",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "omi-admin-api"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "#22c55e",
-            "mode": "fixed"
-          },
-          "decimals": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#22c55e",
-                "value": null
-              }
-            ]
-          },
-          "unit": "currencyUSD"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 3,
-        "x": 3,
-        "y": 14
-      },
-      "id": 12,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "columns": [
-            {
-              "selector": "arr",
-              "text": "ARR",
-              "type": "number"
-            }
-          ],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "omi-admin-api"
-          },
-          "format": "table",
-          "parser": "backend",
-          "refId": "A",
-          "root_selector": "",
-          "source": "url",
-          "type": "json",
-          "url": "http://127.0.0.1:8899/api/omi/stats/revenue",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "title": "ARR",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "omi-admin-api"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "#3b82f6",
-            "mode": "fixed"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#3b82f6",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 3,
-        "x": 6,
-        "y": 14
-      },
-      "id": 13,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "columns": [
-            {
-              "selector": "totalSubscriptions",
-              "text": "Subs",
-              "type": "number"
-            }
-          ],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "omi-admin-api"
-          },
-          "format": "table",
-          "parser": "backend",
-          "refId": "A",
-          "root_selector": "",
-          "source": "url",
-          "type": "json",
-          "url": "http://127.0.0.1:8899/api/omi/stats/subscriptions",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "title": "Active subscriptions",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "omi-admin-api"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "fixedColor": "#0ea5e9",
-            "mode": "fixed"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "#0ea5e9",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 3,
-        "x": 9,
-        "y": 14
-      },
-      "id": 14,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "auto"
-      },
-      "targets": [
-        {
-          "columns": [
-            {
-              "selector": "trialing",
-              "text": "Trialing",
-              "type": "number"
-            }
-          ],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "omi-admin-api"
-          },
-          "format": "table",
-          "parser": "backend",
-          "refId": "A",
-          "root_selector": "",
-          "source": "url",
-          "type": "json",
-          "url": "http://127.0.0.1:8899/api/omi/stats/subscriptions",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "title": "Trialing",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "omi-admin-api"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
             "fixedColor": "#3b82f6",
             "mode": "fixed"
           },
@@ -1726,7 +1452,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1798,7 +1526,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1870,7 +1600,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -1942,7 +1674,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -2016,7 +1750,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -2089,7 +1825,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -2163,7 +1901,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -2236,7 +1976,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -2309,7 +2051,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -2382,7 +2126,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "/^Crash-free$/",
           "values": false
         },
@@ -2460,7 +2206,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -2494,224 +2242,6 @@
       ],
       "title": "macOS active today",
       "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "omi-admin-api"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 12,
-            "gradientMode": "opacity",
-            "lineWidth": 2,
-            "pointSize": 4,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            }
-          },
-          "unit": "currencyUSD"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "MRR"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#22c55e",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 22
-      },
-      "id": 27,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "columns": [
-            {
-              "selector": "monthKey",
-              "text": "time",
-              "timestampFormat": "2006-01-02T15:04:05Z07:00",
-              "type": "timestamp"
-            },
-            {
-              "selector": "mrr",
-              "text": "MRR",
-              "type": "number"
-            }
-          ],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "omi-admin-api"
-          },
-          "format": "timeseries",
-          "parser": "backend",
-          "refId": "A",
-          "root_selector": "data",
-          "source": "url",
-          "type": "json",
-          "url": "http://127.0.0.1:8899/api/omi/stats/mrr-trends?months=12&_tzdates=monthKey",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "timeFrom": "400d",
-      "title": "MRR over time  \u00b7  ${d_mrr}",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "omi-admin-api"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "bars",
-            "fillOpacity": 65,
-            "gradientMode": "none",
-            "lineWidth": 2,
-            "pointSize": 4,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "normal"
-            }
-          },
-          "unit": "short"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Monthly"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#3b82f6",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Annual"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#22c55e",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 22
-      },
-      "id": 28,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "columns": [
-            {
-              "selector": "monthKey",
-              "text": "time",
-              "timestampFormat": "2006-01-02T15:04:05Z07:00",
-              "type": "timestamp"
-            },
-            {
-              "selector": "monthly",
-              "text": "Monthly",
-              "type": "number"
-            },
-            {
-              "selector": "annual",
-              "text": "Annual",
-              "type": "number"
-            }
-          ],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "omi-admin-api"
-          },
-          "format": "timeseries",
-          "parser": "backend",
-          "refId": "A",
-          "root_selector": "data",
-          "source": "url",
-          "type": "json",
-          "url": "http://127.0.0.1:8899/api/omi/stats/subscription-trends?months=12&_tzdates=monthKey",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "timeFrom": "400d",
-      "title": "New subscriptions / month  \u00b7  ${d_subs}",
-      "type": "timeseries"
     },
     {
       "datasource": {
@@ -4680,80 +4210,6 @@
           "color": {
             "mode": "palette-classic"
           },
-          "unit": "currencyUSD"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 62
-      },
-      "id": 42,
-      "options": {
-        "displayLabels": ["name", "percent"],
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true,
-          "values": ["value"]
-        },
-        "pieType": "donut",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "columns": [
-            {
-              "selector": "productName",
-              "text": "Product",
-              "type": "string"
-            },
-            {
-              "selector": "mrr",
-              "text": "MRR",
-              "type": "number"
-            }
-          ],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "omi-admin-api"
-          },
-          "format": "table",
-          "parser": "backend",
-          "refId": "A",
-          "root_selector": "byProduct",
-          "source": "url",
-          "type": "json",
-          "url": "http://127.0.0.1:8899/api/omi/stats/subscriptions",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "title": "MRR by product",
-      "type": "piechart"
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "omi-admin-api"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
           "unit": "short"
         },
         "overrides": []
@@ -4766,16 +4222,23 @@
       },
       "id": 43,
       "options": {
-        "displayLabels": ["name", "percent"],
+        "displayLabels": [
+          "name",
+          "percent"
+        ],
         "legend": {
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "values": ["value"]
+          "values": [
+            "value"
+          ]
         },
         "pieType": "donut",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": true
         },
@@ -4840,16 +4303,23 @@
       },
       "id": 44,
       "options": {
-        "displayLabels": ["name", "percent"],
+        "displayLabels": [
+          "name",
+          "percent"
+        ],
         "legend": {
           "displayMode": "table",
           "placement": "right",
           "showLegend": true,
-          "values": ["value"]
+          "values": [
+            "value"
+          ]
         },
         "pieType": "donut",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": true
         },
@@ -4897,601 +4367,6 @@
         "type": "yesoreyeram-infinity-datasource",
         "uid": "omi-admin-api"
       },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "bars",
-            "fillOpacity": 65,
-            "gradientMode": "none",
-            "lineWidth": 2,
-            "pointSize": 4,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "normal"
-            }
-          },
-          "unit": "short"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Desktop"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#3b82f6",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Mobile"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#22c55e",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 70
-      },
-      "id": 45,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "columns": [
-            {
-              "selector": "date",
-              "text": "time",
-              "timestampFormat": "2006-01-02T15:04:05Z07:00",
-              "type": "timestamp"
-            },
-            {
-              "selector": "desktop",
-              "text": "Desktop",
-              "type": "number"
-            },
-            {
-              "selector": "mobile",
-              "text": "Mobile",
-              "type": "number"
-            }
-          ],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "omi-admin-api"
-          },
-          "format": "timeseries",
-          "parser": "backend",
-          "refId": "A",
-          "root_selector": "users",
-          "source": "url",
-          "type": "json",
-          "url": "http://127.0.0.1:8899/api/omi/stats/profitability?days=30&_tzdates=date",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "timeFrom": "30d",
-      "title": "New users / day by platform  \u00b7  ${d_pusers}",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "omi-admin-api"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 35,
-            "gradientMode": "opacity",
-            "lineWidth": 2,
-            "pointSize": 4,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "normal"
-            }
-          },
-          "unit": "currencyUSD"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Desktop"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#3b82f6",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Mobile"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#22c55e",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 70
-      },
-      "id": 46,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "columns": [
-            {
-              "selector": "date",
-              "text": "time",
-              "timestampFormat": "2006-01-02T15:04:05Z07:00",
-              "type": "timestamp"
-            },
-            {
-              "selector": "desktop",
-              "text": "Desktop",
-              "type": "number"
-            },
-            {
-              "selector": "mobile",
-              "text": "Mobile",
-              "type": "number"
-            }
-          ],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "omi-admin-api"
-          },
-          "format": "timeseries",
-          "parser": "backend",
-          "refId": "A",
-          "root_selector": "revenue",
-          "source": "url",
-          "type": "json",
-          "url": "http://127.0.0.1:8899/api/omi/stats/profitability?days=30&_tzdates=date",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "timeFrom": "30d",
-      "title": "Revenue / day by platform (est.)  \u00b7  ${d_prev}",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "omi-admin-api"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "bars",
-            "fillOpacity": 65,
-            "gradientMode": "none",
-            "lineWidth": 2,
-            "pointSize": 4,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "normal"
-            }
-          },
-          "unit": "currencyUSD"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Desktop"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#f59e0b",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Mobile"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#ef4444",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 16,
-        "y": 70
-      },
-      "id": 47,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "columns": [
-            {
-              "selector": "date",
-              "text": "time",
-              "timestampFormat": "2006-01-02T15:04:05Z07:00",
-              "type": "timestamp"
-            },
-            {
-              "selector": "desktop",
-              "text": "Desktop",
-              "type": "number"
-            },
-            {
-              "selector": "mobile",
-              "text": "Mobile",
-              "type": "number"
-            }
-          ],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "omi-admin-api"
-          },
-          "format": "timeseries",
-          "parser": "backend",
-          "refId": "A",
-          "root_selector": "cost",
-          "source": "url",
-          "type": "json",
-          "url": "http://127.0.0.1:8899/api/omi/stats/profitability?days=30&_tzdates=date",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "timeFrom": "30d",
-      "title": "Infra cost / day by platform  \u00b7  ${d_cost}",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "omi-admin-api"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 12,
-            "gradientMode": "opacity",
-            "lineWidth": 2,
-            "pointSize": 4,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            }
-          },
-          "unit": "currencyUSD"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Desktop $/user"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#f59e0b",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Mobile $/user"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#ef4444",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 0,
-        "y": 78
-      },
-      "id": 48,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "columns": [
-            {
-              "selector": "date",
-              "text": "time",
-              "timestampFormat": "2006-01-02T15:04:05Z07:00",
-              "type": "timestamp"
-            },
-            {
-              "selector": "desktop",
-              "text": "Desktop $/user",
-              "type": "number"
-            },
-            {
-              "selector": "mobile",
-              "text": "Mobile $/user",
-              "type": "number"
-            }
-          ],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "omi-admin-api"
-          },
-          "format": "timeseries",
-          "parser": "backend",
-          "refId": "A",
-          "root_selector": "costPerUser",
-          "source": "url",
-          "type": "json",
-          "url": "http://127.0.0.1:8899/api/omi/stats/profitability?days=30&_tzdates=date",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "timeFrom": "30d",
-      "title": "Cost / user / day  \u00b7  ${d_cpu}",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "omi-admin-api"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 12,
-            "gradientMode": "opacity",
-            "lineWidth": 2,
-            "pointSize": 4,
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            }
-          },
-          "unit": "percent"
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Desktop"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#3b82f6",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Mobile"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#22c55e",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 8,
-        "y": 78
-      },
-      "id": 49,
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "columns": [
-            {
-              "selector": "date",
-              "text": "time",
-              "timestampFormat": "2006-01-02T15:04:05Z07:00",
-              "type": "timestamp"
-            },
-            {
-              "selector": "desktop",
-              "text": "Desktop",
-              "type": "number"
-            },
-            {
-              "selector": "mobile",
-              "text": "Mobile",
-              "type": "number"
-            }
-          ],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "omi-admin-api"
-          },
-          "format": "timeseries",
-          "parser": "backend",
-          "refId": "A",
-          "root_selector": "conversion",
-          "source": "url",
-          "type": "json",
-          "url": "http://127.0.0.1:8899/api/omi/stats/profitability?days=30&_tzdates=date",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "timeFrom": "30d",
-      "title": "Free \u2192 paid conversion  \u00b7  ${d_conv}",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "omi-admin-api"
-      },
       "description": "Desktop notifications_enabled toggle; missing values default to enabled.",
       "fieldConfig": {
         "defaults": {
@@ -5527,7 +4402,9 @@
       "id": 50,
       "options": {
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "/^Enabled share$/",
           "values": false
         },
@@ -6846,730 +5723,14 @@
           ]
         }
       ]
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "omi-admin-api"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "noValue": "N/A",
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "wrapText": true,
-            "wrapHeaderText": true
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Status"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 300
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "fixed",
-                  "fixedColor": "orange"
-                }
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 140,
-        "w": 24,
-        "h": 6
-      },
-      "id": 1003,
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm",
-        "footer": {
-          "show": false
-        }
-      },
-      "targets": [
-        {
-          "columns": [
-            {
-              "selector": "status",
-              "text": "Status",
-              "type": "string"
-            },
-            {
-              "selector": "window",
-              "text": "Cost window",
-              "type": "string"
-            },
-            {
-              "selector": "revenueAsOf",
-              "text": "Revenue snapshot",
-              "type": "string"
-            },
-            {
-              "selector": "basis",
-              "text": "Method and exclusions",
-              "type": "string"
-            }
-          ],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "omi-admin-api"
-          },
-          "format": "table",
-          "parser": "backend",
-          "refId": "A",
-          "root_selector": "status",
-          "source": "url",
-          "type": "json",
-          "url": "http://127.0.0.1:8899/api/omi/stats/plan-economics",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "title": "Plan economics \u2014 data coverage",
-      "type": "table",
-      "description": "Cost and revenue snapshot freshness. Latest cost must be D\u22122 or D\u22123, with seven consecutive reconciled days. Monetary values become N/A when data is stale. Seven settled usage days normalized to a 30-day cost run rate. See the data coverage panel for dates and limitations. Costs include shared allocation and fixed commitments; STT is estimated, SaaS and one-time charges excluded. Unlimited and Neo are combined by the existing cost feed. N/A means unavailable, stale, or no denominator.",
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "indexByName": {
-              "Status": 0,
-              "Cost window": 1,
-              "Revenue snapshot": 2,
-              "Method and exclusions": 3
-            }
-          }
-        }
-      ]
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "omi-admin-api"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "noValue": "N/A",
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "wrapText": true,
-            "wrapHeaderText": true
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Plan"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 220
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "MRR snapshot"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "currencyUSD"
-              },
-              {
-                "id": "decimals",
-                "value": 2
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Allocated / 30d"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "currencyUSD"
-              },
-              {
-                "id": "decimals",
-                "value": 2
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Est. STT / 30d"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "currencyUSD"
-              },
-              {
-                "id": "decimals",
-                "value": 2
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Est. total / 30d"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "currencyUSD"
-              },
-              {
-                "id": "decimals",
-                "value": 2
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Est. margin"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "percent"
-              },
-              {
-                "id": "decimals",
-                "value": 1
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "thresholds"
-                }
-              },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "red",
-                      "value": null
-                    },
-                    {
-                      "color": "green",
-                      "value": 0
-                    }
-                  ]
-                }
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "High-STT margin"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "percent"
-              },
-              {
-                "id": "decimals",
-                "value": 1
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "thresholds"
-                }
-              },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "red",
-                      "value": null
-                    },
-                    {
-                      "color": "green",
-                      "value": 0
-                    }
-                  ]
-                }
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 146,
-        "w": 24,
-        "h": 11
-      },
-      "id": 1004,
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm",
-        "footer": {
-          "show": false
-        }
-      },
-      "targets": [
-        {
-          "columns": [
-            {
-              "selector": "planName",
-              "text": "Plan",
-              "type": "string"
-            },
-            {
-              "selector": "mrr",
-              "text": "MRR snapshot",
-              "type": "number"
-            },
-            {
-              "selector": "allocatedMonthly",
-              "text": "Allocated / 30d",
-              "type": "number"
-            },
-            {
-              "selector": "estimatedSttMonthly",
-              "text": "Est. STT / 30d",
-              "type": "number"
-            },
-            {
-              "selector": "estimatedCostMonthly",
-              "text": "Est. total / 30d",
-              "type": "number"
-            },
-            {
-              "selector": "estimatedMarginPct",
-              "text": "Est. margin",
-              "type": "number"
-            },
-            {
-              "selector": "highSttMarginPct",
-              "text": "High-STT margin",
-              "type": "number"
-            }
-          ],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "omi-admin-api"
-          },
-          "format": "table",
-          "parser": "backend",
-          "refId": "A",
-          "root_selector": "rows",
-          "source": "url",
-          "type": "json",
-          "url": "http://127.0.0.1:8899/api/omi/stats/plan-economics",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "title": "Cost and margin by plan \u2014 30-day run rate",
-      "type": "table",
-      "description": "Seven settled usage days normalized to a 30-day cost run rate. See the data coverage panel for dates and limitations. Costs include shared allocation and fixed commitments; STT is estimated, SaaS and one-time charges excluded. Unlimited and Neo are combined by the existing cost feed. N/A means unavailable, stale, or no denominator.",
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "indexByName": {
-              "Plan": 0,
-              "MRR snapshot": 1,
-              "Allocated / 30d": 2,
-              "Est. STT / 30d": 3,
-              "Est. total / 30d": 4,
-              "Est. margin": 5,
-              "High-STT margin": 6
-            }
-          }
-        }
-      ]
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "omi-admin-api"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "noValue": "N/A",
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "auto"
-            },
-            "wrapText": true,
-            "wrapHeaderText": true
-          }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Plan"
-            },
-            "properties": [
-              {
-                "id": "custom.width",
-                "value": 220
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Paying subs"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "none"
-              },
-              {
-                "id": "decimals",
-                "value": 0
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Revenue/sub/mo"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "currencyUSD"
-              },
-              {
-                "id": "decimals",
-                "value": 2
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Est. cost/sub/30d"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "currencyUSD"
-              },
-              {
-                "id": "decimals",
-                "value": 2
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Contribution/sub/30d"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "currencyUSD"
-              },
-              {
-                "id": "decimals",
-                "value": 2
-              },
-              {
-                "id": "color",
-                "value": {
-                  "mode": "thresholds"
-                }
-              },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    {
-                      "color": "red",
-                      "value": null
-                    },
-                    {
-                      "color": "green",
-                      "value": 0
-                    }
-                  ]
-                }
-              },
-              {
-                "id": "custom.cellOptions",
-                "value": {
-                  "type": "color-text"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Cost-active/day"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "none"
-              },
-              {
-                "id": "decimals",
-                "value": 1
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "Est. cost/active-day"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "currencyUSD"
-              },
-              {
-                "id": "decimals",
-                "value": 2
-              }
-            ]
-          }
-        ]
-      },
-      "gridPos": {
-        "x": 0,
-        "y": 157,
-        "w": 24,
-        "h": 11
-      },
-      "id": 1005,
-      "options": {
-        "showHeader": true,
-        "cellHeight": "sm",
-        "footer": {
-          "show": false
-        }
-      },
-      "targets": [
-        {
-          "columns": [
-            {
-              "selector": "planName",
-              "text": "Plan",
-              "type": "string"
-            },
-            {
-              "selector": "activeUsersPerDay",
-              "text": "Cost-active/day",
-              "type": "number"
-            },
-            {
-              "selector": "costPerActiveDay",
-              "text": "Est. cost/active-day",
-              "type": "number"
-            },
-            {
-              "selector": "subscribers",
-              "text": "Paying subs",
-              "type": "number"
-            },
-            {
-              "selector": "revenuePerSubscriber",
-              "text": "Revenue/sub/mo",
-              "type": "number"
-            },
-            {
-              "selector": "costPerSubscriber",
-              "text": "Est. cost/sub/30d",
-              "type": "number"
-            },
-            {
-              "selector": "contributionPerSubscriber",
-              "text": "Contribution/sub/30d",
-              "type": "number"
-            },
-            {
-              "selector": "unitBasis",
-              "text": "Subscriber basis",
-              "type": "string"
-            }
-          ],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "omi-admin-api"
-          },
-          "format": "table",
-          "parser": "backend",
-          "refId": "A",
-          "root_selector": "rows",
-          "source": "url",
-          "type": "json",
-          "url": "http://127.0.0.1:8899/api/omi/stats/plan-economics",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "title": "Per-user economics by plan",
-      "type": "table",
-      "description": "Seven settled usage days normalized to a 30-day cost run rate. See the data coverage panel for dates and limitations. Costs include shared allocation and fixed commitments; STT is estimated, SaaS and one-time charges excluded. Unlimited and Neo are combined by the existing cost feed. N/A means unavailable, stale, or no denominator. Free has costs but no paid subscriber denominator. Unmapped plans retain active-user costs; subscriber economics require a matching revenue snapshot.",
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "indexByName": {
-              "Plan": 0,
-              "Cost-active/day": 1,
-              "Est. cost/active-day": 2,
-              "Paying subs": 3,
-              "Revenue/sub/mo": 4,
-              "Est. cost/sub/30d": 5,
-              "Contribution/sub/30d": 6,
-              "Subscriber basis": 7
-            }
-          }
-        }
-      ]
-    },
-    {
-      "datasource": {
-        "type": "yesoreyeram-infinity-datasource",
-        "uid": "omi-admin-api"
-      },
-      "description": "Allocated billed cost (including fixed Vertex PT) plus the low estimated vendor STT, per plan, as a 30-day run rate from the settled finops feed. Mirrors the MRR-by-product donut; methodology in the coverage and margin tables below.",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "noValue": "N/A",
-          "unit": "currencyUSD"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 11,
-        "w": 12,
-        "x": 0,
-        "y": 168
-      },
-      "id": 1006,
-      "options": {
-        "displayLabels": ["name", "percent"],
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true,
-          "values": ["value"]
-        },
-        "pieType": "donut",
-        "reduceOptions": {
-          "calcs": ["lastNotNull"],
-          "fields": "",
-          "values": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "columns": [
-            {
-              "selector": "planName",
-              "text": "Plan",
-              "type": "string"
-            },
-            {
-              "selector": "estimatedCostMonthly",
-              "text": "Est. monthly cost",
-              "type": "number"
-            }
-          ],
-          "datasource": {
-            "type": "yesoreyeram-infinity-datasource",
-            "uid": "omi-admin-api"
-          },
-          "format": "table",
-          "parser": "backend",
-          "refId": "A",
-          "root_selector": "rows",
-          "source": "url",
-          "type": "json",
-          "url": "http://127.0.0.1:8899/api/omi/stats/plan-economics",
-          "url_options": {
-            "data": "",
-            "method": "GET"
-          }
-        }
-      ],
-      "title": "Cost by plan \u2014 30-day run rate",
-      "type": "piechart"
     }
   ],
   "refresh": "1h",
   "schemaVersion": 39,
-  "tags": ["omi", "tv"],
+  "tags": [
+    "omi",
+    "tv"
+  ],
   "templating": {
     "list": [
       {
@@ -7634,80 +5795,6 @@
             "source": "url",
             "type": "json",
             "url": "http://127.0.0.1:8899/compare?path=%2Fapi%2Fomi%2Fstats%2Fdaily-new-users%3Fdays%3Dall&root=data&fields=users&agg=sum&window=30&label=vs+prev+30d",
-            "url_options": {
-              "data": "",
-              "method": "GET"
-            }
-          },
-          "query": "",
-          "queryType": "infinity"
-        },
-        "refresh": 2,
-        "skipUrlSync": true,
-        "type": "query"
-      },
-      {
-        "current": {},
-        "datasource": {
-          "type": "yesoreyeram-infinity-datasource",
-          "uid": "omi-admin-api"
-        },
-        "hide": 2,
-        "name": "d_mrr",
-        "options": [],
-        "query": {
-          "infinityQuery": {
-            "columns": [
-              {
-                "selector": "value",
-                "text": "value",
-                "type": "string"
-              }
-            ],
-            "format": "table",
-            "parser": "backend",
-            "refId": "variable",
-            "root_selector": "",
-            "source": "url",
-            "type": "json",
-            "url": "http://127.0.0.1:8899/compare?path=%2Fapi%2Fomi%2Fstats%2Fmrr-trends%3Fmonths%3D12&root=data&fields=mrr&agg=last&window=1&label=vs+last+mo",
-            "url_options": {
-              "data": "",
-              "method": "GET"
-            }
-          },
-          "query": "",
-          "queryType": "infinity"
-        },
-        "refresh": 2,
-        "skipUrlSync": true,
-        "type": "query"
-      },
-      {
-        "current": {},
-        "datasource": {
-          "type": "yesoreyeram-infinity-datasource",
-          "uid": "omi-admin-api"
-        },
-        "hide": 2,
-        "name": "d_subs",
-        "options": [],
-        "query": {
-          "infinityQuery": {
-            "columns": [
-              {
-                "selector": "value",
-                "text": "value",
-                "type": "string"
-              }
-            ],
-            "format": "table",
-            "parser": "backend",
-            "refId": "variable",
-            "root_selector": "",
-            "source": "url",
-            "type": "json",
-            "url": "http://127.0.0.1:8899/compare?path=%2Fapi%2Fomi%2Fstats%2Fsubscription-trends%3Fmonths%3D12&root=data&fields=monthly%2Cannual&agg=last&window=1&label=vs+last+mo",
             "url_options": {
               "data": "",
               "method": "GET"
@@ -8152,191 +6239,6 @@
             "source": "url",
             "type": "json",
             "url": "http://127.0.0.1:8899/compare?path=%2Fapi%2Fomi%2Fstats%2Fcrash-rate%3Fdays%3D30&root=data&fields=crashFreeRate&agg=avg&window=15&label=vs+prev+15d",
-            "url_options": {
-              "data": "",
-              "method": "GET"
-            }
-          },
-          "query": "",
-          "queryType": "infinity"
-        },
-        "refresh": 2,
-        "skipUrlSync": true,
-        "type": "query"
-      },
-      {
-        "current": {},
-        "datasource": {
-          "type": "yesoreyeram-infinity-datasource",
-          "uid": "omi-admin-api"
-        },
-        "hide": 2,
-        "name": "d_pusers",
-        "options": [],
-        "query": {
-          "infinityQuery": {
-            "columns": [
-              {
-                "selector": "value",
-                "text": "value",
-                "type": "string"
-              }
-            ],
-            "format": "table",
-            "parser": "backend",
-            "refId": "variable",
-            "root_selector": "",
-            "source": "url",
-            "type": "json",
-            "url": "http://127.0.0.1:8899/compare?path=%2Fapi%2Fomi%2Fstats%2Fprofitability%3Fdays%3D30&root=users&fields=desktop%2Cmobile&agg=sum&window=15&label=vs+prev+15d",
-            "url_options": {
-              "data": "",
-              "method": "GET"
-            }
-          },
-          "query": "",
-          "queryType": "infinity"
-        },
-        "refresh": 2,
-        "skipUrlSync": true,
-        "type": "query"
-      },
-      {
-        "current": {},
-        "datasource": {
-          "type": "yesoreyeram-infinity-datasource",
-          "uid": "omi-admin-api"
-        },
-        "hide": 2,
-        "name": "d_prev",
-        "options": [],
-        "query": {
-          "infinityQuery": {
-            "columns": [
-              {
-                "selector": "value",
-                "text": "value",
-                "type": "string"
-              }
-            ],
-            "format": "table",
-            "parser": "backend",
-            "refId": "variable",
-            "root_selector": "",
-            "source": "url",
-            "type": "json",
-            "url": "http://127.0.0.1:8899/compare?path=%2Fapi%2Fomi%2Fstats%2Fprofitability%3Fdays%3D30&root=revenue&fields=desktop%2Cmobile&agg=sum&window=15&label=vs+prev+15d",
-            "url_options": {
-              "data": "",
-              "method": "GET"
-            }
-          },
-          "query": "",
-          "queryType": "infinity"
-        },
-        "refresh": 2,
-        "skipUrlSync": true,
-        "type": "query"
-      },
-      {
-        "current": {},
-        "datasource": {
-          "type": "yesoreyeram-infinity-datasource",
-          "uid": "omi-admin-api"
-        },
-        "hide": 2,
-        "name": "d_cost",
-        "options": [],
-        "query": {
-          "infinityQuery": {
-            "columns": [
-              {
-                "selector": "value",
-                "text": "value",
-                "type": "string"
-              }
-            ],
-            "format": "table",
-            "parser": "backend",
-            "refId": "variable",
-            "root_selector": "",
-            "source": "url",
-            "type": "json",
-            "url": "http://127.0.0.1:8899/compare?path=%2Fapi%2Fomi%2Fstats%2Fprofitability%3Fdays%3D30&root=cost&fields=desktop%2Cmobile&agg=sum&window=15&label=vs+prev+15d",
-            "url_options": {
-              "data": "",
-              "method": "GET"
-            }
-          },
-          "query": "",
-          "queryType": "infinity"
-        },
-        "refresh": 2,
-        "skipUrlSync": true,
-        "type": "query"
-      },
-      {
-        "current": {},
-        "datasource": {
-          "type": "yesoreyeram-infinity-datasource",
-          "uid": "omi-admin-api"
-        },
-        "hide": 2,
-        "name": "d_cpu",
-        "options": [],
-        "query": {
-          "infinityQuery": {
-            "columns": [
-              {
-                "selector": "value",
-                "text": "value",
-                "type": "string"
-              }
-            ],
-            "format": "table",
-            "parser": "backend",
-            "refId": "variable",
-            "root_selector": "",
-            "source": "url",
-            "type": "json",
-            "url": "http://127.0.0.1:8899/compare?path=%2Fapi%2Fomi%2Fstats%2Fprofitability%3Fdays%3D30&root=costPerUser&fields=desktop%2Cmobile&agg=avg&window=15&label=vs+prev+15d",
-            "url_options": {
-              "data": "",
-              "method": "GET"
-            }
-          },
-          "query": "",
-          "queryType": "infinity"
-        },
-        "refresh": 2,
-        "skipUrlSync": true,
-        "type": "query"
-      },
-      {
-        "current": {},
-        "datasource": {
-          "type": "yesoreyeram-infinity-datasource",
-          "uid": "omi-admin-api"
-        },
-        "hide": 2,
-        "name": "d_conv",
-        "options": [],
-        "query": {
-          "infinityQuery": {
-            "columns": [
-              {
-                "selector": "value",
-                "text": "value",
-                "type": "string"
-              }
-            ],
-            "format": "table",
-            "parser": "backend",
-            "refId": "variable",
-            "root_selector": "",
-            "source": "url",
-            "type": "json",
-            "url": "http://127.0.0.1:8899/compare?path=%2Fapi%2Fomi%2Fstats%2Fprofitability%3Fdays%3D30&root=conversion&fields=desktop%2Cmobile&agg=avg&window=15&label=vs+prev+15d",
             "url_options": {
               "data": "",
               "method": "GET"
