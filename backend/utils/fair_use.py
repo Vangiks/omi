@@ -19,7 +19,7 @@ from database.redis_db import r as redis_client
 from config.plan_catalog import FAIR_USE_PROFILE_LIMITS, UNLIMITED_TRANSCRIPTION_PLAN_TYPES
 from models.fair_use import SoftCapTrigger
 from models.users import PlanType
-from utils.subscription import has_transcription_credits, is_paid_plan
+from utils.subscription import is_paid_plan
 from utils.executors import db_executor, postprocess_executor, run_blocking
 from utils.llm.fair_use_classifier import classify_user_purpose
 from utils.notifications import send_notification
@@ -422,30 +422,12 @@ def invalidate_enforcement_cache(uid: str) -> None:
         pass
 
 
-def is_free_credits_exhausted(uid: str) -> bool:
-    """Check if a user is on a free (basic) plan with exhausted transcription credits.
-
-    Returns True only for non-paid users who have used all monthly credits.
-    Paid users and users with remaining credits return False.
-    """
-    try:
-        subscription = users_db.get_user_valid_subscription(uid)
-        if subscription and is_paid_plan(subscription.plan):
-            return False
-        return not has_transcription_credits(uid)
-    except Exception as e:
-        logger.error(f'fair_use: error checking free credits for {uid}: {e}')
-        return False
-
-
 def escalate_enforcement(
     uid: str, triggered_caps: List[Dict[str, Any]], classifier_result: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """Escalate enforcement based on violations and classifier result.
 
-    Used for both abuse detection (LLM classifier) and free-exhausted users (#6083).
-    Free-exhausted users get a synthetic score > 0.7 instead of LLM classification,
-    so they follow the same graduated escalation: none → warning → throttle → restrict.
+    Graduated escalation driven by the LLM classifier: none → warning → throttle → restrict.
 
     Returns dict describing the action taken.
     """
@@ -797,9 +779,6 @@ async def trigger_classifier_if_needed(uid: str, triggered_caps: List[Dict[str, 
 
     Uses a Redis lock to prevent concurrent runs for the same user.
     Runs asynchronously — does not block the WebSocket path.
-
-    Free-exhausted users (#6083) get a synthetic score of 1.0 instead of
-    the LLM classifier, then follow the same graduated escalation pipeline.
     """
     # Already at terminal stage — no escalation possible, skip LLM + lock (#6316)
     try:
@@ -830,12 +809,7 @@ async def trigger_classifier_if_needed(uid: str, triggered_caps: List[Dict[str, 
         return
 
     try:
-        # Free-exhausted users: synthetic score > 0.7, skip LLM classifier (#6083)
-        if await run_blocking(db_executor, is_free_credits_exhausted, uid):
-            classifier_result = {'misuse_score': 1.0, 'usage_type': 'free_exhausted'}
-            logger.info(f'fair_use: free-exhausted uid={uid}, using synthetic score 1.0')
-        else:
-            classifier_result = await _get_classify_user_purpose()(uid)
+        classifier_result = await _get_classify_user_purpose()(uid)
         escalation = await run_blocking(db_executor, escalate_enforcement, uid, triggered_caps, classifier_result)
 
         logger.info(

@@ -63,8 +63,6 @@ class TestSkipClassifierRestrict:
         mock_classify = AsyncMock(return_value={'misuse_score': 0.5, 'usage_type': 'personal'})
 
         with patch.object(fair_use_mod, 'get_enforcement_stage', return_value='throttle'), patch.object(
-            fair_use_mod, 'is_free_credits_exhausted', return_value=False
-        ), patch.object(
             fair_use_mod, '_get_classify_user_purpose', return_value=mock_classify
         ) as mock_getter, patch.object(
             fair_use_mod,
@@ -83,8 +81,6 @@ class TestSkipClassifierRestrict:
         mock_classify = AsyncMock(return_value={'misuse_score': 0.3, 'usage_type': 'personal'})
 
         with patch.object(fair_use_mod, 'get_enforcement_stage', return_value='warning'), patch.object(
-            fair_use_mod, 'is_free_credits_exhausted', return_value=False
-        ), patch.object(
             fair_use_mod, '_get_classify_user_purpose', return_value=mock_classify
         ) as mock_getter, patch.object(
             fair_use_mod,
@@ -103,8 +99,6 @@ class TestSkipClassifierRestrict:
         mock_classify = AsyncMock(return_value={'misuse_score': 0.1, 'usage_type': 'personal'})
 
         with patch.object(fair_use_mod, 'get_enforcement_stage', return_value='none'), patch.object(
-            fair_use_mod, 'is_free_credits_exhausted', return_value=False
-        ), patch.object(
             fair_use_mod, '_get_classify_user_purpose', return_value=mock_classify
         ) as mock_getter, patch.object(
             fair_use_mod,

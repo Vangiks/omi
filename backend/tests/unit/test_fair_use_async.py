@@ -34,8 +34,6 @@ def _patch_fair_use_deps():
     with patch.object(fair_use_mod, 'redis_client', MagicMock(name='redis_client')), patch.object(
         fair_use_mod, 'fair_use_db', _fair_use_db
     ), patch.object(fair_use_mod, 'users_db', MagicMock(name='users_db')), patch.object(
-        fair_use_mod, 'has_transcription_credits', MagicMock(return_value=True)
-    ), patch.object(
         fair_use_mod, 'is_paid_plan', MagicMock(return_value=False)
     ):
         yield
@@ -140,15 +138,12 @@ class TestTriggerClassifierIfNeeded:
 
         classify = AsyncMock(return_value={'misuse_score': 0.2, 'usage_type': 'personal'})
         stage = MagicMock(return_value='none')
-        exhausted = MagicMock(return_value=False)
         escalate = MagicMock(return_value={'action': 'none', 'previous_stage': 'none', 'new_stage': 'none'})
         _redis().set.return_value = True
 
         with patch.object(fair_use_mod, 'run_blocking', tracking_run_blocking), patch.object(
             fair_use_mod, 'get_enforcement_stage', stage
-        ), patch.object(fair_use_mod, 'is_free_credits_exhausted', exhausted), patch.object(
-            fair_use_mod, 'escalate_enforcement', escalate
-        ), patch.object(
+        ), patch.object(fair_use_mod, 'escalate_enforcement', escalate), patch.object(
             fair_use_mod, '_get_classify_user_purpose', return_value=classify
         ):
             await fair_use_mod.trigger_classifier_if_needed(
@@ -156,7 +151,7 @@ class TestTriggerClassifierIfNeeded:
                 [{'trigger': SoftCapTrigger.DAILY, 'speech_ms': 8_000_000, 'threshold_ms': 7_200_000}],
             )
 
-        assert [func for _, func in calls] == [stage, _redis().set, exhausted, escalate]
+        assert [func for _, func in calls] == [stage, _redis().set, escalate]
         assert all(executor is fair_use_mod.db_executor for executor, _ in calls)
 
 

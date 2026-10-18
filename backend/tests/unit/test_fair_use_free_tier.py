@@ -1,8 +1,7 @@
-"""Tests for free-tier fair-use enforcement (#6083).
+"""Tests for fair-use classifier escalation and the DG budget.
 
-Architecture: free-exhausted users get a synthetic score of 1.0 (instead of
-the LLM classifier) and follow the same graduated escalation pipeline as
-abuse-detected users: none → warning → throttle → restrict.
+Abuse-detected users follow the graduated escalation pipeline:
+none → warning → throttle → restrict.
 """
 
 import asyncio
@@ -59,59 +58,12 @@ def _make_trigger(trigger_type='daily'):
 
 
 # ---------------------------------------------------------------------------
-# is_free_credits_exhausted tests
+# trigger_classifier_if_needed tests
 # ---------------------------------------------------------------------------
 
 
-class TestIsFreeCreditsExhausted:
-    def test_paid_user_returns_false(self):
-        mock_sub = MagicMock()
-        mock_sub.plan = 'unlimited'
-        fair_use_mod.users_db.get_user_valid_subscription = MagicMock(return_value=mock_sub)
-        fair_use_mod.is_paid_plan = MagicMock(return_value=True)
-        fair_use_mod.has_transcription_credits = MagicMock(return_value=False)
-
-        assert fair_use_mod.is_free_credits_exhausted('test-uid') is False
-
-    def test_basic_user_with_credits_returns_false(self):
-        mock_sub = MagicMock()
-        mock_sub.plan = 'basic'
-        fair_use_mod.users_db.get_user_valid_subscription = MagicMock(return_value=mock_sub)
-        fair_use_mod.is_paid_plan = MagicMock(return_value=False)
-        fair_use_mod.has_transcription_credits = MagicMock(return_value=True)
-
-        assert fair_use_mod.is_free_credits_exhausted('test-uid') is False
-
-    def test_basic_user_no_credits_returns_true(self):
-        mock_sub = MagicMock()
-        mock_sub.plan = 'basic'
-        fair_use_mod.users_db.get_user_valid_subscription = MagicMock(return_value=mock_sub)
-        fair_use_mod.is_paid_plan = MagicMock(return_value=False)
-        fair_use_mod.has_transcription_credits = MagicMock(return_value=False)
-
-        assert fair_use_mod.is_free_credits_exhausted('test-uid') is True
-
-    def test_no_subscription_no_credits_returns_true(self):
-        fair_use_mod.users_db.get_user_valid_subscription = MagicMock(return_value=None)
-        fair_use_mod.is_paid_plan = MagicMock(return_value=False)
-        fair_use_mod.has_transcription_credits = MagicMock(return_value=False)
-
-        assert fair_use_mod.is_free_credits_exhausted('test-uid') is True
-
-    def test_exception_returns_false(self):
-        """Fail-open: any exception returns False (user keeps access)."""
-        fair_use_mod.users_db.get_user_valid_subscription = MagicMock(side_effect=Exception('DB down'))
-
-        assert fair_use_mod.is_free_credits_exhausted('test-uid') is False
-
-
-# ---------------------------------------------------------------------------
-# trigger_classifier_if_needed tests — free-exhausted synthetic score
-# ---------------------------------------------------------------------------
-
-
-class TestTriggerClassifierFreeTier:
-    """Free-exhausted users get synthetic score 1.0 and go through escalation."""
+class TestTriggerClassifier:
+    """trigger_classifier_if_needed runs the LLM classifier before escalation."""
 
     def setup_method(self):
         _mock_redis.reset_mock()
@@ -125,105 +77,12 @@ class TestTriggerClassifierFreeTier:
         _fair_use_db.update_fair_use_state.reset_mock()
 
     @patch.object(fair_use_mod, 'FAIR_USE_ENABLED', True)
-    @patch.object(fair_use_mod, 'is_free_credits_exhausted', return_value=True)
     @patch.object(fair_use_mod, '_get_classify_user_purpose')
     @patch.object(
         fair_use_mod, 'get_rolling_speech_ms', return_value={'daily_ms': 0, 'three_day_ms': 0, 'weekly_ms': 0}
     )
-    def test_free_exhausted_uses_synthetic_score(self, _mock_speech, mock_get_classify, _mock_free):
-        """Free-exhausted: acquires lock, skips LLM, uses synthetic score 1.0 for escalation."""
-        mock_classifier = MagicMock()
-        mock_get_classify.return_value = mock_classifier
-
-        loop = asyncio.new_event_loop()
-        try:
-            loop.run_until_complete(fair_use_mod.trigger_classifier_if_needed('test-uid', _make_trigger()))
-        finally:
-            loop.close()
-
-        # LLM classifier not called
-        mock_classifier.assert_not_called()
-        # Lock was acquired
-        _mock_redis.set.assert_called_once()
-        # Escalation happened (none → warning with synthetic score 1.0)
-        _fair_use_db.update_fair_use_state.assert_called()
-        # First call is the stage update; last call may be last_case_ref
-        stage_call = _fair_use_db.update_fair_use_state.call_args_list[0][0]
-        assert stage_call[1]['stage'] == 'warning'
-
-    @patch.object(fair_use_mod, 'FAIR_USE_ENABLED', True)
-    @patch.object(fair_use_mod, 'is_free_credits_exhausted', return_value=True)
-    @patch.object(fair_use_mod, '_get_classify_user_purpose')
-    @patch.object(
-        fair_use_mod, 'get_rolling_speech_ms', return_value={'daily_ms': 0, 'three_day_ms': 0, 'weekly_ms': 0}
-    )
-    def test_free_exhausted_stores_synthetic_metadata(self, _mock_speech, mock_get_classify, _mock_free):
-        """Verify the exact synthetic classifier payload is stored in the fair-use event."""
-        mock_get_classify.return_value = MagicMock()
-
-        loop = asyncio.new_event_loop()
-        try:
-            loop.run_until_complete(fair_use_mod.trigger_classifier_if_needed('test-uid', _make_trigger()))
-        finally:
-            loop.close()
-
-        # create_fair_use_event stores the classifier result in the event payload
-        _fair_use_db.create_fair_use_event.assert_called_once()
-        event_data = _fair_use_db.create_fair_use_event.call_args[0][1]
-        assert event_data['classifier'] == {'misuse_score': 1.0, 'usage_type': 'free_exhausted'}
-
-    @patch.object(fair_use_mod, 'FAIR_USE_ENABLED', True)
-    @patch.object(fair_use_mod, 'is_free_credits_exhausted', return_value=True)
-    @patch.object(fair_use_mod, '_get_classify_user_purpose')
-    @patch.object(
-        fair_use_mod, 'get_rolling_speech_ms', return_value={'daily_ms': 0, 'three_day_ms': 0, 'weekly_ms': 0}
-    )
-    def test_free_exhausted_escalates_warning_to_throttle(self, _mock_speech, mock_get_classify, _mock_free):
-        """Free-exhausted user already at warning with enough violations → throttle."""
-        _fair_use_db.get_fair_use_state.return_value = {'stage': 'warning'}
-        _fair_use_db.get_violation_counts.return_value = {'violation_count_7d': 2, 'violation_count_30d': 3}
-        mock_get_classify.return_value = MagicMock()
-
-        loop = asyncio.new_event_loop()
-        try:
-            loop.run_until_complete(fair_use_mod.trigger_classifier_if_needed('test-uid', _make_trigger()))
-        finally:
-            loop.close()
-
-        _fair_use_db.update_fair_use_state.assert_called()
-        stage_call = _fair_use_db.update_fair_use_state.call_args_list[0][0]
-        assert stage_call[1]['stage'] == 'throttle'
-
-    @patch.object(fair_use_mod, 'FAIR_USE_ENABLED', True)
-    @patch.object(fair_use_mod, 'is_free_credits_exhausted', return_value=True)
-    @patch.object(fair_use_mod, '_get_classify_user_purpose')
-    @patch.object(
-        fair_use_mod, 'get_rolling_speech_ms', return_value={'daily_ms': 0, 'three_day_ms': 0, 'weekly_ms': 0}
-    )
-    def test_free_exhausted_escalates_throttle_to_restrict(self, _mock_speech, mock_get_classify, _mock_free):
-        """Free-exhausted user at throttle with enough violations → restrict."""
-        _fair_use_db.get_fair_use_state.return_value = {'stage': 'throttle'}
-        _fair_use_db.get_violation_counts.return_value = {'violation_count_7d': 3, 'violation_count_30d': 5}
-        mock_get_classify.return_value = MagicMock()
-
-        loop = asyncio.new_event_loop()
-        try:
-            loop.run_until_complete(fair_use_mod.trigger_classifier_if_needed('test-uid', _make_trigger()))
-        finally:
-            loop.close()
-
-        _fair_use_db.update_fair_use_state.assert_called()
-        stage_call = _fair_use_db.update_fair_use_state.call_args_list[0][0]
-        assert stage_call[1]['stage'] == 'restrict'
-
-    @patch.object(fair_use_mod, 'FAIR_USE_ENABLED', True)
-    @patch.object(fair_use_mod, '_get_classify_user_purpose')
-    @patch.object(
-        fair_use_mod, 'get_rolling_speech_ms', return_value={'daily_ms': 0, 'three_day_ms': 0, 'weekly_ms': 0}
-    )
-    @patch.object(fair_use_mod, 'is_free_credits_exhausted', return_value=False)
-    def test_non_free_user_calls_classifier(self, _mock_free, _mock_speech, mock_get_classify):
-        """Non-free user: goes through the normal LLM classifier pipeline."""
+    def test_runs_the_llm_classifier(self, _mock_speech, mock_get_classify):
+        """Every user goes through the LLM classifier pipeline."""
         classify_called = {'called': False}
         _fair_use_db.create_fair_use_event.reset_mock()
 
@@ -243,13 +102,12 @@ class TestTriggerClassifierFreeTier:
 
 
 # ---------------------------------------------------------------------------
-# escalate_enforcement tests — shared by both abuse and free-exhausted paths
+# escalate_enforcement tests
 # ---------------------------------------------------------------------------
 
 
 class TestEscalateEnforcement:
-    """escalate_enforcement handles both abuse detection (LLM) and free-exhausted
-    (synthetic score) paths. The score gate (misuse_score >= threshold) is always required."""
+    """The score gate (misuse_score >= threshold) is always required."""
 
     def setup_method(self):
         _fair_use_db.get_fair_use_state.reset_mock()
@@ -323,22 +181,6 @@ class TestEscalateEnforcement:
 
         assert result['action'] == 'restrict'
         assert result['new_stage'] == 'restrict'
-
-    @patch.object(fair_use_mod, 'FAIR_USE_ENABLED', True)
-    @patch.object(
-        fair_use_mod, 'get_rolling_speech_ms', return_value={'daily_ms': 0, 'three_day_ms': 0, 'weekly_ms': 0}
-    )
-    def test_free_exhausted_synthetic_score_escalates(self, _mock_speech):
-        """Free-exhausted synthetic score (1.0) should escalate same as abuse."""
-        _fair_use_db.get_fair_use_state.return_value = {'stage': 'none'}
-        _fair_use_db.get_violation_counts.return_value = {'violation_count_7d': 0, 'violation_count_30d': 0}
-
-        result = fair_use_mod.escalate_enforcement(
-            'test-uid', _make_trigger(), {'misuse_score': 1.0, 'usage_type': 'free_exhausted'}
-        )
-
-        assert result['action'] == 'warning'
-        assert result['new_stage'] == 'warning'
 
 
 # ---------------------------------------------------------------------------

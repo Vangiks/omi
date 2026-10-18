@@ -70,7 +70,6 @@ def env(monkeypatch):
 
         return run
 
-    allowance = MagicMock(return_value=SimpleNamespace(managed=True, reason='plan_within_allowance'))
     signal = MagicMock()
     cache = MagicMock()
     fakes = {}
@@ -80,7 +79,6 @@ def env(monkeypatch):
         'database.conversations',
         'database.redis_db',
         'database._client',
-        'utils.subscription',
         'utils.observability.fallback',
         'utils.fair_use',
     ]:
@@ -92,7 +90,6 @@ def env(monkeypatch):
     fakes['database.redis_db'].release_token_lock = lambda key, token: redis.release(keys=[key], args=[token])
     fakes['database.redis_db'].set_credits_invalidation_signal = signal
     fakes['database._client'].db = db
-    fakes['utils.subscription'].resolve_transcription_allowance = allowance
     fakes['utils.observability.fallback'].record_fallback = MagicMock()
     # The access cache the recovery repairs is the fair-use enforcement cache.
     fakes['utils.fair_use'].invalidate_enforcement_cache = cache
@@ -108,7 +105,6 @@ def env(monkeypatch):
             state_data=state_data,
             locks=locks,
             calls=calls,
-            allowance=allowance,
             signal=signal,
             cache=cache,
             fakes=fakes,
@@ -143,7 +139,6 @@ def test_redis_eviction_uses_durable_period_marker(env):
     env.state_data['completed_period'] = '2026-11'
     env.module.recover_locked_content('test-user', now=NOW)
     assert env.calls == []
-    env.allowance.assert_not_called()
 
 
 def test_bounded_pass_resumes_until_empty_tail(env):
@@ -188,38 +183,6 @@ def test_invalidation_failure_is_repaired_before_completion(env):
     assert env.cache.call_count == 2
 
 
-@pytest.mark.parametrize(
-    'reason',
-    [
-        'plan_allowance_exhausted',
-        'usage_invalid',
-        'allowance_unavailable',
-        'subscription_inactive',
-        'byok',
-        'marketplace_reviewer',
-    ],
-)
-def test_exhausted_or_untrusted_or_override_stays_locked(env, reason):
-    env.locks.update(memories=3, actions=3, conversations=3)
-    env.allowance.return_value = SimpleNamespace(managed=reason in {'byok', 'marketplace_reviewer'}, reason=reason)
-    env.module.recover_locked_content('test-user', now=NOW)
-    assert env.calls == [] and not env.state_data
-    assert env.locks == dict(canonical_memories=0, memories=3, actions=3, conversations=3)
-    env.signal.assert_not_called()
-    env.cache.assert_not_called()
-
-
-def test_allowance_rechecked_between_collections(env):
-    env.locks.update(memories=3, actions=3, conversations=3)
-    env.allowance.side_effect = [
-        SimpleNamespace(managed=True, reason='plan_within_allowance'),
-        SimpleNamespace(managed=False, reason='plan_allowance_exhausted'),
-    ]
-    env.module.recover_locked_content('test-user', now=NOW)
-    assert env.locks == dict(canonical_memories=0, memories=0, actions=3, conversations=3)
-    assert not env.state_data
-
-
 def test_lease_contention_does_not_run(env):
     env.redis.values['users:test-user:locked_content_reset:lease'] = 'other-owner'
     env.module.recover_locked_content('test-user', now=NOW)
@@ -227,38 +190,11 @@ def test_lease_contention_does_not_run(env):
     assert env.redis.values['users:test-user:locked_content_reset:lease'] == 'other-owner'
 
 
-def test_requests_throttled_before_usage_read(env):
-    env.allowance.return_value = SimpleNamespace(managed=False, reason='plan_allowance_exhausted')
+def test_requests_throttled_between_passes(env):
+    env.locks.update(memories=201)
     env.module.recover_locked_content('test-user', now=NOW)
     env.module.recover_locked_content('test-user', now=NOW)
-    assert env.allowance.call_count == 1
-
-
-@pytest.mark.parametrize('committed_collections', [1, 2])
-@pytest.mark.parametrize('recheck_failure', ['denied', 'exception'])
-def test_allowance_recheck_repairs_caches_after_committed_pages(env, committed_collections, recheck_failure):
-    env.locks.update(memories=3, canonical_memories=2, actions=3, conversations=3)
-    eligible = SimpleNamespace(managed=True, reason='plan_within_allowance')
-    failure = (
-        SimpleNamespace(managed=False, reason='plan_allowance_exhausted')
-        if recheck_failure == 'denied'
-        else RuntimeError('allowance provider unavailable')
-    )
-    env.allowance.side_effect = [eligible] * committed_collections + [failure]
-    env.module.recover_locked_content('test-user', now=NOW)
-    assert env.locks['memories'] == env.locks['canonical_memories'] == 0
-    assert env.locks['actions'] == (0 if committed_collections == 2 else 3)
-    assert env.locks['conversations'] == 3
-    assert env.calls == ['memories', 'actions'][:committed_collections]
-    env.signal.assert_called_once_with('test-user')
-    env.cache.assert_called_once_with('test-user')
-    assert not env.state_data
-    assert not any(':done:' in key or key.endswith(':lease') for key in env.redis.values)
-    env.allowance.side_effect = None
-    env.redis.next_request()
-    env.module.recover_locked_content('test-user', now=NOW)
-    assert not any(env.locks.values())
-    assert env.state_data['completed_period'] == '2026-11'
+    assert env.calls == ['memories', 'actions', 'conversations']
 
 
 @pytest.mark.parametrize(

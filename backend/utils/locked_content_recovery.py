@@ -37,7 +37,6 @@ def recover_locked_content(uid: str, *, now: datetime | None = None) -> None:
     from database import action_items, conversations, memories, redis_db
     from database._client import db
     from utils.fair_use import invalidate_enforcement_cache
-    from utils.subscription import resolve_transcription_allowance
     from utils.observability.fallback import record_fallback
 
     now = now or datetime.now(timezone.utc)
@@ -63,29 +62,16 @@ def recover_locked_content(uid: str, *, now: datetime | None = None) -> None:
         if completed_period == period:
             redis_db.r.set(done_key, '1', ex=period_ttl)
             return
-
-        # No reviewer/BYOK/trial override may authorize a persistent unlock.
-        # Only the ordinary plan allowance, successfully resolved, qualifies.
-        def eligible() -> bool:
-            allowance = resolve_transcription_allowance(uid, byok_active=False)
-            return allowance.managed and allowance.reason in {'plan_within_allowance', 'plan_unlimited'}
-
-        if not eligible():
-            return
         # Same helpers as the paid-upgrade webhook, now with bounded pages.
         # Children first; each collection drains independently over retries.
         # A page can expose a parent before all child pages finish.
         try:
             memory_count = memories.unlock_all_memories(uid, limit=PAGE_SIZE)
-            if not eligible():
-                return
             action_count = action_items.unlock_all_action_items(uid, limit=PAGE_SIZE)
-            if not eligible():
-                return
             conversation_count = conversations.unlock_all_conversations(uid, limit=PAGE_SIZE)
         finally:
-            # Repair access caches even when a later recheck denies or fails,
-            # or a helper raises after an already-committed page.
+            # Repair access caches even when a helper raises after an
+            # already-committed page.
             redis_db.set_credits_invalidation_signal(uid)
             invalidate_enforcement_cache(uid)
         # Each memory collection has its own page. A full page stays incomplete
