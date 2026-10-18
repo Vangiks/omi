@@ -10,7 +10,6 @@ backend-main:http:DELETE:/v1/announcements/{announcement_id}
 backend-main:http:DELETE:/v1/apps/tester/access
 backend-main:http:DELETE:/v1/apps/{app_id}
 backend-main:http:DELETE:/v1/apps/{app_id}/keys/{key_id}
-backend-main:http:DELETE:/v1/apps/{app_id}/subscription
 backend-main:http:DELETE:/v1/conversations/{conversation_id}
 backend-main:http:DELETE:/v1/conversations/{conversation_id}/action-items
 backend-main:http:DELETE:/v1/conversations/{conversation_id}/calendar-event
@@ -82,8 +81,6 @@ backend-main:http:GET:/v1/announcements/{announcement_id}
 backend-main:http:GET:/v1/app-capabilities
 backend-main:http:GET:/v1/app-categories
 backend-main:http:GET:/v1/app/generate-prompts
-backend-main:http:GET:/v1/app/payment-plans
-backend-main:http:GET:/v1/app/plans
 backend-main:http:GET:/v1/app/proactive-notification-scopes
 backend-main:http:GET:/v1/approved-apps
 backend-main:http:GET:/v1/apps
@@ -95,7 +92,6 @@ backend-main:http:GET:/v1/apps/tester/check
 backend-main:http:GET:/v1/apps/{app_id}
 backend-main:http:GET:/v1/apps/{app_id}/keys
 backend-main:http:GET:/v1/apps/{app_id}/reviews
-backend-main:http:GET:/v1/apps/{app_id}/subscription
 backend-main:http:GET:/v1/auth/authorize
 backend-main:http:GET:/v1/auth/callback/google
 backend-main:http:GET:/v1/auto/model-pick
@@ -160,13 +156,11 @@ backend-main:http:GET:/v1/mcp/screen-activity
 backend-main:http:GET:/v1/mcp/sse
 backend-main:http:GET:/v1/mcp/sse/info
 backend-main:http:GET:/v1/oauth/authorize
-backend-main:http:GET:/v1/payment-methods/status
 backend-main:http:GET:/v1/payments/available-plans
 backend-main:http:GET:/v1/payments/cancel
 backend-main:http:GET:/v1/payments/overage-info
 backend-main:http:GET:/v1/payments/portal-return
 backend-main:http:GET:/v1/payments/success
-backend-main:http:GET:/v1/paypal/payment-details
 backend-main:http:GET:/v1/personas
 backend-main:http:GET:/v1/personas/twitter/initial-message
 backend-main:http:GET:/v1/personas/twitter/profile
@@ -175,9 +169,6 @@ backend-main:http:GET:/v1/personas/{persona_id}
 backend-main:http:GET:/v1/phone/numbers
 backend-main:http:GET:/v1/scores
 backend-main:http:GET:/v1/staged-tasks
-backend-main:http:GET:/v1/stripe/onboarded
-backend-main:http:GET:/v1/stripe/return/{account_id}
-backend-main:http:GET:/v1/stripe/supported-countries
 backend-main:http:GET:/v1/summary-app-ids
 backend-main:http:GET:/v1/sync/audio/{conversation_id}/urls
 backend-main:http:GET:/v1/sync/audio/{conversation_id}/{audio_file_id}
@@ -391,11 +382,9 @@ backend-main:http:POST:/v1/mcp/sse
 backend-main:http:POST:/v1/messages/{message_id}/report
 backend-main:http:POST:/v1/notification
 backend-main:http:POST:/v1/oauth/token
-backend-main:http:POST:/v1/payment-methods/default
 backend-main:http:POST:/v1/payments/checkout-session
 backend-main:http:POST:/v1/payments/customer-portal
 backend-main:http:POST:/v1/payments/upgrade-subscription
-backend-main:http:POST:/v1/paypal/payment-details
 backend-main:http:POST:/v1/personas
 backend-main:http:POST:/v1/phone/numbers/verify
 backend-main:http:POST:/v1/phone/numbers/verify/check
@@ -406,9 +395,6 @@ backend-main:http:POST:/v1/staged-tasks/migrate
 backend-main:http:POST:/v1/staged-tasks/migrate-conversation-items
 backend-main:http:POST:/v1/staged-tasks/promote
 backend-main:http:POST:/v1/staged-tasks/{task_id}/promote
-backend-main:http:POST:/v1/stripe/connect-accounts
-backend-main:http:POST:/v1/stripe/connect/webhook
-backend-main:http:POST:/v1/stripe/refresh/{account_id}
 backend-main:http:POST:/v1/stripe/webhook
 backend-main:http:POST:/v1/summary-app-ids/{app_id}
 backend-main:http:POST:/v1/sync-local-files

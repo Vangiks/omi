@@ -43,7 +43,8 @@ def test_no_paid_app_code_left_in_backend():
     offenders = []
     for path in BACKEND.rglob('*.py'):
         relative = path.relative_to(BACKEND)
-        if relative.parts[0] in {'.venv', 'tests'}:
+        # Skip tests and local virtualenvs (.venv, .openapi-venv, ...).
+        if relative.parts[0] == 'tests' or relative.parts[0].startswith('.'):
             continue
         for number, line in enumerate(path.read_text(encoding='utf-8').splitlines(), 1):
             if pattern.search(line):

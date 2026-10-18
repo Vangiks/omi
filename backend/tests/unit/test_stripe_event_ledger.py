@@ -196,7 +196,7 @@ def test_auxiliary_observation_failure_does_not_change_handler_response(dispatch
     assert dispatch.outcomes == ['unprotected', 'observe_error']
 
 
-def test_creator_app_checkout_keeps_its_separate_legacy_delivery_semantics(dispatch):
+def test_leftover_app_checkout_bypasses_the_ledger(dispatch):
     payload = event(kind='checkout.session.completed')
     payload['data']['object']['metadata'] = {'app_id': 'fixture-creator-app'}
     assert dispatch.run(payload) == {'status': 'success'}
