@@ -49,6 +49,8 @@ OUT_OF_SCOPE_PREFIXES = (
     '/v2/messages/',  # SSE streaming
     '/v2/files',  # multipart upload
     '/v2/apps',  # Rust-proxied app routes (desktop uses v1/apps)
+    '/v1/payments/',  # billing removed from the fork; the macOS app is kept for reference
+    '/v1/users/me/referral',  # referral program removed with billing
 )
 
 # Swift string-interpolation route literals look like "v1/conversations/\(id)".

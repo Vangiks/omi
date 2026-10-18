@@ -88,7 +88,6 @@ export interface ActionItemCreateRequest {
   exported?: boolean;
   goal_id?: string | null;
   indent_level?: number;
-  is_locked?: boolean;
   owner?: TaskOwner;
   priority?: TaskPriority | null;
   provenance?: Array<EvidenceRef>;
@@ -120,7 +119,6 @@ export interface ActionItemResponse {
   goal_id?: string | null;
   id: string;
   indent_level?: number;
-  is_locked?: boolean;
   owner?: TaskOwner;
   priority?: TaskPriority | null;
   provenance?: Array<EvidenceRef>;
@@ -256,20 +254,12 @@ export interface App {
   image: string;
   installs?: number;
   is_influencer?: boolean | null;
-  is_paid?: boolean | null;
   is_popular?: boolean | null;
-  is_user_paid?: boolean | null;
   memory_prompt?: string | null;
   money_made?: number | null;
   name: string;
   official?: boolean | null;
-  payment_link?: string | null;
-  payment_link_id?: string | null;
-  payment_plan?: string | null;
-  payment_price_id?: string | null;
-  payment_product_id?: string | null;
   persona_prompt?: string | null;
-  price?: number | null;
   private?: boolean;
   proactive_notification?: ProactiveNotification | null;
   rating_avg?: number | null;
@@ -314,14 +304,9 @@ export interface AppBaseModel {
   image: string;
   installs?: number;
   is_influencer?: boolean | null;
-  is_paid?: boolean | null;
   is_popular?: boolean | null;
-  is_user_paid?: boolean | null;
   name: string;
   official?: boolean | null;
-  payment_link?: string | null;
-  payment_plan?: string | null;
-  price?: number | null;
   private?: boolean;
   proactive_notification?: ProactiveNotification | null;
   rating_avg?: number | null;
@@ -370,9 +355,7 @@ export interface AppCatalogItem {
   id: string;
   image?: string;
   installs?: number;
-  is_paid?: boolean | null;
   name?: string;
-  price?: number | null;
   private?: boolean;
   rating_avg?: number | null;
   rating_count?: number;
@@ -502,26 +485,6 @@ export interface AppSelectOption {
 export interface AppStatusMessageResponse {
   message: string;
   status: string;
-}
-
-export interface AppSubscriptionCancelResponse {
-  cancel_at_period_end?: boolean | null;
-  current_period_end?: number | null;
-  message: string;
-  status: string;
-}
-
-export interface AppSubscriptionDetails {
-  cancel_at_period_end?: boolean | null;
-  current_period_end?: number | null;
-  customer_id?: string | null;
-  id?: string | null;
-  price_id?: string | null;
-  status?: string | null;
-}
-
-export interface AppSubscriptionResponse {
-  subscription?: AppSubscriptionDetails | null;
 }
 
 export interface AppTesterCheckResponse {
@@ -675,10 +638,6 @@ export interface AvailableLanguagesResponse {
   languages: Array<AvailableLanguage>;
 }
 
-export interface AvailablePlansResponse {
-  plans: Array<routers__payment__PricingOption>;
-}
-
 export interface BYOKActivateRequest {
   fingerprints: Record<string, string>;
 }
@@ -729,7 +688,6 @@ export interface BatchMigrationRequest {
 }
 
 export interface BatchMutationResponse {
-  locked_ids?: Array<string> | null;
   missing_ids?: Array<string> | null;
   noop_ids?: Array<string> | null;
   status: string;
@@ -876,11 +834,6 @@ export interface CalendarOnboardingStatusResponse {
   onboarding_completed: boolean;
   reauth_reason?: string | null;
   state: string;
-}
-
-export interface CancelSubscriptionRequest {
-  reason?: string | null;
-  reason_details?: string | null;
 }
 
 export interface CandidateAcceptanceRequest {
@@ -1315,7 +1268,6 @@ export interface Conversation {
   geolocation?: Geolocation | null;
   id: string;
   imported?: boolean;
-  is_locked?: boolean;
   language?: string | null;
   meeting_dedup_speech_s?: number | null;
   meeting_duration_s?: number | null;
@@ -1513,7 +1465,6 @@ export interface ConversationSearchItem {
   geolocation?: Geolocation | null;
   id: string;
   imported?: boolean;
-  is_locked?: boolean;
   language?: string | null;
   match_snippets?: Array<TranscriptMatchSnippet>;
   meeting_dedup_speech_s?: number | null;
@@ -1644,11 +1595,6 @@ export interface CreateChatSessionRequest {
   title?: string | null;
 }
 
-export interface CreateCheckoutRequest {
-  price_id: string;
-  promotion_code?: string | null;
-}
-
 export interface CreateConversationFromTranscriptRequest {
   capture_evidence?: CaptureEvidenceLineage | null;
   client_device_id?: string | null;
@@ -1769,10 +1715,6 @@ export interface CsatRatingRequest {
   platform: string;
   revision?: number;
   score: number;
-}
-
-export interface CustomerPortalSessionResponse {
-  url: string;
 }
 
 export interface DailySummariesResponse {
@@ -3338,7 +3280,6 @@ export interface MemoryDB {
   invalid_at?: string | null;
   is_baseline?: boolean;
   is_dismissed?: boolean;
-  is_locked?: boolean;
   is_read?: boolean;
   kg_extracted?: boolean;
   kind?: MemoryKind | null;
@@ -3697,25 +3638,6 @@ export interface OutcomeRecord {
   subject_kind: FeedbackSubjectKind;
 }
 
-export interface OverageInfoResponse {
-  byok_available?: boolean;
-  excess_questions?: number;
-  explainer_body: string;
-  explainer_title: string;
-  included_cost_usd?: number | null;
-  included_questions?: number | null;
-  is_overage_plan: boolean;
-  markup_multiplier: number;
-  markup_percent: number;
-  overage_usd?: number;
-  plan: string;
-  plan_type: string;
-  provider_reference_rates: Record<string, unknown>;
-  real_cost_usd?: number;
-  reset_at?: number | null;
-  used_questions?: number;
-}
-
 export interface PageContext {
   end_date?: string | null;
   id?: string | null;
@@ -3731,56 +3653,6 @@ export interface Participant {
   organization?: string | null;
   role?: string | null;
   source: "roster" | "transcript";
-}
-
-export interface PayPalPaymentDetailsResponse {
-  email: string;
-  paypalme_url: string;
-}
-
-export interface PaymentCheckoutSessionResponse {
-  message?: string | null;
-  next_billing_date?: number | null;
-  session_id?: string | null;
-  status?: string | null;
-  url?: string | null;
-}
-
-export interface PaymentMethodStatusResponse {
-  default?: string | null;
-  paypal: string;
-  stripe: string;
-}
-
-export interface PaymentMutationResponse {
-  status: string;
-}
-
-export interface PaymentStatusMessageResponse {
-  message: string;
-  status: string;
-}
-
-export interface PaymentSubscriptionResponse {
-  cancel_at_period_end?: boolean;
-  current_period_end?: number | null;
-  current_period_start?: number | null;
-  current_price_id?: string | null;
-  deprecated?: boolean;
-  deprecation_message?: string | null;
-  features?: Array<string>;
-  limits?: PlanLimits;
-  plan?: string;
-  status?: string;
-  stripe_subscription_id?: string | null;
-}
-
-export interface PaymentUpgradeSubscriptionResponse {
-  days_remaining: number;
-  message: string;
-  schedule_id?: string | null;
-  status: string;
-  subscription: PaymentSubscriptionResponse;
 }
 
 export interface PaywallStatusResponse {
@@ -4189,19 +4061,6 @@ export interface RecordLlmUsageBucketRequest {
   total_tokens?: number;
 }
 
-export interface ReferralClaimRequest {
-  code: string;
-}
-
-export interface ReferralClaimResponse {
-  claimed: boolean;
-  trial_days: number;
-}
-
-export interface ReferralLinkResponse {
-  referral_url: string;
-}
-
 export interface RejectSpeakerRequest {
   kind: "not_me" | "not_person" | "not_a_person";
   person_id?: string | null;
@@ -4382,11 +4241,6 @@ export interface SamePersonItem {
 export interface SaveFcmTokenRequest {
   fcm_token: string;
   time_zone: string;
-}
-
-export interface SavePayPalPaymentDetailsRequest {
-  email: string;
-  paypalme_url: string;
 }
 
 export interface ScreenActivityAppSummary {
@@ -4595,10 +4449,6 @@ export interface SetConversationStarredOperation {
 export interface SetConversationTitleOperation {
   title: string;
   type?: "set_title";
-}
-
-export interface SetDefaultPaymentMethodRequest {
-  method: string;
 }
 
 export interface SetUserLanguageRequest {
@@ -5010,79 +4860,6 @@ export interface StoreMeetingResponse {
 
 export interface StoreRecordingPermissionResponse {
   store_recording_permission: boolean;
-}
-
-export interface StorefrontCurrent {
-  cancel_at_period_end?: boolean;
-  interval?: "month" | "year" | null;
-  legacy: boolean;
-  legacy_note?: string | null;
-  line: string;
-  name: string;
-  plan_id: string;
-  price_id?: string | null;
-}
-
-export interface StorefrontPrice {
-  amount_minor: number;
-  cta_label?: string | null;
-  currency: string;
-  headline: string;
-  interval: "month" | "year";
-  months_free?: number | null;
-  price_id?: string | null;
-  renewal_line?: string | null;
-  subline?: string | null;
-}
-
-export interface StorefrontResponse {
-  catalog_revision: number;
-  current?: StorefrontCurrent | null;
-  header?: string | null;
-  schema_version?: 2;
-  show_subscription_ui?: boolean;
-  tiers?: Array<StorefrontTier>;
-  usage?: StorefrontUsage;
-  yearly_toggle_label?: string | null;
-}
-
-export interface StorefrontTier {
-  action: "checkout" | "current" | "none";
-  blocked_line?: string | null;
-  bullets: Array<string>;
-  compact?: boolean;
-  cta_label?: string | null;
-  hours_line: string;
-  is_current?: boolean;
-  name: string;
-  plan_id: string;
-  prices: Array<StorefrontPrice>;
-  recommended?: boolean;
-  tier_id: string;
-}
-
-export interface StorefrontUsage {
-  kind?: "usage_budget" | "transcription" | "unavailable";
-  meter_line?: string | null;
-  nudge_line?: string | null;
-  percent?: number | null;
-  period_id?: string | null;
-  pro_gates?: Array<string>;
-  reset_label?: string | null;
-}
-
-export interface StripeConnectAccountResponse {
-  account_id: string;
-  url: string;
-}
-
-export interface StripeOnboardingStatusResponse {
-  onboarding_complete: boolean;
-}
-
-export interface StripeSupportedCountryResponse {
-  id: string;
-  name: string;
 }
 
 export interface Structured {
@@ -5724,11 +5501,6 @@ export interface UpdateSummaryRequest {
   content: string;
 }
 
-export interface UpgradeSubscriptionRequest {
-  price_id: string;
-  promotion_code?: string | null;
-}
-
 export interface UsageHistoryPoint {
   date: string;
   insights_gained?: number;
@@ -6043,19 +5815,6 @@ export interface routers__memories__BatchMemoriesResponse {
   memories: Array<MemoryDB>;
 }
 
-export interface routers__payment__PricingOption {
-  description?: string | null;
-  eyebrow?: string | null;
-  id: string;
-  interval: string;
-  is_active?: boolean;
-  plan_id?: string;
-  price_string: string;
-  subtitle?: string | null;
-  title: string;
-  unit_amount: number;
-}
-
 export interface OmiApiSchemas {
   "AIUserProfileResponse": AIUserProfileResponse;
   "AcceptSharedActionItemsResponse": AcceptSharedActionItemsResponse;
@@ -6111,9 +5870,6 @@ export interface OmiApiSchemas {
   "AppSearchResponse": AppSearchResponse;
   "AppSelectOption": AppSelectOption;
   "AppStatusMessageResponse": AppStatusMessageResponse;
-  "AppSubscriptionCancelResponse": AppSubscriptionCancelResponse;
-  "AppSubscriptionDetails": AppSubscriptionDetails;
-  "AppSubscriptionResponse": AppSubscriptionResponse;
   "AppTesterCheckResponse": AppTesterCheckResponse;
   "AppThumbnailUploadResponse": AppThumbnailUploadResponse;
   "AppleHealthSyncData": AppleHealthSyncData;
@@ -6136,7 +5892,6 @@ export interface OmiApiSchemas {
   "AuthStep": AuthStep;
   "AvailableLanguage": AvailableLanguage;
   "AvailableLanguagesResponse": AvailableLanguagesResponse;
-  "AvailablePlansResponse": AvailablePlansResponse;
   "BYOKActivateRequest": BYOKActivateRequest;
   "BYOKActiveResponse": BYOKActiveResponse;
   "BatchActionItemsRequest": BatchActionItemsRequest;
@@ -6173,7 +5928,6 @@ export interface OmiApiSchemas {
   "CalendarOnboardingResetResponse": CalendarOnboardingResetResponse;
   "CalendarOnboardingSkipResponse": CalendarOnboardingSkipResponse;
   "CalendarOnboardingStatusResponse": CalendarOnboardingStatusResponse;
-  "CancelSubscriptionRequest": CancelSubscriptionRequest;
   "CandidateAcceptanceRequest": CandidateAcceptanceRequest;
   "CandidateAction": CandidateAction;
   "CandidateCompatibilityMetadata": CandidateCompatibilityMetadata;
@@ -6269,7 +6023,6 @@ export interface OmiApiSchemas {
   "CreateActionItemRequest": CreateActionItemRequest;
   "CreateAnnouncementRequest": CreateAnnouncementRequest;
   "CreateChatSessionRequest": CreateChatSessionRequest;
-  "CreateCheckoutRequest": CreateCheckoutRequest;
   "CreateConversationFromTranscriptRequest": CreateConversationFromTranscriptRequest;
   "CreateConversationRequest": CreateConversationRequest;
   "CreateConversationResponse": CreateConversationResponse;
@@ -6285,7 +6038,6 @@ export interface OmiApiSchemas {
   "CsatConfigResponse": CsatConfigResponse;
   "CsatRatingReceipt": CsatRatingReceipt;
   "CsatRatingRequest": CsatRatingRequest;
-  "CustomerPortalSessionResponse": CustomerPortalSessionResponse;
   "DailySummariesResponse": DailySummariesResponse;
   "DailySummaryActionItem": DailySummaryActionItem;
   "DailySummaryDayStats": DailySummaryDayStats;
@@ -6541,16 +6293,8 @@ export interface OmiApiSchemas {
   "OpenLoopStatus": OpenLoopStatus;
   "OutcomeCreate": OutcomeCreate;
   "OutcomeRecord": OutcomeRecord;
-  "OverageInfoResponse": OverageInfoResponse;
   "PageContext": PageContext;
   "Participant": Participant;
-  "PayPalPaymentDetailsResponse": PayPalPaymentDetailsResponse;
-  "PaymentCheckoutSessionResponse": PaymentCheckoutSessionResponse;
-  "PaymentMethodStatusResponse": PaymentMethodStatusResponse;
-  "PaymentMutationResponse": PaymentMutationResponse;
-  "PaymentStatusMessageResponse": PaymentStatusMessageResponse;
-  "PaymentSubscriptionResponse": PaymentSubscriptionResponse;
-  "PaymentUpgradeSubscriptionResponse": PaymentUpgradeSubscriptionResponse;
   "PaywallStatusResponse": PaywallStatusResponse;
   "PendingSyncResponse": PendingSyncResponse;
   "PeopleResponse": PeopleResponse;
@@ -6603,9 +6347,6 @@ export interface OmiApiSchemas {
   "Recommendation": Recommendation;
   "RecommendationSubjectKind": RecommendationSubjectKind;
   "RecordLlmUsageBucketRequest": RecordLlmUsageBucketRequest;
-  "ReferralClaimRequest": ReferralClaimRequest;
-  "ReferralClaimResponse": ReferralClaimResponse;
-  "ReferralLinkResponse": ReferralLinkResponse;
   "RejectSpeakerRequest": RejectSpeakerRequest;
   "ReleaseChannel": ReleaseChannel;
   "ReorderFoldersRequest": ReorderFoldersRequest;
@@ -6628,7 +6369,6 @@ export interface OmiApiSchemas {
   "SamePersonAnswer": SamePersonAnswer;
   "SamePersonItem": SamePersonItem;
   "SaveFcmTokenRequest": SaveFcmTokenRequest;
-  "SavePayPalPaymentDetailsRequest": SavePayPalPaymentDetailsRequest;
   "ScreenActivityAppSummary": ScreenActivityAppSummary;
   "ScreenActivityCoverage": ScreenActivityCoverage;
   "ScreenActivityResponse": ScreenActivityResponse;
@@ -6660,7 +6400,6 @@ export interface OmiApiSchemas {
   "SetConversationEventsStateRequest": SetConversationEventsStateRequest;
   "SetConversationStarredOperation": SetConversationStarredOperation;
   "SetConversationTitleOperation": SetConversationTitleOperation;
-  "SetDefaultPaymentMethodRequest": SetDefaultPaymentMethodRequest;
   "SetUserLanguageRequest": SetUserLanguageRequest;
   "SetUserWebhookUrlRequest": SetUserWebhookUrlRequest;
   "ShareActionItemsResponse": ShareActionItemsResponse;
@@ -6721,14 +6460,6 @@ export interface OmiApiSchemas {
   "StoreMeetingRequest": StoreMeetingRequest;
   "StoreMeetingResponse": StoreMeetingResponse;
   "StoreRecordingPermissionResponse": StoreRecordingPermissionResponse;
-  "StorefrontCurrent": StorefrontCurrent;
-  "StorefrontPrice": StorefrontPrice;
-  "StorefrontResponse": StorefrontResponse;
-  "StorefrontTier": StorefrontTier;
-  "StorefrontUsage": StorefrontUsage;
-  "StripeConnectAccountResponse": StripeConnectAccountResponse;
-  "StripeOnboardingStatusResponse": StripeOnboardingStatusResponse;
-  "StripeSupportedCountryResponse": StripeSupportedCountryResponse;
   "Structured": Structured;
   "SttAvailabilityResponse": SttAvailabilityResponse;
   "SubjectAttribution": SubjectAttribution;
@@ -6819,7 +6550,6 @@ export interface OmiApiSchemas {
   "UpdateNotificationSettingsRequest": UpdateNotificationSettingsRequest;
   "UpdateSegmentTextRequest": UpdateSegmentTextRequest;
   "UpdateSummaryRequest": UpdateSummaryRequest;
-  "UpgradeSubscriptionRequest": UpgradeSubscriptionRequest;
   "UsageHistoryPoint": UsageHistoryPoint;
   "UsagePeriod": UsagePeriod;
   "UsageStats": UsageStats;
@@ -6863,7 +6593,6 @@ export interface OmiApiSchemas {
   "routers__mcp__TranscriptMatchSnippet": routers__mcp__TranscriptMatchSnippet;
   "routers__memories__BatchMemoriesRequest": routers__memories__BatchMemoriesRequest;
   "routers__memories__BatchMemoriesResponse": routers__memories__BatchMemoriesResponse;
-  "routers__payment__PricingOption": routers__payment__PricingOption;
 }
 
 export interface OmiApiPaths {
@@ -7239,25 +6968,6 @@ export interface OmiApiPaths {
       };
     };
   };
-  "/v1/app/payment-plans": {
-    get: {
-      operationId: "get_payment_plans_v1_v1_app_payment_plans_get";
-      responses: {
-        "200": Array<AppSelectOption>;
-        "401": void;
-      };
-    };
-  };
-  "/v1/app/plans": {
-    get: {
-      operationId: "get_payment_plans_v1_app_plans_get";
-      responses: {
-        "200": Array<AppSelectOption>;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
   "/v1/app/proactive-notification-scopes": {
     get: {
       operationId: "get_notification_scopes_v1_app_proactive_notification_scopes_get";
@@ -7571,26 +7281,6 @@ export interface OmiApiPaths {
       operationId: "app_reviews_v1_apps__app_id__reviews_get";
       responses: {
         "200": Array<AppReview>;
-        "401": void;
-        "404": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/apps/{app_id}/subscription": {
-    get: {
-      operationId: "get_app_subscription_v1_apps__app_id__subscription_get";
-      responses: {
-        "200": AppSubscriptionResponse;
-        "401": void;
-        "404": void;
-        "422": HTTPValidationError;
-      };
-    };
-    delete: {
-      operationId: "cancel_app_subscription_v1_apps__app_id__subscription_delete";
-      responses: {
-        "200": AppSubscriptionCancelResponse;
         "401": void;
         "404": void;
         "422": HTTPValidationError;
@@ -9792,132 +9482,6 @@ export interface OmiApiPaths {
       };
     };
   };
-  "/v1/payment-methods/default": {
-    post: {
-      operationId: "set_default_payment_method_endpoint_v1_payment_methods_default_post";
-      responses: {
-        "200": PaymentMutationResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/payment-methods/status": {
-    get: {
-      operationId: "get_payment_method_status_v1_payment_methods_status_get";
-      responses: {
-        "200": PaymentMethodStatusResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/payments/available-plans": {
-    get: {
-      operationId: "get_available_plans_endpoint_v1_payments_available_plans_get";
-      responses: {
-        "200": AvailablePlansResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/payments/cancel": {
-    get: {
-      operationId: "stripe_cancel_v1_payments_cancel_get";
-      responses: {
-        "200": unknown;
-        "401": void;
-      };
-    };
-  };
-  "/v1/payments/checkout-session": {
-    post: {
-      operationId: "create_checkout_session_endpoint_v1_payments_checkout_session_post";
-      responses: {
-        "200": PaymentCheckoutSessionResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/payments/customer-portal": {
-    post: {
-      operationId: "create_customer_portal_endpoint_v1_payments_customer_portal_post";
-      responses: {
-        "200": CustomerPortalSessionResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/payments/overage-info": {
-    get: {
-      operationId: "get_overage_info_endpoint_v1_payments_overage_info_get";
-      responses: {
-        "200": OverageInfoResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/payments/portal-return": {
-    get: {
-      operationId: "portal_return_v1_payments_portal_return_get";
-      responses: {
-        "200": unknown;
-        "401": void;
-      };
-    };
-  };
-  "/v1/payments/subscription": {
-    delete: {
-      operationId: "cancel_subscription_endpoint_v1_payments_subscription_delete";
-      responses: {
-        "200": PaymentStatusMessageResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/payments/success": {
-    get: {
-      operationId: "stripe_success_v1_payments_success_get";
-      responses: {
-        "200": unknown;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/payments/upgrade-subscription": {
-    post: {
-      operationId: "upgrade_subscription_endpoint_v1_payments_upgrade_subscription_post";
-      responses: {
-        "200": PaymentUpgradeSubscriptionResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/paypal/payment-details": {
-    get: {
-      operationId: "get_paypal_payment_details_endpoint_v1_paypal_payment_details_get";
-      responses: {
-        "200": PayPalPaymentDetailsResponse | null;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-    post: {
-      operationId: "save_paypal_payment_details_v1_paypal_payment_details_post";
-      responses: {
-        "200": PaymentMutationResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
   "/v1/phone/numbers": {
     get: {
       operationId: "list_phone_numbers_v1_phone_numbers_get";
@@ -10202,76 +9766,6 @@ export interface OmiApiPaths {
       operationId: "mark_speaker_tag_prompts_shown_v1_speaker_tag_prompts_shown_post";
       responses: {
         "200": SpeakerTagPromptsShownResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/stripe/connect-accounts": {
-    post: {
-      operationId: "create_connect_account_endpoint_v1_stripe_connect_accounts_post";
-      responses: {
-        "200": StripeConnectAccountResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/stripe/connect/webhook": {
-    post: {
-      operationId: "stripe_connect_webhook_v1_stripe_connect_webhook_post";
-      responses: {
-        "200": PaymentMutationResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/stripe/onboarded": {
-    get: {
-      operationId: "check_onboarding_status_v1_stripe_onboarded_get";
-      responses: {
-        "200": StripeOnboardingStatusResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/stripe/refresh/{account_id}": {
-    post: {
-      operationId: "refresh_account_link_endpoint_v1_stripe_refresh__account_id__post";
-      responses: {
-        "200": StripeConnectAccountResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/stripe/return/{account_id}": {
-    get: {
-      operationId: "stripe_return_v1_stripe_return__account_id__get";
-      responses: {
-        "200": unknown;
-        "401": void;
-        "404": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/stripe/supported-countries": {
-    get: {
-      operationId: "get_supported_countries_v1_stripe_supported_countries_get";
-      responses: {
-        "200": Array<StripeSupportedCountryResponse>;
-        "401": void;
-      };
-    };
-  };
-  "/v1/stripe/webhook": {
-    post: {
-      operationId: "stripe_webhook_v1_stripe_webhook_post";
-      responses: {
-        "200": PaymentMutationResponse;
         "401": void;
         "422": HTTPValidationError;
       };
@@ -10900,26 +10394,6 @@ export interface OmiApiPaths {
       operationId: "get_user_paywall_status_v1_users_me_paywall_get";
       responses: {
         "200": PaywallStatusResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/users/me/referral": {
-    get: {
-      operationId: "get_referral_link_v1_users_me_referral_get";
-      responses: {
-        "200": ReferralLinkResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/users/me/referral/claim": {
-    post: {
-      operationId: "claim_referral_v1_users_me_referral_claim_post";
-      responses: {
-        "200": ReferralClaimResponse;
         "401": void;
         "422": HTTPValidationError;
       };
@@ -11666,16 +11140,6 @@ export interface OmiApiPaths {
       operationId: "report_message_v2_messages__message_id__report_post";
       responses: {
         "200": MessageReportResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v2/payments/plans": {
-    get: {
-      operationId: "get_storefront_v2_payments_plans_get";
-      responses: {
-        "200": StorefrontResponse;
         "401": void;
         "422": HTTPValidationError;
       };
@@ -12776,40 +12240,6 @@ export async function generate_sample_prompts_endpoint_v1_app_generate_prompts_g
   return _res.status === 204 ? (undefined as any) : await _res.json();
 }
 
-export async function get_payment_plans_v1_v1_app_payment_plans_get(init?: OmiApiClientInit): Promise<Array<AppSelectOption>> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/app/payment-plans`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "GET",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function get_payment_plans_v1_app_plans_get(header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, init?: OmiApiClientInit): Promise<Array<AppSelectOption>> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/app/plans`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "GET",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
 export async function get_notification_scopes_v1_app_proactive_notification_scopes_get(init?: OmiApiClientInit): Promise<Array<AppSelectOption>> {
   const _base = init?.baseURL ?? "";
   const _path = `/v1/app/proactive-notification-scopes`;
@@ -13410,44 +12840,6 @@ export async function app_reviews_v1_apps__app_id__reviews_get(path: { app_id: s
     headers: {
       ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
       ...init?.headers,
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function get_app_subscription_v1_apps__app_id__subscription_get(path: { app_id: string }, header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, init?: OmiApiClientInit): Promise<AppSubscriptionResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/apps/${path.app_id}/subscription`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "GET",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function cancel_app_subscription_v1_apps__app_id__subscription_delete(path: { app_id: string }, header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, init?: OmiApiClientInit): Promise<AppSubscriptionCancelResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/apps/${path.app_id}/subscription`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "DELETE",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
     },
   });
   if (!_res.ok) throw new OmiApiError(_res.status, _res);
@@ -17665,206 +17057,6 @@ export async function submit_mobile_feedback_v1_mobile_feedback_post(header: { X
   return _res.status === 204 ? (undefined as any) : await _res.json();
 }
 
-export async function set_default_payment_method_endpoint_v1_payment_methods_default_post(header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, body: SetDefaultPaymentMethodRequest, init?: OmiApiClientInit): Promise<PaymentMutationResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/payment-methods/default`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "POST",
-    headers: {
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function get_payment_method_status_v1_payment_methods_status_get(header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, init?: OmiApiClientInit): Promise<PaymentMethodStatusResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/payment-methods/status`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "GET",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function get_available_plans_endpoint_v1_payments_available_plans_get(header: { X_App_Platform?: string, X_App_Version?: string, authorization?: string, X_Device_Id_Hash?: string }, init?: OmiApiClientInit): Promise<AvailablePlansResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/payments/available-plans`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "GET",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function create_checkout_session_endpoint_v1_payments_checkout_session_post(header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, body: CreateCheckoutRequest, init?: OmiApiClientInit): Promise<PaymentCheckoutSessionResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/payments/checkout-session`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "POST",
-    headers: {
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function create_customer_portal_endpoint_v1_payments_customer_portal_post(header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, init?: OmiApiClientInit): Promise<CustomerPortalSessionResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/payments/customer-portal`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "POST",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function get_overage_info_endpoint_v1_payments_overage_info_get(header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, init?: OmiApiClientInit): Promise<OverageInfoResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/payments/overage-info`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "GET",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function cancel_subscription_endpoint_v1_payments_subscription_delete(header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, body: CancelSubscriptionRequest, init?: OmiApiClientInit): Promise<PaymentStatusMessageResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/payments/subscription`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "DELETE",
-    headers: {
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function upgrade_subscription_endpoint_v1_payments_upgrade_subscription_post(header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, body: UpgradeSubscriptionRequest, init?: OmiApiClientInit): Promise<PaymentUpgradeSubscriptionResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/payments/upgrade-subscription`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "POST",
-    headers: {
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function get_paypal_payment_details_endpoint_v1_paypal_payment_details_get(header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, init?: OmiApiClientInit): Promise<PayPalPaymentDetailsResponse | null> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/paypal/payment-details`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "GET",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function save_paypal_payment_details_v1_paypal_payment_details_post(header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, body: SavePayPalPaymentDetailsRequest, init?: OmiApiClientInit): Promise<PaymentMutationResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/paypal/payment-details`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "POST",
-    headers: {
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
 export async function list_phone_numbers_v1_phone_numbers_get(header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, init?: OmiApiClientInit): Promise<PhoneNumbersResponse> {
   const _base = init?.baseURL ?? "";
   const _path = `/v1/phone/numbers`;
@@ -18445,113 +17637,6 @@ export async function mark_speaker_tag_prompts_shown_v1_speaker_tag_prompts_show
       ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function create_connect_account_endpoint_v1_stripe_connect_accounts_post(query: { country?: string | null }, header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, init?: OmiApiClientInit): Promise<StripeConnectAccountResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/stripe/connect-accounts`;
-  const _params = query ? Object.entries(query)
-    .filter(([, v]) => v !== undefined && v !== null)
-    .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&') : '';
-  const _search = _params ? `?${_params}` : "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "POST",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function stripe_connect_webhook_v1_stripe_connect_webhook_post(header: { stripe_signature?: string }, init?: OmiApiClientInit): Promise<PaymentMutationResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/stripe/connect/webhook`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "POST",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.stripe_signature !== undefined ? { "stripe-signature": String(header.stripe_signature) } : {}),
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function check_onboarding_status_v1_stripe_onboarded_get(header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, init?: OmiApiClientInit): Promise<StripeOnboardingStatusResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/stripe/onboarded`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "GET",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function refresh_account_link_endpoint_v1_stripe_refresh__account_id__post(path: { account_id: string }, header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, init?: OmiApiClientInit): Promise<StripeConnectAccountResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/stripe/refresh/${path.account_id}`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "POST",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function get_supported_countries_v1_stripe_supported_countries_get(init?: OmiApiClientInit): Promise<Array<StripeSupportedCountryResponse>> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/stripe/supported-countries`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "GET",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function stripe_webhook_v1_stripe_webhook_post(header: { stripe_signature?: string }, init?: OmiApiClientInit): Promise<PaymentMutationResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/stripe/webhook`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "POST",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.stripe_signature !== undefined ? { "stripe-signature": String(header.stripe_signature) } : {}),
-    },
   });
   if (!_res.ok) throw new OmiApiError(_res.status, _res);
   return _res.status === 204 ? (undefined as any) : await _res.json();
@@ -19823,46 +18908,6 @@ export async function get_user_paywall_status_v1_users_me_paywall_get(query: { p
       ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
       ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
     },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function get_referral_link_v1_users_me_referral_get(header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, init?: OmiApiClientInit): Promise<ReferralLinkResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/users/me/referral`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "GET",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function claim_referral_v1_users_me_referral_claim_post(header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, body: ReferralClaimRequest, init?: OmiApiClientInit): Promise<ReferralClaimResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/users/me/referral/claim`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "POST",
-    headers: {
-      ...(body ? { 'Content-Type': 'application/json' } : {}),
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-    body: body ? JSON.stringify(body) : undefined,
   });
   if (!_res.ok) throw new OmiApiError(_res.status, _res);
   return _res.status === 204 ? (undefined as any) : await _res.json();
@@ -21447,28 +20492,6 @@ export async function report_message_v2_messages__message_id__report_post(path: 
   return _res.status === 204 ? (undefined as any) : await _res.json();
 }
 
-export async function get_storefront_v2_payments_plans_get(query: { source?: string | null, trigger?: "proactive_agent" | "screen_context" | "usage_budget" | "mcp_daily_cap" | null, locale?: string | null }, header: { X_App_Platform?: string, X_App_Version?: string, authorization?: string, X_Device_Id_Hash?: string }, init?: OmiApiClientInit): Promise<StorefrontResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v2/payments/plans`;
-  const _params = query ? Object.entries(query)
-    .filter(([, v]) => v !== undefined && v !== null)
-    .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&') : '';
-  const _search = _params ? `?${_params}` : "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "GET",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
 export async function get_review_items_v2_v2_review_items_get(header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, init?: OmiApiClientInit): Promise<ReviewItemsResponseV2> {
   const _base = init?.baseURL ?? "";
   const _path = `/v2/review/items`;
@@ -22102,4 +21125,4 @@ export async function get_speech_profile_v4_speech_profile_get(header: { authori
   return _res.status === 204 ? (undefined as any) : await _res.json();
 }
 
-// Total: 505 client methods generated.
+// Total: 482 client methods generated.
