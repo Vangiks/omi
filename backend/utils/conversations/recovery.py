@@ -19,9 +19,6 @@ _RICH_STRUCTURED_FIELDS = ('overview', 'sections', 'action_items', 'events')
 _PROTECTED_STRUCTURED_TEXT_FIELDS = ('title', 'overview')
 _PROTECTED_STRUCTURED_LIST_FIELDS = ('sections', 'action_items', 'events')
 
-TERMINAL_NO_DERIVED_EFFECTS_FIELD = 'terminal_no_derived_effects'
-
-
 def recovery_minimum_terminal_enabled() -> bool:
     """Kill switch for ending a recovery whose enrichment returned only a minimum."""
     return os.getenv('LISTEN_FINALIZATION_RECOVERY_MINIMUM_TERMINAL_ENABLED', 'false').strip().lower() in {

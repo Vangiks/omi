@@ -104,10 +104,7 @@ def process_external_integration_memory(
             memory_db.app_id = app_id
             saved_memories.append(memory_db)
 
-    # Extract memories from text if provided. Model-formed memories are plan-gated
-    # (§1.8): an app-provided explicit fact is data the app already holds and is
-    # written as before, but luna extraction must not run for a plan the policy
-    # denies.
+    # Extract memories from text if provided.
     if memory_data.text and len(memory_data.text.strip()) > 0:
         extracted_memories = extract_memories_from_text(
             uid,

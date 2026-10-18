@@ -276,7 +276,6 @@ def test_one_admission_then_rerun_is_refused_idempotently():
         ({'deferred': True}, 'deferred'),
         ({'is_locked': True}, 'locked'),
         ({'processing_state': 'local_pending'}, 'local_pending'),
-        ({'terminal_no_derived_effects': True}, 'terminal_no_derived'),
         ({'source': 'desktop'}, 'source'),
         ({'source': 'unknown_source'}, 'source'),
         ({'finished_at': None}, 'no_finished_at'),
@@ -434,7 +433,6 @@ def test_recovery_minimum_structure_raises_before_persist_or_fanout(capsys):
         status=ConversationStatus.processing,
     )
     persistence_observer = MagicMock()
-    disposition_observer = MagicMock()
 
     with stub_modules(fakes):
         pc = load_module_fresh(
@@ -455,7 +453,6 @@ def test_recovery_minimum_structure_raises_before_persist_or_fanout(capsys):
                         'en',
                         conversation,
                         persistence_observer=persistence_observer,
-                        derived_effects_disposition_observer=disposition_observer,
                         trigger=ProcessingTrigger.SERVER_RECOVERY,
                     )
             from types import SimpleNamespace
@@ -496,7 +493,6 @@ def test_recovery_minimum_structure_raises_before_persist_or_fanout(capsys):
             sys.modules.pop('utils.conversations.process_conversation', None)
 
     persistence_observer.assert_not_called()
-    disposition_observer.assert_not_called()
     assert result.status == ConversationStatus.completed
     assert result.discarded is True
     payload = persisted.call_args.args[1]

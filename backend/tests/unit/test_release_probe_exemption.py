@@ -29,7 +29,7 @@ def test_constant_matches_the_documented_uid() -> None:
     assert RELEASE_PROBE_UID == 'omi-release-probe'
 
 
-def test_desktop_gates_exempt_only_the_probe_uid() -> None:
+def test_discard_gates_exempt_only_the_probe_uid() -> None:
     """The discard gates must consult the shared predicate (no local literal,
     no reinvented matching). Static contract: the guard module is the single
     source of truth."""

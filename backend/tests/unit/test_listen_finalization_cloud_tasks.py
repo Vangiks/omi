@@ -2085,10 +2085,9 @@ async def test_finalizer_completes_when_an_app_permanently_rejects_the_delivery(
         ('completed', False, False, False, False),
     ],
 )
-@pytest.mark.parametrize('terminal', [False, True])
 @pytest.mark.parametrize('vector_case', ['success', 'embedding_error', 'stale', 'index_unavailable'])
 async def test_finalizer_summary_vector_requires_visible_structure_and_winning_claim(
-    monkeypatch, claim_status, deleted, discarded, structured, emits, vector_case, caplog, terminal
+    monkeypatch, claim_status, deleted, discarded, structured, emits, vector_case, caplog
 ):
     conversation = SimpleNamespace(
         id='conversation-1',
@@ -2141,7 +2140,6 @@ async def test_finalizer_summary_vector_requires_visible_structure_and_winning_c
             'id': conversation.id,
             'status': 'completed',
             'deleted': deleted,
-            persisted_finalizer.TERMINAL_NO_DERIVED_EFFECTS_FIELD: terminal,
         },
     )
     monkeypatch.setattr(persisted_finalizer, 'deserialize_conversation', deserialize)
@@ -2196,7 +2194,7 @@ async def test_finalizer_summary_vector_requires_visible_structure_and_winning_c
         assert 'exception_type=' in caplog.text
     if claim_status == 'claimed':
         persisted_finalizer.lifecycle_service.complete_finalization_fanout.assert_called_once()
-        if not discarded and not terminal:
+        if not discarded:
             persisted_finalizer.extract_memories.assert_called_once()
         else:
             persisted_finalizer.extract_memories.assert_not_called()

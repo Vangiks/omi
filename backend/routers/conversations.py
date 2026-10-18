@@ -74,7 +74,6 @@ from utils.conversations.projection_payload import (
 )
 from utils.conversations.process_conversation import (
     AppUsageAttribution,
-    DerivedEffectsDisposition,
     process_conversation,
     run_first_open_derived_work,
     retrieve_in_progress_conversation,
@@ -371,7 +370,7 @@ def _accepted_client_projection(raw: Any, segments: Any) -> Optional[ClientProce
     """Bind a client projection to the persisted transcript, or drop it.
 
     Schema failures and hash mismatch are not request errors: the conversation
-    still finalizes on the deterministic minimum. Warnings are content-free
+    still finalizes without the projection. Warnings are content-free
     (reason plus provenance only — never transcript or body).
     """
     if raw is None:
@@ -578,15 +577,10 @@ def process_in_progress_conversation(
 
     conversation.status = ConversationStatus.processing
     persisted = False
-    derived_effects_disposition = DerivedEffectsDisposition.RUN
 
     def record_persistence(current: bool) -> None:
         nonlocal persisted
         persisted = current
-
-    def record_derived_effects_disposition(current: DerivedEffectsDisposition) -> None:
-        nonlocal derived_effects_disposition
-        derived_effects_disposition = current
 
     # This synchronous path has no durable job for the reconciler to replay, so
     # a processing failure must return the admission to in_progress — otherwise
@@ -598,19 +592,12 @@ def process_in_progress_conversation(
             conversation.language,
             conversation,
             persistence_observer=record_persistence,
-            derived_effects_disposition_observer=record_derived_effects_disposition,
             client_projection=client_projection,
             trigger=ProcessingTrigger.CLIENT_FINALIZE,
         )
     if not persisted:
         latest = _get_valid_conversation_by_id(uid, conversation.id)
         return CreateConversationResponse(conversation=deserialize_conversation(latest), messages=[])
-    # A terminal free-tier minimum persists successfully but must not fan out
-    # apps/webhooks — the same decision the durable finalizer already honours
-    # via derived_effects_disposition_observer (section 1.7). The conversation
-    # itself still returns to the client; this suppresses derived effects only.
-    if derived_effects_disposition == DerivedEffectsDisposition.TERMINAL_NO_DERIVED_EFFECTS:
-        return CreateConversationResponse(conversation=conversation, messages=[])
     messages = asyncio.run(trigger_external_integrations(uid, conversation))
 
     return CreateConversationResponse(conversation=conversation, messages=messages)

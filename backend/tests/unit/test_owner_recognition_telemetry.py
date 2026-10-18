@@ -735,6 +735,38 @@ def _stub_completed_reprocess(monkeypatch):
     monkeypatch.setattr(module.conversations_db, 'update_conversation', MagicMock())
 
 
+def test_deferred_desktop_projection_counts_on_first_completed_reprocess(monkeypatch):
+    """A conversation deferred before #17 is observed once, on its first-open reprocess."""
+    module = process_conversation_mod
+    _stub_desktop_persist(monkeypatch)
+    _stub_completed_reprocess(monkeypatch)
+    capture = _desktop_capture()
+    deferred = Conversation(
+        id='deferred-1',
+        created_at=capture.started_at,
+        structured=build_deterministic_minimum_structured(capture),
+        **capture.model_dump(),
+    )
+    deferred.status = ConversationStatus.processing
+    deferred.deferred = True
+    deferred.client_processing = _desktop_projection()
+    assert structured_is_rich(deferred.structured) is False
+    assert (
+        owner_recognition_already_observed(
+            deferred,
+            is_reprocess=True,
+            trigger=ProcessingTrigger.USER_REPROCESS,
+        )
+        is False
+    )
+    before = _conversation_total()
+    stored = module.process_conversation('uid', 'en', deferred, trigger=ProcessingTrigger.USER_REPROCESS)
+    assert stored.status == ConversationStatus.completed
+    assert _conversation_total() == pytest.approx(before + 1)
+    module.process_conversation('uid', 'en', stored, trigger=ProcessingTrigger.USER_REPROCESS)
+    assert _conversation_total() == pytest.approx(before + 1)
+
+
 def test_observer_failure_cannot_skip_persistence_callbacks(monkeypatch):
     module = process_conversation_mod
     _stub_desktop_persist(monkeypatch)
@@ -763,13 +795,9 @@ def test_observer_failure_cannot_skip_persistence_callbacks(monkeypatch):
             _desktop_capture(),
             client_projection=_desktop_projection(),
             persistence_observer=lambda current: seen.append(('persist', current)),
-            derived_effects_disposition_observer=lambda disposition: seen.append(('disposition', disposition)),
         )
     finally:
         module.logger.removeHandler(handler)
         module.logger.setLevel(previous_level)
     assert stored.status == ConversationStatus.completed
-    assert seen == [
-        ('persist', True),
-        ('disposition', module.DerivedEffectsDisposition.RUN),
-    ]
+    assert seen == [('persist', True)]

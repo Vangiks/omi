@@ -1941,8 +1941,7 @@ def _accepted_client_projection(
     """Bind a client projection to the stored transcript, or drop it.
 
     Schema failure and hash mismatch are not request errors: the conversation
-    still lands, with the projection discarded and the coordinator storing the
-    deterministic minimum. The warning is content-free (reason plus provenance
+    still lands, with the projection discarded. The warning is content-free (reason plus provenance
     only — never transcript or body). Provenance itself may be missing.
     The digest is over ``segments`` — the canonical rows ingest persists —
     so a client hashing the same canonicalization as ``canonical_segment``
@@ -2228,7 +2227,7 @@ def _create_conversation_from_segments(
             conversations_db.delete_conversation(uid, conversation_id)
         raise
     # Non-idempotent ingest: the coordinator's generic persist stripped the
-    # field (paid / flag-off deferred). Stamp it now. The session-id path
+    # field. Stamp it now. The session-id path
     # already wrote at create_processing and must not write again after a
     # concurrent late-bind.
     if client_projection is not None and not request.client_session_id:

@@ -242,30 +242,6 @@ class AppUsageAttribution(str, Enum):
     NON_USER_REPROCESS = 'non_user_reprocess'
 
 
-class DerivedEffectsDisposition(str, Enum):
-    """What the durable finalizer should do after the coordinator persists.
-
-    RUN is the paid/legacy bundle (or the empty-bundle memory-extraction
-    fallback). TERMINAL_NO_DERIVED_EFFECTS is a successful persist that must
-    not extract memories or fan out the intelligence bundle. The finalizer
-    still writes the summary vector behind its winning claim.
-    Reporting persistence True alone is unsafe: the finalizer treats an empty
-    bundle as "extract memories now". The terminal value is also written onto
-    the Firestore document (see ``TERMINAL_NO_DERIVED_EFFECTS_FIELD``) so a
-    Cloud Tasks retry after a completed minimum still suppresses the bundle.
-    """
-
-    RUN = 'run'
-    TERMINAL_NO_DERIVED_EFFECTS = 'terminal_no_derived_effects'
-
-
-# Unmodeled Firestore field. Same precedent as ``jit_first_open``: Conversation
-# does not declare it, so the persist dict is the only write path. A Cloud Tasks
-# retry after a completed minimum must still see this marker; otherwise the
-# finalizer defaults disposition to RUN and extracts memories.
-TERMINAL_NO_DERIVED_EFFECTS_FIELD = 'terminal_no_derived_effects'
-
-
 class ExplicitAppSelectionFailedError(RuntimeError):
     """A reprocess that named one summarization app ended without its result.
 
@@ -2360,7 +2336,6 @@ def process_conversation(
     defer_memory_extraction: bool = False,
     defer_derived_effects: bool = False,
     derived_effects_observer: Callable[[Callable[[], None]], None] | None = None,
-    derived_effects_disposition_observer: Callable[[DerivedEffectsDisposition], None] | None = None,
     *,
     client_projection: ClientProcessing | None = None,
     trigger: ProcessingTrigger = ProcessingTrigger.CAPTURE_END,
@@ -2419,15 +2394,12 @@ def process_conversation(
         current: bool,
         *,
         completed: Conversation | None = None,
-        derived_effects: DerivedEffectsDisposition = DerivedEffectsDisposition.RUN,
     ) -> None:
         if current and completed is not None:
             record_capture_loss(completed)
             _observe_owner_recognition_completion(completed)
         if persistence_observer is not None:
             persistence_observer(current)
-        if derived_effects_disposition_observer is not None:
-            derived_effects_disposition_observer(derived_effects)
         # Sync/REST callers finalize here; leased jobs defer this metadata work
         # to finalizer.py after the fanout fence, including completed replays.
         if current and completed is not None and not defer_derived_effects:

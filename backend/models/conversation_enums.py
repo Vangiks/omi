@@ -103,6 +103,9 @@ class ExternalIntegrationConversationSource(str, Enum):
 class ConversationProcessingState(str, Enum):
     """Why a conversation's ``structured`` holds the §1.7 deterministic minimum.
 
+    Nothing writes this since the fork dropped the free tier (#17); it is kept
+    to read conversations stored before that. Enrichment clears it.
+
     Absent (``None``) on every conversation the server enriched itself, and on a
     conversation that already carries a ``client_processing`` projection.
     Clients check ``client_processing`` FIRST: a projection that arrives after
