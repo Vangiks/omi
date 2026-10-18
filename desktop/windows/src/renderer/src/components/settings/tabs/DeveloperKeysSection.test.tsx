@@ -8,10 +8,6 @@ const { getIdToken } = vi.hoisted(() => ({ getIdToken: vi.fn() }))
 vi.mock('../../../lib/firebase', () => ({
   auth: { currentUser: { getIdToken } }
 }))
-vi.mock('../../../lib/billing', () => ({
-  fetchSubscription: vi.fn().mockResolvedValue({}),
-  fetchChatQuota: vi.fn().mockResolvedValue({})
-}))
 
 const validatedProviders = vi.fn()
 const enroll = vi.fn()
@@ -39,11 +35,11 @@ describe('DeveloperKeysSection provider-scoped BYOK', () => {
     render(<DeveloperKeysSection />, { wrapper: SettingsSearchProvider })
 
     expect(await screen.findByText('Chat and AI: BYOK keys active')).not.toBeNull()
-    expect(screen.getByText('Transcription: Omi plan allowance')).not.toBeNull()
+    expect(screen.getByText('Transcription: Omi server key')).not.toBeNull()
     expect(
       screen.getByText(/A validated Deepgram key is required for BYOK transcription/)
     ).not.toBeNull()
-    expect(screen.getByText(/conversation locks still apply/)).not.toBeNull()
+    expect(screen.getByText(/the Omi server transcribes with its own key/)).not.toBeNull()
   })
 
   it('shows Deepgram transcription separately when its current key is enrolled', async () => {
@@ -52,7 +48,7 @@ describe('DeveloperKeysSection provider-scoped BYOK', () => {
 
     expect(await screen.findByText('Transcription: Deepgram BYOK')).not.toBeNull()
     expect(screen.getByText('Chat and AI: BYOK keys active')).not.toBeNull()
-    expect(screen.queryByText('Transcription: Omi plan allowance')).toBeNull()
+    expect(screen.queryByText('Transcription: Omi server key')).toBeNull()
   })
 
   it('explains transcription limits before enrollment', async () => {
@@ -60,7 +56,7 @@ describe('DeveloperKeysSection provider-scoped BYOK', () => {
     render(<DeveloperKeysSection />, { wrapper: SettingsSearchProvider })
 
     expect(await screen.findByText('Bring your own keys')).not.toBeNull()
-    expect(screen.getByText('Transcription: Omi plan allowance')).not.toBeNull()
+    expect(screen.getByText('Transcription: Omi server key')).not.toBeNull()
     expect(screen.queryByText('Chat and AI: BYOK keys active')).toBeNull()
   })
 
@@ -79,7 +75,7 @@ describe('DeveloperKeysSection provider-scoped BYOK', () => {
     })
 
     expect(enroll).toHaveBeenCalledWith('test-token')
-    expect(screen.getByText('Transcription: Omi plan allowance')).not.toBeNull()
+    expect(screen.getByText('Transcription: Omi server key')).not.toBeNull()
     expect(screen.getByText('Chat and AI: BYOK keys active')).not.toBeNull()
     expect(screen.queryByText('Transcription: Deepgram BYOK')).toBeNull()
   })
@@ -101,7 +97,7 @@ describe('DeveloperKeysSection provider-scoped BYOK', () => {
     })
 
     expect(enroll).not.toHaveBeenCalled()
-    expect(screen.getByText('Transcription: Omi plan allowance')).not.toBeNull()
+    expect(screen.getByText('Transcription: Omi server key')).not.toBeNull()
     expect(screen.queryByText('Transcription: Deepgram BYOK')).toBeNull()
   })
 

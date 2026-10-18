@@ -10,10 +10,10 @@ describe('settingsNav deep-link channel', () => {
   })
 
   it('replays a request made before the consumer subscribed (navigate-then-mount race)', () => {
-    requestSettingsTab('plan-usage')
+    requestSettingsTab('advanced')
     const cb = vi.fn()
     const off = onSettingsTabRequest(cb)
-    expect(cb).toHaveBeenCalledWith('plan-usage')
+    expect(cb).toHaveBeenCalledWith('advanced')
     off()
     consumeSettingsTabRequest()
   })

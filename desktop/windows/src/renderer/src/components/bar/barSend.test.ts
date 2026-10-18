@@ -3,13 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { sendFromBar } from './barSend'
 
 // The bar's send path (typed submit AND PTT commit). The fork has no chat quota
-// (#3): a send goes straight to the main window's chat engine, and the bar never
-// asks the backend for /v1/users/me/usage-quota.
-
-const { fetchChatQuota } = vi.hoisted(() => ({
-  fetchChatQuota: vi.fn(async () => ({ allowed: false, limit: 30, used: 30 }))
-}))
-vi.mock('../../lib/billing', () => ({ fetchChatQuota }))
+// (#3): a send goes straight to the main window's chat engine.
 
 const sendChat = vi.fn()
 const notifyAsked = vi.fn()
@@ -21,12 +15,11 @@ beforeEach(() => {
 })
 
 describe('bar send', () => {
-  it('sends a typed message without checking the chat quota', () => {
+  it('sends a typed message to the main window', () => {
     sendFromBar('are you there', false)
 
     expect(sendChat).toHaveBeenCalledWith('are you there', false)
     expect(notifyAsked).toHaveBeenCalledTimes(1)
-    expect(fetchChatQuota).not.toHaveBeenCalled()
   })
 
   it('sends a PTT (voice) turn as a voice message', () => {

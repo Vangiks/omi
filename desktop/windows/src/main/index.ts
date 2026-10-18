@@ -73,7 +73,6 @@ import { registerRewindHandlers } from './ipc/rewind'
 import { registerScreenHandlers } from './ipc/screen'
 import { registerChatPrivacyHandlers } from './ipc/chatPrivacy'
 import { registerAssistantSettingsHandlers } from './ipc/assistantSettings'
-import { registerBillingIpc } from './billing/checkoutWindow'
 import { registerAppsIpc } from './apps/checkAppSetup'
 import { helperProcess } from './ocr/helperProcess'
 import { registerProactivityConsumer } from './proactivity/register'
@@ -911,7 +910,6 @@ app.whenReady().then(async () => {
   registerScreenHandlers()
   registerChatPrivacyHandlers()
   registerAssistantSettingsHandlers()
-  registerBillingIpc()
   registerExternalUrlIpc()
   registerAppsIpc()
   // Cross-window conversations refresh: any renderer that writes a local

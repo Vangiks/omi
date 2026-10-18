@@ -641,9 +641,6 @@ export type UpdateCheckResult = {
   message?: string
 }
 
-/** Result of an in-app Stripe Checkout flow (main/billing/checkoutWindow). */
-export type CheckoutOutcome = 'success' | 'cancel' | 'closed'
-
 /** A file chosen for chat attachment. Produced in the main process by the native
  *  file picker (`chat:openFiles`, which reads the bytes) or built in the renderer
  *  from a drag-drop `File`. `path` is only set for the picker path. `bytes` is
@@ -785,11 +782,7 @@ export type OmiBridgeApi = {
    *  model-invoked capture_screen tool. Returns the stored value. */
   getChatScreenshotSharing: () => Promise<boolean>
   setChatScreenshotSharing: (enabled: boolean) => Promise<boolean>
-  /** Open a Stripe Checkout URL in a modal in-app window; resolves when the flow
-   *  completes ('success'/'cancel' at the backend redirect) or the user closes it
-   *  ('closed'). Only displays Stripe's hosted page — completes no payment. */
-  openCheckout: (url: string) => Promise<CheckoutOutcome>
-  /** Open a web URL (e.g. the Stripe customer portal) in the system browser. */
+  /** Open an http(s) URL in the system browser (`shell:openExternal`). */
   openExternalUrl: (url: string) => Promise<boolean>
   /** Poll an external-integration developer's setup-completed webhook from the
    *  main process (the renderer can't — CORS). https-only, side-effect-free GET;

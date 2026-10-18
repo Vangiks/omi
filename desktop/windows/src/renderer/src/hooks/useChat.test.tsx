@@ -70,16 +70,6 @@ vi.mock('../lib/desktopChatMessages', () => ({
   saveDesktopMessage: (r: unknown) => saveDesktopMessageSpy(r)
 }))
 
-// The fork has no chat quota (#3). If anything still asked the backend for it,
-// this stub would answer "limit reached".
-const fetchChatQuotaSpy = vi.hoisted(() =>
-  vi.fn(async () => ({ allowed: false, unit: 'questions', used: 30, limit: 30 }))
-)
-vi.mock('../lib/billing', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../lib/billing')>()),
-  fetchChatQuota: fetchChatQuotaSpy
-}))
-
 import {
   useChat,
   CHAT_STREAM_TIMEOUT_MS,
@@ -1121,7 +1111,7 @@ describe('useChat — rehydrate preserves attachments', () => {
 })
 
 describe('useChat — no chat quota', () => {
-  it('sends without asking for the chat quota', async () => {
+  it('sends with a single chat request and no quota check', async () => {
     const { result } = renderHook(() => useChat())
     void act(async () => {
       await result.current.send('hello')
@@ -1132,6 +1122,5 @@ describe('useChat — no chat quota', () => {
       await flush()
     })
     expect(global.fetch).toHaveBeenCalledTimes(1)
-    expect(fetchChatQuotaSpy).not.toHaveBeenCalled()
   })
 })

@@ -10,7 +10,7 @@ import { MemoryRouter, Routes, Route, useNavigate, useLocation } from 'react-rou
 // bug this pins. The separate PageChromeBar "Home" pill is what goes Home.
 //
 // Only the rail is exercised here; the rest of the Settings page drags in the whole
-// settings tab surface (billing, agents, R3F brain map).
+// settings tab surface (agents, R3F brain map).
 vi.mock('../components/settings/SettingsTabPanel', () => ({ SettingsTabPanel: () => null }))
 vi.mock('../components/settings/SettingsSearchProvider', () => ({
   SettingsSearchProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>
