@@ -38,7 +38,6 @@ import { InsightToast } from './components/insight/InsightToast'
 import { TrayStateHost } from './components/tray/TrayStateHost'
 import { ChatBridgeHost } from './components/chat/ChatBridgeHost'
 import { VoiceHubDriverHost } from './components/chat/VoiceHubDriverHost'
-import { ClaudeAuthSheet } from './components/settings/billing/ClaudeAuthSheet'
 import { RecordHotkeyHost } from './components/hotkeys/RecordHotkeyHost'
 import { BackgroundConsentInterstitial } from './components/consent/BackgroundConsentInterstitial'
 import { isSecondaryWindow } from './lib/windowRole'
@@ -176,12 +175,6 @@ function AppShellInner(): React.JSX.Element {
           export feedback, mutation errors incl. the tasks failure signal) was a
           silent no-op. Mounting it here, in the main window only, activates them. */}
       <ToastHost />
-      {/* "Upgrade to Omi Pro" upsell shown alongside the parallel Claude Code
-          OAuth launch — ONLY on an in-chat auth_required event (Claude Code's
-          token rejected mid-turn), matching macOS's isClaudeAuthRequired sheet.
-          The Settings → Agents sign-in button does plain OAuth, no upsell.
-          Completing sign-in auto-closes it and grants Claude with no purchase. */}
-      <ClaudeAuthSheet />
     </div>
   )
 }

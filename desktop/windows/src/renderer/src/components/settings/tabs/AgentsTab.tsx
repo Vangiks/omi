@@ -124,10 +124,8 @@ export function AgentsTab(): React.JSX.Element {
     setClaudeAuth((a) => ({ ...a, busy: true, error: undefined }))
     setTests((t) => ({ ...t, acp: { running: false } }))
     // Connecting the coding agent is a plain OAuth (Mac parity) — launch the
-    // Claude Code browser sign-in directly, with NO upsell sheet. The
-    // "Upgrade to Omi Pro" ClaudeAuthSheet is reserved for the mid-turn
-    // auth_required event (see claudeSignIn.ts), so a Pro user connecting here
-    // is never paywalled. Reflect the resulting status / surface a failure.
+    // Claude Code browser sign-in directly. Reflect the resulting status /
+    // surface a failure.
     void window.omi
       .codingAgentStartAuth()
       .then((r) =>
