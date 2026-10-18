@@ -14,7 +14,7 @@ vi.mock('../../lib/apiClient', () => ({
 // overridable per-test so the open-installed uid guard can simulate a signed-out user.
 const { getCacheUidMock } = vi.hoisted(() => ({ getCacheUidMock: vi.fn(() => 'me') }))
 vi.mock('../../lib/persistentCache', () => ({ getCacheUid: getCacheUidMock }))
-// Spy on toasts so the paid/open error-surfacing paths can be asserted (never silent).
+// Spy on toasts so the open error-surfacing paths can be asserted (never silent).
 const { toastFn } = vi.hoisted(() => ({ toastFn: vi.fn() }))
 vi.mock('../../lib/toast', () => ({ toast: toastFn }))
 
@@ -175,46 +175,24 @@ function openSpy(): ReturnType<typeof vi.fn> {
     .openExternalUrl
 }
 
-// Windows goes BEYOND macOS here: macOS decodes is_paid but shows no purchase UX and
-// silently swallows the paid-gate 403. Windows renders a real Purchase affordance and
-// never fails silently.
-describe('AppDetailSheet paid apps (beyond macOS)', () => {
-  const PAID_LINK = 'https://buy.example.com/x?client_reference_id=uid_abc'
-
-  it('shows a "Purchase — $price" CTA and opens payment_link verbatim (no double client_reference_id)', async () => {
+// The fork has no paid apps: even an app the backend still flags as paid installs
+// like any other, with no price and no purchase flow.
+describe('AppDetailSheet without paid apps', () => {
+  it('shows Install with no price or Purchase for an app flagged as paid', async () => {
     mockGets(
-      { ...DETAIL, is_paid: true, is_user_paid: false, payment_link: PAID_LINK, price: 4.99 },
-      []
-    )
-    renderSheet({ enabled: false })
-    const btn = await screen.findByText('Purchase — $4.99')
-    fireEvent.click(btn)
-    expect(openSpy()).toHaveBeenCalledWith(PAID_LINK)
-    // Opened exactly as the backend built it — client_reference_id appears once.
-    expect(PAID_LINK.match(/client_reference_id/g)!.length).toBe(1)
-  })
-
-  it('hides the Purchase CTA once is_user_paid is true (falls back to Install)', async () => {
-    mockGets(
-      { ...DETAIL, is_paid: true, is_user_paid: true, payment_link: PAID_LINK, price: 4.99 },
+      {
+        ...DETAIL,
+        is_paid: true,
+        is_user_paid: false,
+        payment_link: 'https://buy.example.com/x',
+        price: 4.99
+      } as App,
       []
     )
     renderSheet({ enabled: false })
     await waitFor(() => expect(screen.getByText('About')).toBeTruthy())
-    expect(screen.queryByText(/Purchase/)).toBeNull()
+    expect(screen.queryByText(/Purchase|\$4\.99/)).toBeNull()
     expect(screen.getByRole('button', { name: /^Install$/ })).toBeTruthy()
-  })
-
-  it('a paid app with no payment_link never silently no-ops — toasts to buy in the mobile app', async () => {
-    mockGets({ ...DETAIL, is_paid: true, is_user_paid: false, payment_link: null, price: 2 }, [])
-    renderSheet({ enabled: false })
-    const btn = await screen.findByText(/^Purchase/)
-    fireEvent.click(btn)
-    expect(toastFn).toHaveBeenCalled()
-    const [title, opts] = toastFn.mock.calls[0]
-    expect(String(title)).toMatch(/paid app/)
-    expect(String(opts.body)).toMatch(/mobile app/)
-    expect(openSpy()).not.toHaveBeenCalled()
   })
 })
 
