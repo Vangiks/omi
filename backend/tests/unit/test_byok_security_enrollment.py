@@ -360,7 +360,7 @@ class TestBYOKMiddlewareValidation:
         assert not called
 
     @pytest.mark.parametrize(
-        'path', ['/v1/users/me/subscription', '/v1/payments/available-plans', '/v1/users/budget-choice']
+        'path', ['/v1/users/me/subscription', '/v1/payments/available-plans']
     )
     @pytest.mark.parametrize('header', ['X-BYOK-OpenAI', 'X-BYOK-Deepgram'])
     def test_mismatched_keys_reach_byok_recovery_routes_without_keys(self, monkeypatch, path, header):

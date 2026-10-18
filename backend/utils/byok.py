@@ -112,7 +112,6 @@ _byok_validated_ctx: ContextVar[bool] = ContextVar('byok_validated', default=Fal
 _BYOK_RECOVERY_PATHS = frozenset(
     {
         '/v1/payments/available-plans',
-        '/v1/users/budget-choice',
         '/v1/payments/overage-info',
         '/v1/users/me/byok-active',
         '/v1/users/me/subscription',
