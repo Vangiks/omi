@@ -106,9 +106,8 @@ export function gmailSessionConnect(email?: string): Promise<GmailSessionStatus>
   const ses = getGmailSession()
   return new Promise((resolve) => {
     let settled = false
-    // Parent it to the main window (not modal — the sign-in shouldn't block the app),
-    // and mirror billing/checkoutWindow.ts: fully isolated remote content, shown only
-    // once ready to avoid a white flash.
+    // Parent it to the main window (not modal — the sign-in shouldn't block the app).
+    // Fully isolated remote content, shown only once ready to avoid a white flash.
     const parent = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0] ?? undefined
     const win = new BrowserWindow({
       width: 520,

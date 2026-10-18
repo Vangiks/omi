@@ -14,8 +14,8 @@
 // and then only changes its `#hash`, so the sole `file:` URL a window ever shows
 // is its own index.html — a dropped file is always a different path. http/https/
 // mailto and `window.open()`ed links keep their existing behavior (the window's
-// `setWindowOpenHandler` → `shell.openExternal`; the checkout window's own
-// `will-navigate` completion handling — both target http(s), never `file:`).
+// `setWindowOpenHandler` → `shell.openExternal`, which targets http(s), never
+// `file:`).
 //
 // Extracted as a pure predicate so it is unit-testable without an Electron app,
 // mirroring `windowShortcuts.ts` / `externalUrl.ts`.

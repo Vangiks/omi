@@ -28,10 +28,8 @@ describe('shouldBlockNavigation', () => {
 
   it('does not block external http/https navigations (those route via setWindowOpenHandler)', () => {
     const current = 'http://localhost:5179/'
-    expect(shouldBlockNavigation('https://omi.me/pricing', current)).toBe(false)
+    expect(shouldBlockNavigation('https://omi.me', current)).toBe(false)
     expect(shouldBlockNavigation('http://example.com', current)).toBe(false)
-    // Stripe checkout completion hop — handled by the checkout window's own will-navigate.
-    expect(shouldBlockNavigation('https://checkout.stripe.com/success', current)).toBe(false)
   })
 
   it('does not block non-web schemes here (mailto/custom — handled by the open handler)', () => {
