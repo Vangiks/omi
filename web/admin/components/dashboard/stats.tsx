@@ -1,7 +1,7 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Package, Loader2, MessageSquare, CreditCard, Smartphone, AlertTriangle } from "lucide-react";
+import { Package, Loader2, MessageSquare, AlertTriangle } from "lucide-react";
 import useSWR from 'swr';
 import { useAuthToken, authenticatedFetcher } from "@/hooks/useAuthToken";
 
@@ -11,21 +11,6 @@ interface AppStats {
   inReview: number;
   paid: number;
   partial?: boolean;
-}
-
-interface SubscriptionStats {
-  totalSubscriptions: number;
-  partial?: boolean;
-  monthly: number;
-  annual: number;
-  trialing: number;
-}
-
-interface AppSubscriptionStats {
-  totalAppSubscriptions: number;
-  uniqueCustomers: number;
-  priceBreakdown: Record<string, number>;
-  uniquePriceIds: number;
 }
 
 const PartialDataBadge = () => (
@@ -64,28 +49,6 @@ export function DashboardStats() {
     isLoading: conversationLoading
   } = useSWR<{ totalConversations: number }>(
     token ? ['/api/omi/stats/conversation-count', token] : null,
-    authenticatedFetcher,
-    { revalidateOnFocus: false }
-  );
-
-  // Fetch subscription stats using SWR
-  const {
-    data: subscriptionData,
-    error: subscriptionError,
-    isLoading: subscriptionLoading
-  } = useSWR<SubscriptionStats>(
-    token ? ['/api/omi/stats/subscriptions', token] : null,
-    authenticatedFetcher,
-    { revalidateOnFocus: false }
-  );
-
-  // Fetch app subscription stats using SWR
-  const {
-    data: appSubscriptionData,
-    error: appSubscriptionError,
-    isLoading: appSubscriptionLoading
-  } = useSWR<AppSubscriptionStats>(
-    token ? ['/api/omi/stats/app-subscriptions', token] : null,
     authenticatedFetcher,
     { revalidateOnFocus: false }
   );
@@ -174,69 +137,6 @@ export function DashboardStats() {
         <Card className="h-[180px]">
           <CardContent className="p-6 flex items-center justify-center h-full">
             <p className="text-muted-foreground">Conversation data unavailable.</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* --- Subscriptions Card --- */}
-      {subscriptionError ? (
-        <ErrorCard title="Active OMI Subscriptions" error={subscriptionError} />
-      ) : tokenLoading || subscriptionLoading ? (
-        <LoadingCard />
-      ) : subscriptionData && subscriptionData.totalSubscriptions !== undefined ? (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-base font-medium text-muted-foreground">Active OMI Subscriptions</CardTitle>
-              {subscriptionData.partial && <PartialDataBadge />}
-            </div>
-            <CreditCard className="h-5 w-5 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="space-y-3 pt-0 pb-6 px-6">
-            <div className="flex items-baseline gap-2">
-              <p className="text-3xl font-bold">{(subscriptionData.totalSubscriptions ?? 0).toLocaleString()}</p>
-              <p className="text-sm text-muted-foreground">Total</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-              <StatItem color="bg-purple-500" count={subscriptionData.monthly ?? 0} label="Monthly" />
-              <StatItem color="bg-indigo-500" count={subscriptionData.annual ?? 0} label="Annual" />
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="h-[180px]">
-          <CardContent className="p-6 flex items-center justify-center h-full">
-            <p className="text-muted-foreground">Subscription data unavailable.</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* --- App Subscriptions Card --- */}
-      {appSubscriptionError ? (
-        <ErrorCard title="App Subscriptions" error={appSubscriptionError} />
-      ) : tokenLoading || appSubscriptionLoading ? (
-        <LoadingCard />
-      ) : appSubscriptionData && appSubscriptionData.totalAppSubscriptions !== undefined ? (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base font-medium text-muted-foreground">App Subscriptions</CardTitle>
-            <Smartphone className="h-5 w-5 text-muted-foreground" />
-          </CardHeader>
-          <CardContent className="space-y-3 pt-0 pb-6 px-6">
-            <div className="flex items-baseline gap-2">
-              <p className="text-3xl font-bold">{(appSubscriptionData.totalAppSubscriptions ?? 0).toLocaleString()}</p>
-              <p className="text-sm text-muted-foreground">Total</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-              <StatItem color="bg-emerald-500" count={appSubscriptionData.uniqueCustomers ?? 0} label="Customers" />
-              <StatItem color="bg-teal-500" count={appSubscriptionData.uniquePriceIds ?? 0} label="Price Plans" />
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="h-[180px]">
-          <CardContent className="p-6 flex items-center justify-center h-full">
-            <p className="text-muted-foreground">App subscription data unavailable.</p>
           </CardContent>
         </Card>
       )}

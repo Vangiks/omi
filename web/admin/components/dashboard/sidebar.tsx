@@ -8,9 +8,7 @@ import {
   Package2,
   Users,
   LogOut,
-  CreditCard,
   CheckSquare,
-  DollarSign,
   Building2,
   MessageSquare,
   ChevronLeft,
@@ -18,7 +16,6 @@ import {
   Megaphone,
   Truck,
   Bell,
-  ShieldAlert,
   ThumbsDown,
   FlaskConical,
   Rocket,
@@ -78,16 +75,6 @@ export function DashboardSidebar() {
       icon: CheckSquare,
     },
     {
-      title: "Subscriptions",
-      href: "/dashboard/subscriptions",
-      icon: CreditCard,
-    },
-    {
-      title: "App Payouts",
-      href: "/dashboard/payouts",
-      icon: DollarSign,
-    },
-    {
       title: "Affiliates",
       href: "/dashboard/affiliates",
       icon: Handshake,
@@ -136,11 +123,6 @@ export function DashboardSidebar() {
       title: "Distributors",
       href: "/dashboard/distributors",
       icon: Truck,
-    },
-    {
-      title: "Fair Use",
-      href: "/dashboard/fair-use",
-      icon: ShieldAlert,
     },
     {
       title: "Negative Feedback",
