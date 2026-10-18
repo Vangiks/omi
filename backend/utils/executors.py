@@ -1,7 +1,7 @@
 """Dedicated ThreadPoolExecutors for Lane 2 of the 3-lane async architecture (issue #6369).
 
 Provides shared executors with strict separation (bulkhead pattern):
-- critical_executor: auth verification, rate limiting, hard restriction checks,
+- critical_executor: auth verification, rate limiting,
   small session/code cache reads. Must never starve — gates every request.
 - db_executor: Firestore CRUD and Redis data mutations. High volume, moderate latency.
 - llm_executor: persona generation, onboarding LLM, slow model-backed work. Bulkhead

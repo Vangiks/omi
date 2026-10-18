@@ -76,7 +76,6 @@ def _build_pipeline_fakes() -> dict:
         'utils.dream_vocabulary',
         'utils.sync.bridge',
         'utils.executors',
-        'utils.fair_use',
         'utils.http_client',
         'utils.metrics',
         'utils.observability.fallback',
@@ -128,7 +127,6 @@ def _prepare(pipeline, wav_paths):
     pipeline.bind_or_converge_sync_ledger_completion = MagicMock(return_value=None)
     pipeline._reprocess_merged_conversations = MagicMock()
     pipeline._load_sync_segment_context = _fake_load_segment_context
-    pipeline.FAIR_USE_ENABLED = False
 
     captured = []
 

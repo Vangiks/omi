@@ -161,7 +161,6 @@ def _patch_sync_pipeline(
     monkeypatch.setattr("utils.conversations.lifecycle.ingest_sync_conversation", fake_ingest_sync_conversation)
     monkeypatch.setattr(sync_pipeline, "_reprocess_conversation_after_update", fake_reprocess_after_update)
     monkeypatch.setattr(sync_router, "start_background_task", capture_background_task)
-    monkeypatch.setattr(sync_pipeline, "FAIR_USE_ENABLED", False)
     return pending_coroutines
 
 

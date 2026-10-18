@@ -739,7 +739,6 @@ _STUB_MODULES = [
     'database._client',
     'database.redis_db',
     'database.auth',
-    'database.fair_use',
     'database.users',
     'database.user_usage',
     'database.conversations',
@@ -760,7 +759,6 @@ _STUB_MODULES = [
     'utils.speaker_learning_jobs',
     'utils.stt.speaker_embedding',
     'utils.stt.owner_profile',
-    'utils.fair_use',
     'utils.subscription',
     'utils.cloud_tasks',
     'utils.sync.content_id',
@@ -906,19 +904,8 @@ class TestProcessSegmentReal:
         sys.modules['utils.stt.speaker_embedding'].compare_embeddings = MagicMock(return_value=1.0)
         sys.modules['utils.stt.speaker_embedding'].speaker_embedding_configured = lambda: True
         sys.modules['utils.stt.speaker_embedding'].SPEAKER_MATCH_THRESHOLD = 0.45
-        sys.modules['utils.fair_use'].FAIR_USE_ENABLED = False
-        sys.modules['utils.fair_use'].FAIR_USE_RESTRICT_DAILY_DG_MS = 0
-        sys.modules['utils.fair_use'].record_speech_ms = MagicMock()
-        sys.modules['utils.fair_use'].get_rolling_speech_ms = MagicMock()
-        sys.modules['utils.fair_use'].check_soft_caps = MagicMock()
-        sys.modules['utils.fair_use'].is_hard_restricted = MagicMock(return_value=False)
-        sys.modules['utils.fair_use'].get_hard_restriction_status = MagicMock(return_value=(False, None))
         sys.modules['python_multipart'].__version__ = '0.0.99'
         sys.modules['python_multipart.multipart'].parse_options_header = MagicMock(return_value={})
-        sys.modules['utils.fair_use'].trigger_classifier_if_needed = MagicMock()
-        sys.modules['utils.fair_use'].is_dg_budget_exhausted = MagicMock(return_value=False)
-        sys.modules['utils.fair_use'].get_enforcement_stage = MagicMock(return_value='off')
-        sys.modules['utils.fair_use'].record_dg_usage_ms = MagicMock()
         sys.modules['utils.conversations.process_conversation'].process_conversation = MagicMock()
 
         class _ConversationSource:

@@ -92,7 +92,6 @@ def _build_fakes() -> dict:
         'daily_summaries',
         'dev_api_key',
         'dream_store',
-        'fair_use',
         'folders',
         'goals',
         'helpers',

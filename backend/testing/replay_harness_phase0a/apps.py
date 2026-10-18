@@ -3,7 +3,7 @@
 FEASIBILITY-ONLY: The finalizer and every shortcut are declared fakes, labeled
 feasibility-only. This entrypoint preserves production PCM decoding, upload
 staging, task-protobuf construction, route authentication, Redis locks,
-job/ledger transitions, fair-use metering, status polling, and conversation
+job/ledger transitions, status polling, and conversation
 persistence. Only external/provider leaves are replaced.
 
 Capabilities installed (all feasibility-only unless noted):

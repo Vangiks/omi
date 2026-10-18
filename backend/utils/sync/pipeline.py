@@ -1,4 +1,4 @@
-"""Sync local-files pipeline: decode → VAD → fair-use → STT → conversation merge.
+"""Sync local-files pipeline: decode → VAD → STT → conversation merge.
 
 Extracted from routers/sync.py so the router stays thin and utils never imports routers.
 """
@@ -100,17 +100,6 @@ from utils.executors import (
     storage_executor,
     submit_with_context,
     sync_executor,
-)
-from utils.fair_use import (
-    FAIR_USE_ENABLED,
-    FAIR_USE_RESTRICT_DAILY_DG_MS,
-    check_soft_caps,
-    get_enforcement_stage,
-    get_rolling_speech_ms,
-    is_dg_budget_exhausted,
-    record_dg_usage_ms,
-    record_speech_ms,
-    trigger_classifier_if_needed,
 )
 from utils.http_client import _get_semaphore
 from utils.cloud_tasks import is_audio_merge_dispatch_enabled
@@ -230,7 +219,6 @@ _SYNC_FAILURE_REASON_CODES = {
     'sync_invalid_audio',
     'sync_persistence_failed',
     'sync_staged_audio_expired',
-    'sync_transcription_budget_exhausted',
     'sync_vad_failed',
     'sync_worker_stale',
 }
@@ -313,27 +301,6 @@ def _firestore_doc_kind(error: BaseException) -> str:
     if isinstance(stamped, str) and stamped in FIRESTORE_DOCUMENT_KINDS:
         return stamped
     return firestore_document_kind(error)
-
-
-async def _resolve_fair_use_soft_cap_plan(uid: str):
-    """Return the stored plan, falling back to the default soft-cap tier on read failure."""
-    try:
-        fair_use_sub = await run_blocking(db_executor, users_db.get_existing_user_subscription, uid)
-        return fair_use_sub.plan if fair_use_sub else None
-    except Exception as e:
-        logger.warning(
-            'event=sync_fair_use outcome=subscription_plan_fallback exception_type=%s',
-            _bounded_exception_type(e),
-        )
-        record_fallback(
-            component='other',
-            from_mode='subscription_plan',
-            to_mode='default_cap',
-            reason='policy',
-            outcome='degraded',
-            log=logger,
-        )
-        return None
 
 
 def _bounded_sync_failure_reason(reason: str | None) -> str:
@@ -1911,38 +1878,6 @@ async def _load_sync_segment_context(uid: str) -> tuple[bool, str | None, dict]:
     return private_cloud_sync_enabled, data_protection_level, person_embeddings_cache
 
 
-async def _record_restricted_sync_dg_usage(
-    *,
-    enabled: bool,
-    uid: str,
-    job_id: str,
-    content_id: str | None,
-    total_speech_seconds: float,
-) -> None:
-    """Meter post-STT Deepgram usage without complicating the coordinator flow."""
-    if not enabled:
-        return
-    try:
-        dg_ms = int(total_speech_seconds * 1000)
-        should_record_dg = bool(content_id) or await run_blocking(db_executor, try_mark_once, job_id, 'dg_ms')
-        if dg_ms > 0 and should_record_dg:
-            await run_blocking(
-                db_executor,
-                record_dg_usage_ms,
-                uid,
-                dg_ms,
-                idempotency_key=content_id,
-                raise_on_error=bool(content_id),
-            )
-    except Exception as error:
-        logger.error(
-            'event=sync_usage outcome=dg_record_failed exception_type=%s',
-            _bounded_exception_type(error),
-        )
-        if content_id:
-            raise
-
-
 async def _run_sync_vad_phase(
     wav_paths: list,
     segmented_paths: set,
@@ -2038,7 +1973,7 @@ async def _run_full_pipeline_background_async(  # pyright: ignore[reportGeneralT
     audio_end_seconds: Optional[float] = None,
     raw_capture_paths: Optional[list[str]] = None,
 ):
-    """Async coordinator for the full sync pipeline (decode → VAD → fair-use → STT → LLM).
+    """Async coordinator for the full sync pipeline (decode → VAD → STT → LLM).
 
     Inline dispatch (task_mode=False): runs as a fire-and-forget asyncio task,
     bounded by the per-instance pipeline semaphore; unexpected errors mark the
@@ -2401,7 +2336,7 @@ async def _run_full_pipeline_background_async(  # pyright: ignore[reportGeneralT
                 )
                 return
 
-            # --- Phase 3: Speech metrics & fair-use ---
+            # --- Phase 3: Speech metrics ---
             job_phase = 'usage'
             total_speech_seconds = await run_blocking(
                 sync_executor, lambda: sum(get_wav_duration(p) for p in segmented_paths)
@@ -2500,80 +2435,6 @@ async def _run_full_pipeline_background_async(  # pyright: ignore[reportGeneralT
                 OMI_SYNC_LANE_SPEECH_MS_TOTAL.labels(lane=sync_lane).inc(total_speech_ms)
             except Exception:
                 pass
-
-            if FAIR_USE_ENABLED and total_speech_ms > 0:
-                # Redis performs the content-key check and increment in one
-                # Lua transaction. Legacy jobs retain their job-scoped guard.
-                should_meter = bool(content_id) or await run_blocking(db_executor, try_mark_once, job_id, 'speech_ms')
-                if should_meter:
-                    # Use a distinct local for the metering source. Reassigning `source`
-                    # here clobbered the ConversationSource parameter, so later
-                    # conversation creation received the metering string
-                    # ('sync_fresh'/'sync_backfill'), which coerces to
-                    # ConversationSource.unknown — every v2-synced new conversation was
-                    # stored with source=unknown. Mirrors the v1 endpoint's meter_source
-                    # local.
-                    meter_source = 'sync_backfill' if sync_lane == SyncLane.BACKFILL.value else 'sync_fresh'
-                    await run_blocking(
-                        db_executor,
-                        record_speech_ms,
-                        uid,
-                        total_speech_ms,
-                        source=meter_source,
-                        idempotency_key=content_id,
-                        raise_on_error=bool(content_id),
-                    )
-                if sync_lane == SyncLane.FRESH.value:
-                    fair_use_plan = await _resolve_fair_use_soft_cap_plan(uid)
-                    speech_totals = await run_blocking(db_executor, get_rolling_speech_ms, uid)
-                    triggered_caps = await run_blocking(
-                        db_executor, check_soft_caps, uid, speech_totals=speech_totals, plan=fair_use_plan
-                    )
-                    if triggered_caps:
-                        logger.info(
-                            'event=sync_fair_use outcome=soft_cap_triggered cap_count=%d',
-                            len(triggered_caps),
-                        )
-                        try:
-                            start_background_task(
-                                trigger_classifier_if_needed(uid, triggered_caps),
-                                name=f'sync_job_fair_use_classifier:{uid}',
-                            )
-                        except Exception as e:
-                            logger.error(
-                                'event=sync_classifier outcome=schedule_failed exception_type=%s',
-                                _bounded_exception_type(e),
-                            )
-
-            # DG budget gate
-            fair_use_restrict_dg = False
-            if FAIR_USE_ENABLED and sync_lane == SyncLane.FRESH.value:
-                try:
-                    fair_use_stage = await run_blocking(db_executor, get_enforcement_stage, uid)
-                    if fair_use_stage == 'restrict' and FAIR_USE_RESTRICT_DAILY_DG_MS > 0:
-                        fair_use_restrict_dg = True
-                        if await run_blocking(db_executor, is_dg_budget_exhausted, uid):
-                            await run_blocking(storage_executor, _cleanup_files, list(segmented_paths))
-                            segmented_paths = set()
-                            await _finalize_sync_job_failure(
-                                job_id=job_id,
-                                uid=uid,
-                                content_id=content_id,
-                                error_code='sync_transcription_budget_exhausted',
-                                outcome=TranscriptionOutcome.UPSTREAM_ERROR,
-                                provider=sync_provider,
-                                model=sync_model,
-                                lane=sync_lane,
-                                run_lock_token=active_run_lock_token,
-                                attempt_ref=attempt_ref,
-                                failure_phase='usage',
-                            )
-                            return
-                except Exception as e:
-                    logger.error(
-                        'event=sync_fair_use outcome=check_failed exception_type=%s',
-                        _bounded_exception_type(e),
-                    )
 
             # --- Phase 4: Fetch prefs & embeddings ---
             job_phase = 'provider_select'
@@ -2904,16 +2765,6 @@ async def _run_full_pipeline_background_async(  # pyright: ignore[reportGeneralT
             schedule_person_voice_learning_retries(uid, response, _RESPONSE_FENCED_CONVERSATION_IDS)
 
             stage_timings['stt_llm_ms'] = int((time.monotonic() - t0) * 1000)
-
-            # Record DG usage after processing.
-            job_phase = 'usage'
-            await _record_restricted_sync_dg_usage(
-                enabled=fair_use_restrict_dg,
-                uid=uid,
-                job_id=job_id,
-                content_id=content_id,
-                total_speech_seconds=total_speech_seconds,
-            )
 
             # Build result
             failed_segments = len(segment_errors)

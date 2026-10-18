@@ -81,25 +81,6 @@ class TestV1RecordUsage:
         assert record_pos > 0, "record_usage must exist"
         assert record_pos > all_failed_pos, "record_usage must come after all-segments-failed check"
 
-    def test_record_usage_not_under_fair_use_guard(self):
-        """record_usage must NOT be nested inside fair_use_restrict_dg block."""
-        body = self._get_v1_body()
-        # Find the record_usage call
-        record_idx = body.find('record_usage,')
-        # Walk backwards to find the enclosing if-block
-        preceding = body[:record_idx]
-        lines = preceding.split('\n')
-        # The record_usage call should be at try/except level, not under if fair_use_restrict_dg
-        for line in reversed(lines):
-            stripped = line.strip()
-            if stripped.startswith('if fair_use_restrict_dg'):
-                # Check if we've left that block's scope
-                record_line = body[record_idx:].split('\n')[0]
-                record_indent = len(record_line) - len(record_line.lstrip())
-                if_indent = len(line) - len(line.lstrip())
-                assert record_indent <= if_indent, "record_usage must not be inside fair_use_restrict_dg block"
-                break
-
     def test_record_usage_wrapped_in_try_except(self):
         """record_usage must be protected by try/except."""
         body = self._get_v1_body()

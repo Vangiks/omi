@@ -164,8 +164,6 @@ class Harness:
                 "SYNC_TASKS_INVOKER_SA": LOCAL_INVOKER_SA,
                 "SYNC_TASKS_MAX_ATTEMPTS": "2",
                 "HTTP_SYNC_JOBS_RUN_TIMEOUT": "30",
-                "FAIR_USE_ENABLED": "true",
-                "MAX_DAILY_AUDIO_HOURS": "30",
                 "STT_PRERECORDED_MODEL": "parakeet",
                 "STT_SERVICE_MODELS": "parakeet",
                 "HOSTED_PARAKEET_API_URL": "http://127.0.0.1:1",

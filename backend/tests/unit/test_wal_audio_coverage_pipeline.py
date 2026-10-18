@@ -309,8 +309,6 @@ def _wire_real(
     monkeypatch.setattr(pipeline, '_record_sync_segment_failure_async', AsyncMock())
     monkeypatch.setattr(pipeline, '_reprocess_merged_conversations', lambda *a, **k: None)
     monkeypatch.setattr(pipeline, 'schedule_person_voice_learning_retries', lambda *a, **k: None)
-    monkeypatch.setattr(pipeline, '_record_restricted_sync_dg_usage', AsyncMock())
-    monkeypatch.setattr(pipeline, 'FAIR_USE_ENABLED', False)
     monkeypatch.setattr(pipeline, 'try_mark_once', lambda *a, **k: True)
     monkeypatch.setattr(pipeline, 'record_usage', lambda *a, **k: None)
     monkeypatch.setattr(pipeline, 'plan_segment_targets', lambda *a, **k: {})

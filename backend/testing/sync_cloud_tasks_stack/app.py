@@ -369,7 +369,7 @@ else:
         return completed
 
     # Replace only external/provider leaves.  The decoder, staging/download,
-    # task route, fair-use policy/metering, Redis locks, ledger, and lifecycle
+    # task route, Redis locks, ledger, and lifecycle
     # owner remain production code.
     sync_pipeline.vad_is_empty = _local_vad
     sync_pipeline.get_prerecorded_service = lambda _language='en': ('parakeet', 'en', 'parakeet')

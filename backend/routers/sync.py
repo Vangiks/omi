@@ -7,7 +7,6 @@ import shutil
 import threading
 import time
 import uuid as _uuid
-from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
@@ -16,7 +15,6 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from database import conversations as conversations_db
-from database import fair_use as fair_use_db
 from database import sync_dead_letters
 from database import sync_backfill_sequencer
 from database import users as users_db
@@ -75,25 +73,11 @@ from utils.cloud_tasks import (
     verify_cloud_tasks_oidc,
 )
 from utils.executors import (
-    critical_executor,
     db_executor,
     storage_executor,
     sync_executor,
     run_blocking,
     start_background_task,
-)
-from utils.fair_use import (
-    FAIR_USE_ENABLED,
-    FAIR_USE_RESTRICT_DAILY_DG_MS,
-    check_soft_caps,
-    get_enforcement_stage,
-    get_hard_restriction_status,
-    get_rolling_speech_ms,
-    is_daily_audio_ceiling_exceeded,
-    is_dg_budget_exhausted,
-    record_dg_usage_ms,
-    record_speech_ms,
-    trigger_classifier_if_needed,
 )
 from utils.observability.fallback import record_fallback
 from utils.multipart import MultipartMaxPartSizeRoute, SYNC_AUDIO_MAX_PART_SIZE, max_part_size
@@ -143,15 +127,6 @@ from utils.sync.pipeline import (
 )
 from utils.stt.outcomes import TranscriptionOutcome, sync_failure_from_exception
 from utils.speaker_learning_jobs import schedule_person_voice_learning_retries
-from utils.sync.rate_limit import (
-    FAIR_USE_RATE_LIMIT_CODE,
-    bounded_fair_use_retry_after,
-    build_sync_rate_limit_event,
-    emit_sync_rate_limit_event,
-    fair_use_rate_limit_headers,
-    retry_after_until_next_utc_day,
-    validated_correlation_id,
-)
 from utils.sync.backfill import (
     release_backfill_slot,
     reserve_backfill_speech,
@@ -165,7 +140,7 @@ from utils.sync.capture_manifest import (
     manifest_claims_match_paths,
     verify_capture_manifest,
 )
-from utils.sync.lanes import CaptureTimeTrust, SyncLane, classify_sync_lane
+from utils.sync.lanes import SyncLane, classify_sync_lane
 from utils.sync import backfill_cutover, legacy_fresh, stage as sync_stage, uid_sequencer
 from utils.sync.provenance import capture_matches_server_conversation as _capture_matches_server_conversation
 
@@ -282,83 +257,6 @@ async def create_sync_capture_manifest(
 class AudioDownloadPendingResponse(BaseModel):
     status: str
     poll_after_ms: int
-
-
-def _get_sync_rate_limit_telemetry_fields(uid: str) -> Dict[str, object]:
-    """Load rejection-only account metadata without affecting the response path on read failures."""
-    fields: Dict[str, object] = {
-        'subscription_plan': 'unknown',
-        'subscription_status': 'unknown',
-        'fair_use_stage': 'unknown',
-        'classifier_type': 'unknown',
-    }
-    try:
-        state = fair_use_db.get_fair_use_state(uid)
-        fields['fair_use_stage'] = state.get('stage')
-        fields['classifier_type'] = state.get('last_classifier_type')
-    except Exception as e:
-        logger.warning('sync_rate_limit_telemetry fair_use_state_read_failed error=%s', type(e).__name__)
-
-    try:
-        subscription = users_db.get_existing_user_subscription(uid)
-        if subscription is None:
-            # This is the same effective default as get_user_subscription(), without
-            # creating a Firestore record from a telemetry-only rejection path.
-            fields['subscription_plan'] = 'basic'
-            fields['subscription_status'] = 'active'
-        else:
-            fields['subscription_plan'] = subscription.plan
-            fields['subscription_status'] = subscription.status
-    except Exception as e:
-        logger.warning('sync_rate_limit_telemetry subscription_read_failed error=%s', type(e).__name__)
-
-    return fields
-
-
-async def _fair_use_restriction_response(
-    *,
-    uid: str,
-    retry_after: int | None,
-    client_platform: object,
-    device_hash: object,
-    app_version: object,
-    request_id: object = None,
-    cloud_trace_context: object = None,
-    base_headers: Optional[Dict[str, str]] = None,
-    extra_content: Optional[Dict[str, object]] = None,
-) -> JSONResponse:
-    telemetry = await run_blocking(db_executor, _get_sync_rate_limit_telemetry_fields, uid)
-    correlation_id = (
-        validated_correlation_id(request_id) or validated_correlation_id(cloud_trace_context) or str(_uuid.uuid4())
-    )
-    safe_retry_after = bounded_fair_use_retry_after(retry_after)
-    event = build_sync_rate_limit_event(
-        uid=uid,
-        device_hash=device_hash,
-        app_platform=client_platform,
-        app_version=app_version,
-        subscription_plan=telemetry['subscription_plan'],
-        subscription_status=telemetry['subscription_status'],
-        fair_use_stage=telemetry['fair_use_stage'],
-        classifier_type=telemetry['classifier_type'],
-        retry_after=safe_retry_after,
-        backend_revision=os.getenv('K_REVISION') or os.getenv('DD_VERSION'),
-        correlation_id=correlation_id,
-    )
-    try:
-        emit_sync_rate_limit_event(event)
-    except Exception as e:
-        logger.warning('sync_rate_limit_telemetry emit_failed error=%s', type(e).__name__)
-
-    headers = fair_use_rate_limit_headers(safe_retry_after, base_headers)
-    headers['X-Request-ID'] = correlation_id
-    content: Dict[str, object] = {
-        'code': FAIR_USE_RATE_LIMIT_CODE,
-        'detail': 'Account temporarily restricted due to fair-use policy',
-    }
-    if extra_content:
-        content.update(extra_content)
-    return JSONResponse(status_code=429, headers=headers, content=content)
 
 
 @router.post("/v1/sync/audio/{conversation_id}/precache", response_model=AudioPrecacheResponse, tags=['v1'])
@@ -562,36 +460,6 @@ async def sync_local_files(
             },
         )
 
-    # Pre-check gates (#5854)
-    hard_restricted, retry_after = await run_blocking(critical_executor, get_hard_restriction_status, uid)
-    if lane_decision.lane == SyncLane.FRESH and hard_restricted:
-        return await _fair_use_restriction_response(
-            uid=uid,
-            retry_after=retry_after,
-            client_platform=client_device_context.platform,
-            device_hash=client_device_context.device_hash,
-            app_version=client_device_context.app_version,
-            request_id=request.headers.get('x-request-id'),
-            cloud_trace_context=request.headers.get('x-cloud-trace-context'),
-            base_headers=_V1_DEPRECATION_HEADERS,
-        )
-
-    # Hard anti-abuse daily-audio ceiling (all plans): reject fresh sync once the user is
-    # already over the rolling-24h total. Set high enough that no legitimate user hits it;
-    # it exists to stop bulk-sync dumps. Backfill has its own separate pacing.
-    if lane_decision.lane == SyncLane.FRESH and await run_blocking(db_executor, is_daily_audio_ceiling_exceeded, uid):
-        logger.info(f'sync: daily audio ceiling reached uid={uid}')
-        return await _fair_use_restriction_response(
-            uid=uid,
-            retry_after=retry_after_until_next_utc_day(),
-            client_platform=client_device_context.platform,
-            device_hash=client_device_context.device_hash,
-            app_version=client_device_context.app_version,
-            request_id=request.headers.get('x-request-id'),
-            cloud_trace_context=request.headers.get('x-cloud-trace-context'),
-            base_headers=_V1_DEPRECATION_HEADERS,
-        )
-
     # Detect source from filenames
     source = detect_source_from_filenames([f.filename for f in files])
 
@@ -660,7 +528,7 @@ async def sync_local_files(
                 error_detail += f" (and {len(vad_errors) - 3} more)"
             raise HTTPException(status_code=500, detail=error_detail, headers=_V1_DEPRECATION_HEADERS)
 
-        # Fair-use speech tracking from raw VAD segments (#5854)
+        # Speech duration from raw VAD segments (#5854)
         # Compute duration from raw segments BEFORE merging (silence gaps not counted)
         total_speech_seconds = sum(get_wav_duration(p) for p in segmented_paths)
         total_speech_ms = int(total_speech_seconds * 1000)
@@ -690,57 +558,10 @@ async def sync_local_files(
                     },
                 )
 
-        if FAIR_USE_ENABLED and total_speech_ms > 0:
-            meter_source = 'sync_backfill' if lane_decision.lane == SyncLane.BACKFILL else 'sync_fresh'
-            await run_blocking(db_executor, record_speech_ms, uid, total_speech_ms, source=meter_source)
-            if lane_decision.lane == SyncLane.FRESH:
-                fair_use_sub = await run_blocking(db_executor, users_db.get_existing_user_subscription, uid)
-                fair_use_plan = fair_use_sub.plan if fair_use_sub else None
-                speech_totals = await run_blocking(db_executor, get_rolling_speech_ms, uid)
-                triggered_caps = check_soft_caps(uid, speech_totals=speech_totals, plan=fair_use_plan)
-                if triggered_caps:
-                    logger.info(f'sync: soft caps triggered for {uid}: {triggered_caps}')
-                    start_background_task(
-                        trigger_classifier_if_needed(uid, triggered_caps), name=f'sync_fair_use_classifier:{uid}'
-                    )
-
         response = {'updated_memories': set(), 'new_memories': set()}
         segment_errors = []
         segment_lock = threading.Lock()
         total_segments = len(segmented_paths)
-
-        # DG budget gate: throttle cloud STT for restrict-stage users (#6083)
-        # Check budget first; only record usage after successful processing.
-        dg_budget_blocked = False
-        fair_use_restrict_dg = False
-        if FAIR_USE_ENABLED and lane_decision.lane == SyncLane.FRESH:
-            try:
-                fair_use_stage = await run_blocking(db_executor, get_enforcement_stage, uid)
-                if fair_use_stage == 'restrict' and FAIR_USE_RESTRICT_DAILY_DG_MS > 0:
-                    fair_use_restrict_dg = True
-                    dg_budget_blocked = await run_blocking(db_executor, is_dg_budget_exhausted, uid)
-            except Exception as e:
-                logger.error(f'sync: DG budget check error for {uid}: {e}')
-
-        if dg_budget_blocked:
-            logger.info(f'sync: DG budget exhausted, skipping {total_segments} segments uid={uid}')
-            await run_blocking(sync_executor, _cleanup_files, list(segmented_paths))
-            return await _fair_use_restriction_response(
-                uid=uid,
-                retry_after=retry_after_until_next_utc_day(),
-                client_platform=client_device_context.platform,
-                device_hash=client_device_context.device_hash,
-                app_version=client_device_context.app_version,
-                request_id=request.headers.get('x-request-id'),
-                cloud_trace_context=request.headers.get('x-cloud-trace-context'),
-                base_headers=_V1_DEPRECATION_HEADERS,
-                extra_content={
-                    'new_memories': [],
-                    'updated_memories': [],
-                    'dg_budget_exhausted': True,
-                    'skipped_segments': total_segments,
-                },
-            )
 
         # Fetch user transcription preferences once before spawning threads
         transcription_prefs = await run_blocking(db_executor, users_db.get_user_transcription_preferences, uid)
@@ -795,15 +616,6 @@ async def sync_local_files(
         if private_cloud_sync_enabled:
             await run_blocking(sync_executor, _finalize_sync_audio_files, uid, response)
         schedule_person_voice_learning_retries(uid, response, _RESPONSE_FENCED_CONVERSATION_IDS)
-
-        # Record DG usage after successful processing (not before, to avoid charging on retries)
-        if fair_use_restrict_dg:
-            try:
-                dg_ms = int(total_speech_seconds * 1000)
-                if dg_ms > 0:
-                    await run_blocking(db_executor, record_dg_usage_ms, uid, dg_ms)
-            except Exception as e:
-                logger.error(f'sync: DG usage record error for {uid}: {e}')
 
         if archive_paths:
             await run_blocking(
@@ -899,6 +711,7 @@ async def sync_local_files_v2(
     x_app_platform: Optional[str] = Header(None, alias='X-App-Platform'),
     x_device_id_hash: Optional[str] = Header(None, alias='X-Device-Id-Hash'),
     x_app_version: Optional[str] = Header(None, alias='X-App-Version'),
+    # Unused since fair use left (#19); kept so the released request contract stays unchanged.
     x_request_id: Optional[str] = Header(None, alias='X-Request-ID'),
     x_cloud_trace_context: Optional[str] = Header(None, alias='X-Cloud-Trace-Context'),
     x_omi_sync_capture_manifest: Optional[str] = Header(None, alias='X-Omi-Sync-Capture-Manifest'),
@@ -967,25 +780,6 @@ async def sync_local_files_v2(
     )
     if lane_decision.reason == 'recent_legacy_capture':
         lane_decision = await run_blocking(db_executor, legacy_fresh.admit, uid, lane_decision, [f.size for f in files])
-    # Fresh is optional for LEGACY uploads: a live-only refusal must preserve
-    # their existing backfill acceptance. Resolve before recording the final lane.
-    fresh_refused = False
-    retry_after = None
-    if lane_decision.lane == SyncLane.FRESH:
-        hard_restricted, retry_after = await run_blocking(critical_executor, get_hard_restriction_status, uid)
-        refusal_reason = None
-        if hard_restricted:
-            refusal_reason = 'legacy_fresh_hard_restricted'
-        elif await run_blocking(db_executor, is_daily_audio_ceiling_exceeded, uid):
-            logger.info('sync_v2: daily audio ceiling reached uid=%s', uid)
-            refusal_reason = 'legacy_fresh_daily_ceiling'
-            retry_after = retry_after_until_next_utc_day()
-        if refusal_reason:
-            if lane_decision.trust == CaptureTimeTrust.LEGACY:
-                lane_decision = replace(lane_decision, lane=SyncLane.BACKFILL, reason=refusal_reason)
-            else:
-                fresh_refused = True
-
     try:
         OMI_SYNC_LANE_ADMISSIONS_TOTAL.labels(
             lane=lane_decision.lane.value, trust=lane_decision.trust.value, reason=lane_decision.reason
@@ -1027,17 +821,6 @@ async def sync_local_files_v2(
         )
     except Exception:
         pass
-
-    if fresh_refused:
-        return await _fair_use_restriction_response(
-            uid=uid,
-            retry_after=retry_after,
-            client_platform=client_device_context.platform,
-            device_hash=client_device_context.device_hash,
-            app_version=client_device_context.app_version,
-            request_id=x_request_id if isinstance(x_request_id, str) else None,
-            cloud_trace_context=x_cloud_trace_context if isinstance(x_cloud_trace_context, str) else None,
-        )
 
     # Detect source
     source = detect_source_from_filenames([f.filename for f in files])
