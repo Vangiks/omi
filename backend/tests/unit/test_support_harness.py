@@ -12,7 +12,6 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from models.support import SupportLookupResponse, SupportTraceResponse, SupportTraceRow
-from config.plan_catalog import FULL_ACCESS_PLAN
 from scripts import export_openapi
 from utils.support_trace import project_support_trace
 
@@ -216,7 +215,7 @@ def test_lookup_allowlist_and_hashed_audit(harness):
     data = response.json()
     assert set(data) == set(SupportLookupResponse.model_fields)
     assert data['email'] == EMAIL and data['uid'] == 'target-customer'
-    assert data['plan'] == FULL_ACCESS_PLAN.value and data['transcription_seconds_used'] == 125
+    assert 'plan' not in data and data['transcription_seconds_used'] == 125
     assert data['transcription_seconds_limit'] is None and data['transcription_seconds_remaining'] is None
     for forbidden in ('phone', 'transcript', 'summary', 'audio_url', 'memories', 'stripe_subscription_id', 'events'):
         assert forbidden not in data
@@ -247,7 +246,6 @@ def test_subscription_reader_does_not_create_or_migrate(harness, stored):
     harness.store.subscription = stored
     response = lookup(harness)
     assert response.status_code == 200, response.text
-    assert response.json()['plan'] == FULL_ACCESS_PLAN.value
     assert len(harness.store.writes) == 1
     assert harness.store.subscription == stored
 

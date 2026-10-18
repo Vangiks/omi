@@ -59,7 +59,6 @@ def lookup_support_account(email: str = Query(...), caller_uid: str = Depends(ge
         response = SupportLookupResponse(
             uid=uid,
             email=email,
-            plan=subscription.plan,
             last_active_at=activity.get('last_active_at'),
             last_active_platform=activity.get('last_active_platform'),
             transcription_seconds_used=used,

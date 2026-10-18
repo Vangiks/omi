@@ -64,7 +64,6 @@ def test_refresh_sends_refresh_grant_and_does_not_print_token(monkeypatch, capsy
             {
                 'email': 'customer@example.com',
                 'uid': 'target',
-                'plan': 'basic',
                 'fair_use_stage': 'none',
                 'transcription_seconds_used': 0,
             }
@@ -86,7 +85,7 @@ def test_refresh_sends_refresh_grant_and_does_not_print_token(monkeypatch, capsy
     assert 'refresh-secret' in captured['body']
     assert 'Bearer' not in out
     assert 'refresh-secret' not in out
-    assert 'plan: basic' in out
+    assert 'plan:' not in out
     assert any('securetoken.googleapis.com' in url for url in captured['urls'])
     assert any('/v1/support/lookup' in url for url in captured['urls'])
 

@@ -138,7 +138,6 @@ def print_lookup(payload: dict[str, Any]) -> None:
     fields = (
         'email',
         'uid',
-        'plan',
         'last_active_at',
         'last_active_platform',
         'transcription_seconds_used',

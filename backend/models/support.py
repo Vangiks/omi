@@ -13,7 +13,6 @@ class SupportLookupResponse(BaseModel):
 
     uid: str
     email: str
-    plan: str
     last_active_at: datetime | None = None
     last_active_platform: str | None = None
     transcription_seconds_used: float
