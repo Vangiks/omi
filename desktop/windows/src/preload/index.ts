@@ -167,7 +167,7 @@ const omi: OmiBridgeApi = {
   setChatScreenshotSharing: (enabled: boolean) =>
     ipcRenderer.invoke('chat:setScreenshotSharing', enabled),
   openCheckout: (url: string) => ipcRenderer.invoke('billing:openCheckout', url),
-  openExternalUrl: (url: string) => ipcRenderer.invoke('billing:openExternal', url),
+  openExternalUrl: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
   checkAppSetup: (args: { url: string; uid: string }) =>
     ipcRenderer.invoke('apps:checkSetup', args),
   memoryImportParse: (dump: string) => ipcRenderer.invoke('memoryImport:parse', dump),
