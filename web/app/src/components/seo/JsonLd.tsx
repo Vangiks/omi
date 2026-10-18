@@ -48,7 +48,6 @@ interface SoftwareAppJsonLdProps {
   category: string;
   ratingValue?: number;
   ratingCount?: number;
-  price?: number;
   url: string;
 }
 
@@ -60,7 +59,6 @@ export function SoftwareAppJsonLd({
   category,
   ratingValue,
   ratingCount,
-  price,
   url,
 }: SoftwareAppJsonLdProps) {
   const data: Record<string, unknown> = {
@@ -77,7 +75,7 @@ export function SoftwareAppJsonLd({
     },
     offers: {
       '@type': 'Offer',
-      price: price || 0,
+      price: 0,
       priceCurrency: 'USD',
     },
     url: `https://omi.me${url}`,

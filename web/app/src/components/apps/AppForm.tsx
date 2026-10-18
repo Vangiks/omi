@@ -194,7 +194,7 @@ export function AppForm({ mode, app }: AppFormProps) {
   // Notification scopes
   const [selectedScopes, setSelectedScopes] = useState<string[]>([]);
 
-  // Privacy & Payment
+  // Privacy
   const [isPrivate, setIsPrivate] = useState(true);
 
   // Source code URL
@@ -1017,7 +1017,7 @@ export function AppForm({ mode, app }: AppFormProps) {
             </section>
           )}
 
-          {/* Privacy & Payment Section */}
+          {/* Privacy Section */}
           <section className={cn(sectionCardClass, 'space-y-4')}>
             <h2 className="text-lg font-medium text-text-primary">Settings</h2>
 

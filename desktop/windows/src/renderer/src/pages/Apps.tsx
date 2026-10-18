@@ -58,8 +58,9 @@ const APPS_SURFACE = 'apps'
 // Surfaces the backend `detail` on an enable/disable failure ONLY when it is
 // user-appropriate and actionable — currently just the disabled-app "…currently
 // unavailable…" 400. The other backend details are deliberately omitted: the
-// private-app 403 "You are not authorized…" is non-actionable and the external-app 400 "App setup is not completed"
-// is handled by the dedicated setup flow, not this quick toggle. macOS swallows ALL
+// private-app 403 "You are not authorized…" is non-actionable and the external-app
+// 400 "App setup is not completed" is handled by the dedicated setup flow, not this
+// quick toggle. macOS swallows ALL
 // of these (its bound `errorMessage` has zero read sites); Windows surfaces the
 // failure via a toast, and shows the raw detail only where it helps the user.
 function userSafeDetail(e: unknown): string | undefined {

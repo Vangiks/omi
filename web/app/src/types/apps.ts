@@ -197,11 +197,8 @@ export interface AppFormData {
   // Notification scopes (conditional)
   notificationScopes?: string[];
 
-  // Privacy & Payment
+  // Privacy
   isPrivate: boolean;
-  isPaid: boolean;
-  price?: number;
-  paymentPlan?: string;
 }
 
 export interface CreateAppRequest {
