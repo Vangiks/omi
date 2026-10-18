@@ -1,18 +1,15 @@
 import os
-from typing import Any, Dict, Optional, cast
+from typing import Any, Dict, Optional
 from urllib.parse import urljoin
 
-import pycountry
 import stripe
 
-from database import redis_db
 import logging
 
 logger = logging.getLogger(__name__)
 
 stripe.api_key = os.getenv('STRIPE_API_KEY')
 endpoint_secret = os.getenv('STRIPE_WEBHOOK_SECRET')
-connect_secret = os.getenv('STRIPE_CONNECT_WEBHOOK_SECRET')
 base_url = os.getenv('BASE_API_URL')
 if base_url and not base_url.startswith(('http://', 'https://')):
     base_url = 'https://' + base_url
@@ -179,53 +176,6 @@ def find_billable_app_subscription_ids(uid: str) -> list[str]:
     ]
 
 
-def find_app_subscription_by_customer_id(
-    customer_id: str, app_id: str, uid: str, status_filter: str = 'all'
-) -> Optional[Dict[str, Any]]:
-    """Find app subscription using customer ID (fast path)."""
-    try:
-        subscriptions = stripe.Subscription.list(customer=customer_id, status=cast(Any, status_filter), limit=5)
-        latest_subscription = None
-
-        for sub in subscriptions.data:
-            sub_dict = sub.to_dict()  # type: ignore[reportDeprecated, reportUnknownVariableType]  # legacy stripe to_dict
-            if sub_dict.get('metadata', {}).get('app_id') == app_id and sub_dict.get('metadata', {}).get('uid') == uid:
-                if latest_subscription is None or sub_dict.get('created', 0) > latest_subscription.get('created', 0):
-                    latest_subscription = sub_dict
-
-        return latest_subscription
-    except Exception as e:
-        logger.error(f"Error finding app subscription by customer ID {customer_id}: {e}")
-        return None
-
-
-def find_app_subscription_by_metadata(app_id: str, uid: str, status_filter: str = 'all') -> Optional[Dict[str, Any]]:
-    """Find app subscription by searching metadata (slow path)."""
-    try:
-        subscriptions = stripe.Subscription.list(limit=100, status=cast(Any, status_filter))
-        latest_subscription = None
-
-        for sub in subscriptions.data:
-            sub_dict = sub.to_dict()  # type: ignore[reportDeprecated, reportUnknownVariableType]  # legacy stripe to_dict
-            if sub_dict.get('metadata', {}).get('app_id') == app_id and sub_dict.get('metadata', {}).get('uid') == uid:
-                if latest_subscription is None or sub_dict.get('created', 0) > latest_subscription.get('created', 0):
-                    latest_subscription = sub_dict
-
-        return latest_subscription
-    except Exception as e:
-        logger.error(f"Error finding app subscription by metadata: {e}")
-        return None
-
-
-def modify_subscription(subscription_id: str, **kwargs: Any) -> Any:
-    """Modify a Stripe subscription with given parameters."""
-    try:
-        return stripe.Subscription.modify(subscription_id, **kwargs)
-    except Exception as e:
-        logger.error(f"Error modifying subscription {subscription_id}: {e}")
-        return None
-
-
 def create_app_payment_link(price_id: str, app_id: str, stripe_acc_id: str):
     """Create a payment link for the specified price."""
     payment_link = stripe.PaymentLink.create(
@@ -247,86 +197,3 @@ def create_app_payment_link(price_id: str, app_id: str, stripe_acc_id: str):
 def parse_event(payload: Any, sig_header: Any) -> Any:
     """Parse the Stripe event."""
     return stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)  # type: ignore[reportUnknownMemberType]  # stripe Webhook.construct_event partially typed
-
-
-def parse_connect_event(payload: Any, sig_header: Any) -> Any:
-    """Parse the Stripe Connect event."""
-    return stripe.Webhook.construct_event(payload, sig_header, connect_secret)  # type: ignore[reportUnknownMemberType]  # stripe Webhook.construct_event partially typed
-
-
-def create_connect_account(uid: str, country: str):
-    account = stripe.Account.create(
-        controller={
-            "stripe_dashboard": {
-                "type": "express",
-            },
-            "fees": {"payer": "application"},
-            "losses": {"payments": "application"},
-        },
-        country=country,
-        tos_acceptance={"service_agreement": "full" if country == "US" else "recipient"},
-        capabilities={"transfers": {"requested": True}},
-        metadata={
-            "uid": uid,
-        },
-        settings={
-            "payouts": {
-                "schedule": {"interval": "monthly", "monthly_anchor": 2},
-            },
-        },
-    )
-
-    # Generate the onboarding URL with dynamic return and refresh URLs
-    account_links = stripe.AccountLink.create(
-        account=account.id,
-        refresh_url=urljoin(base_url, f"/v1/stripe/refresh/{account.id}"),  # type: ignore[reportArgumentType]  # base_url validated at runtime
-        return_url=urljoin(base_url, f"/v1/stripe/return/{account.id}"),  # type: ignore[reportArgumentType]  # base_url validated at runtime
-        type="account_onboarding",
-    )
-
-    return {"account_id": account.id, "url": account_links.url}
-
-
-def refresh_connect_account_link(account_id: str):
-    account_link = stripe.AccountLink.create(
-        account=account_id,
-        refresh_url=urljoin(base_url, f"/v1/stripe/refresh/{account_id}"),  # type: ignore[reportArgumentType]  # base_url validated at runtime
-        return_url=urljoin(base_url, f"/v1/stripe/return/{account_id}"),  # type: ignore[reportArgumentType]  # base_url validated at runtime
-        type="account_onboarding",
-    )
-    return {"account_id": account_id, "url": account_link.url}
-
-
-def is_onboarding_complete(account_id: str):
-    account = stripe.Account.retrieve(account_id)  # type: ignore[reportUnknownMemberType]  # stripe Account.retrieve partially typed
-    return account.charges_enabled and account.payouts_enabled and account.details_submitted
-
-
-# Stripe does not have any official API to get a list of supported countries for connect
-def get_supported_countries():
-    if countries := redis_db.get_generic_cache('stripe_supported_countries'):
-        return countries
-    country_codes: list[str] = []
-    starting_after: str | None = None
-    while True:
-        kwargs: Dict[str, Any] = {"limit": 100}
-        if starting_after:
-            kwargs["starting_after"] = starting_after
-        page = stripe.CountrySpec.list(**kwargs)
-        country_codes.extend(c['id'] for c in page.data)
-        if not page.has_more or not page.data:
-            break
-        starting_after = page.data[-1]['id']
-    # Gibraltar is not supported by us since it does not allow transfers
-    country_codes = [c for c in country_codes if c != "GI"]
-    if "US" not in country_codes:
-        country_codes.append("US")
-    country_codes = sorted(set(country_codes))
-    countries = [
-        {"id": code, "name": country.name}
-        for code in country_codes
-        if (country := pycountry.countries.get(alpha_2=code)) is not None
-    ]
-    # cache in redis for 7 days since it does not change that often. Maybe cache it for 30 days?
-    redis_db.set_generic_cache('stripe_supported_countries', countries, 604800)
-    return countries

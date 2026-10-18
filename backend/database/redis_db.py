@@ -335,25 +335,8 @@ def get_specific_user_review(app_id: str, uid: str) -> Dict[str, Any]:
     return cast(Dict[str, Any], loaded.get(uid, {}))
 
 
-def set_user_paid_app(app_id: str, uid: str, ttl: int) -> None:
-    r.set(f'users:{uid}:paid_apps:{app_id}', app_id, ex=ttl)
-
-
 def get_user_paid_app(app_id: str, uid: str) -> Optional[str]:
     val = r.get(f'users:{uid}:paid_apps:{app_id}')
-    if not val:
-        return None
-    return val.decode()
-
-
-def set_user_app_subscription_customer_id(app_id: str, uid: str, customer_id: str) -> None:
-    """Store the Stripe customer ID for a user's app subscription"""
-    r.set(f'users:{uid}:app_subs:{app_id}:customer_id', customer_id)
-
-
-def get_user_app_subscription_customer_id(app_id: str, uid: str) -> Optional[str]:
-    """Get the Stripe customer ID for a user's app subscription"""
-    val = r.get(f'users:{uid}:app_subs:{app_id}:customer_id')
     if not val:
         return None
     return val.decode()

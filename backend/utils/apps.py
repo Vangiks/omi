@@ -61,12 +61,9 @@ from database.redis_db import (
     set_app_money_made_amount_cache,
     get_app_money_made_amount_cache,
     set_app_usage_count_cache,
-    set_user_paid_app,
     get_user_paid_app,
     delete_app_cache_by_id,
     is_username_taken,
-    get_user_app_subscription_customer_id,
-    set_user_app_subscription_customer_id,
     can_update_persona,
     set_persona_update_timestamp,
 )
@@ -741,58 +738,6 @@ def is_permit_payment_plan_get(uid: str):
     if is_marketplace_reviewer(uid) or uid in MarketplaceAppReviewUIDs:
         return False
     return True
-
-
-_PAID_APP_RENEWAL_GRACE_SECONDS = 60 * 60 * 24
-
-
-def paid_app(app_id: str, uid: str, current_period_end: Optional[int] = None):
-    expired_seconds = 60 * 60 * 24 * 30  # 30 days
-    if current_period_end:
-        period_remaining = current_period_end - int(datetime.now(timezone.utc).timestamp())
-        expired_seconds = max(period_remaining, 0) + _PAID_APP_RENEWAL_GRACE_SECONDS
-    set_user_paid_app(app_id, uid, expired_seconds)
-
-
-def set_user_app_sub_customer_id(app_id: str, uid: str, customer_id: str):
-    set_user_app_subscription_customer_id(app_id, uid, customer_id)
-
-
-def find_app_subscription(app_id: str, uid: str, status_filter: str = 'all') -> Dict[str, Any] | None:
-    """
-    Find a user's subscription for a specific app using cached customer ID or metadata search.
-
-    Args:
-        app_id: The app ID to search for
-        uid: The user ID
-        status_filter: Stripe subscription status filter ('all', 'active', etc.)
-
-    Returns:
-        Dictionary representation of the subscription or None if not found
-    """
-    try:
-        cached_customer_id = get_user_app_subscription_customer_id(app_id, uid)
-        latest_subscription = None
-
-        if cached_customer_id:
-            latest_subscription = stripe.find_app_subscription_by_customer_id(
-                cached_customer_id, app_id, uid, status_filter
-            )
-
-            if latest_subscription is None:
-                cached_customer_id = None
-
-        if not latest_subscription and not cached_customer_id:
-            latest_subscription = stripe.find_app_subscription_by_metadata(app_id, uid, status_filter)
-
-            # Cache the customer ID for future lookups
-            if latest_subscription and latest_subscription.get('customer'):
-                set_user_app_subscription_customer_id(app_id, uid, str(latest_subscription.get('customer')))
-
-        return latest_subscription
-    except Exception as e:
-        logger.error(f"Error finding app subscription: {e}")
-        return None
 
 
 def is_audio_bytes_app_enabled(uid: str):

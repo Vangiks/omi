@@ -639,13 +639,12 @@ def test_missing_profile_currently_does_not_block_subscription_mutation(lane):
 
 
 @pytest.mark.parametrize('kind', ['invoice.paid', 'invoice.payment_succeeded'])
-def test_invoice_only_renews_creator_app(lane, monkeypatch, kind):
+def test_invoice_has_no_effect_without_paid_apps(lane, kind):
     lane.stripe_obj = event(EVENTS[1], 'active')['data']['object']
     lane.stripe_obj['metadata']['app_id'] = 'creator-fixture'
     lane.event = {'type': kind, 'data': {'object': {'subscription': 'sub-current'}}}
-    monkeypatch.setattr(payment, 'paid_app', lambda *args: lane.calls.append(('paid_app', args)))
     run(lane)
-    assert [name for name, _ in lane.calls] == ['paid_app']
+    assert lane.calls == []
     assert lane.current is None
 
 

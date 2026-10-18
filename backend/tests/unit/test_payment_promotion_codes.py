@@ -301,15 +301,9 @@ def _setup_payment_module(include_client: bool = True) -> Any:
     stripe_utils_mod = sys.modules["utils.stripe"]
     stripe_utils_mod.base_url = "http://test/"
     stripe_utils_mod.create_subscription_checkout_session = MagicMock()
-    stripe_utils_mod.create_connect_account = MagicMock()
-    stripe_utils_mod.refresh_connect_account_link = MagicMock()
-    stripe_utils_mod.is_onboarding_complete = MagicMock()
 
     apps_mod = sys.modules["utils.apps"]
-    apps_mod.find_app_subscription = MagicMock()
     apps_mod.get_is_user_paid_app = MagicMock()
-    apps_mod.paid_app = MagicMock()
-    apps_mod.set_user_app_sub_customer_id = MagicMock()
 
     endpoints_mod = sys.modules["utils.other.endpoints"]
     endpoints_mod.get_current_user_uid = lambda: "test-uid"
@@ -337,13 +331,7 @@ def _setup_payment_module(include_client: bool = True) -> Any:
     models_mod.PlanLimits = MagicMock()
 
     users_db_mod = sys.modules["database.users"]
-    users_db_mod.get_stripe_connect_account_id = MagicMock()
     users_db_mod.get_user_profile = MagicMock(return_value={})
-    users_db_mod.set_stripe_connect_account_id = MagicMock()
-    users_db_mod.set_paypal_payment_details = MagicMock()
-    users_db_mod.get_default_payment_method = MagicMock()
-    users_db_mod.set_default_payment_method = MagicMock()
-    users_db_mod.get_paypal_payment_details = MagicMock()
 
     # Force re-import of payment router
     if "routers.payment" in sys.modules:

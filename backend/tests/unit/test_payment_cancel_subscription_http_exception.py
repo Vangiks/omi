@@ -1,17 +1,15 @@
-"""Subscription cancellation endpoints must re-raise HTTPException rather than masking as 500.
+"""The subscription cancellation endpoint must re-raise HTTPException rather than masking as 500.
 
-In routers/payment.py, cancel_app_subscription and cancel_subscription_endpoint explicitly raise
-HTTPException with specific status codes (e.g. 404 for missing app subscription or invalid data,
-and 400 for missing customer ID). Because HTTPException inherits from Exception, a generic
+In routers/payment.py, cancel_subscription_endpoint explicitly raises HTTPException with specific
+status codes (e.g. 400 for missing customer ID). Because HTTPException inherits from Exception, a generic
 `except Exception as e:` catch-all without a preceding `except HTTPException: raise` swalllows
 these intended client errors and masks them as internal server errors (500), breaking the API
 contract and polluting server logs with false-positive alerts.
 
 These tests verify that:
-1. Expected HTTPException client errors (404, 400) propagate cleanly to the caller.
-2. The source structure in routers/payment.py includes explicit `except HTTPException: raise`
-   guards before generic `except Exception` blocks in both cancellation endpoints, matching
-   upgrade_subscription_endpoint.
+1. Expected HTTPException client errors (400) propagate cleanly to the caller.
+2. The source structure in routers/payment.py includes an explicit `except HTTPException: raise`
+   guard before the generic `except Exception` block, matching upgrade_subscription_endpoint.
 """
 
 import os
@@ -33,22 +31,6 @@ def _source() -> str:
     return PAYMENT_SOURCE.read_text(encoding='utf-8')
 
 
-def test_cancel_app_subscription_reraises_404_when_subscription_not_found():
-    with patch('routers.payment.find_app_subscription', return_value=None):
-        with pytest.raises(HTTPException) as exc_info:
-            payment.cancel_app_subscription('test_app_id', 'test_uid')
-        assert exc_info.value.status_code == 404
-        assert exc_info.value.detail == 'Active subscription not found for this app'
-
-
-def test_cancel_app_subscription_reraises_404_when_subscription_data_invalid():
-    with patch('routers.payment.find_app_subscription', return_value={'id': None}):
-        with pytest.raises(HTTPException) as exc_info:
-            payment.cancel_app_subscription('test_app_id', 'test_uid')
-        assert exc_info.value.status_code == 404
-        assert exc_info.value.detail == 'Invalid subscription data'
-
-
 def test_cancel_subscription_endpoint_reraises_400_when_customer_id_missing():
     mock_sub = MagicMock()
     mock_sub.stripe_subscription_id = 'sub_123'
@@ -61,18 +43,6 @@ def test_cancel_subscription_endpoint_reraises_400_when_customer_id_missing():
             payment.cancel_subscription_endpoint(payment.CancelSubscriptionRequest(), uid='test_uid')
         assert exc_info.value.status_code == 400
         assert exc_info.value.detail == 'No customer ID found for subscription.'
-
-
-def test_cancel_app_subscription_source_has_http_exception_reraise():
-    source = _source()
-    start = source.index('def cancel_app_subscription(')
-    end = source.index('\n@router.', start + 1) if '\n@router.' in source[start + 1 :] else len(source)
-    func_source = source[start:end]
-
-    assert 'except HTTPException:\n        raise' in func_source
-    http_pos = func_source.index('except HTTPException:')
-    generic_pos = func_source.index('except Exception as e:')
-    assert http_pos < generic_pos, 'except HTTPException must precede generic except Exception'
 
 
 def test_cancel_subscription_endpoint_source_has_http_exception_reraise():

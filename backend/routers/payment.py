@@ -47,21 +47,11 @@ from utils.subscription import (
 )
 from utils.observability.fallback import record_fallback
 from utils.observability.subscription_events import record_subscription_event
-from database.users import (
-    get_stripe_connect_account_id,
-    set_stripe_connect_account_id,
-    set_paypal_payment_details,
-    get_default_payment_method,
-    set_default_payment_method,
-    get_paypal_payment_details,
-    get_user_profile,
-)
 from utils import stripe as stripe_utils
-from utils.apps import find_app_subscription, paid_app, set_user_app_sub_customer_id
 from utils.other import endpoints as auth
 from fastapi.responses import HTMLResponse
 
-from utils.stripe import base_url, create_connect_account, refresh_connect_account_link, is_onboarding_complete
+from utils.stripe import base_url
 from utils import subscription as subscription_utils
 from utils.overage import (
     OVERAGE_EXPLAINER_TITLE,
@@ -144,26 +134,6 @@ class PaymentSubscriptionResponse(BaseModel):
     deprecation_message: Optional[str] = None
 
 
-class AppSubscriptionDetails(BaseModel):
-    id: Optional[str] = None
-    status: Optional[str] = None
-    current_period_end: Optional[int] = None
-    cancel_at_period_end: Optional[bool] = None
-    price_id: Optional[str] = None
-    customer_id: Optional[str] = None
-
-
-class AppSubscriptionResponse(BaseModel):
-    subscription: Optional[AppSubscriptionDetails] = None
-
-
-class AppSubscriptionCancelResponse(BaseModel):
-    status: str
-    message: str
-    cancel_at_period_end: Optional[bool] = None
-    current_period_end: Optional[int] = None
-
-
 class PaymentUpgradeSubscriptionResponse(BaseModel):
     status: str
     message: str
@@ -174,40 +144,6 @@ class PaymentUpgradeSubscriptionResponse(BaseModel):
 
 class CustomerPortalSessionResponse(BaseModel):
     url: str
-
-
-class StripeConnectAccountResponse(BaseModel):
-    account_id: str
-    url: str
-
-
-class StripeOnboardingStatusResponse(BaseModel):
-    onboarding_complete: bool
-
-
-class StripeSupportedCountryResponse(BaseModel):
-    id: str
-    name: str
-
-
-class PayPalPaymentDetailsResponse(BaseModel):
-    email: str
-    paypalme_url: str
-
-
-class SavePayPalPaymentDetailsRequest(BaseModel):
-    email: str
-    paypalme_url: str
-
-
-class PaymentMethodStatusResponse(BaseModel):
-    stripe: str
-    paypal: str
-    default: Optional[str] = None
-
-
-class SetDefaultPaymentMethodRequest(BaseModel):
-    method: str
 
 
 class PricingOption(BaseModel):
@@ -948,33 +884,8 @@ async def _handle_stripe_event(event: dict, background_tasks: BackgroundTasks | 
         session = event['data']['object']
         client_reference_id = session.get('client_reference_id')
 
-        # App payments for creators
-        if session.get('metadata', {}).get('app_id'):
-            logger.info(f"Payment completed for session: {session['id']}")
-            app_id = session['metadata']['app_id']
-            uid = session['client_reference_id']
-            if not uid or len(uid) < 4:
-                raise HTTPException(status_code=400, detail="Invalid client")
-            uid = uid[4:]
-
-            current_period_end = None
-            if session.get("subscription"):
-                subscription_id = session["subscription"]
-                subscription = await run_blocking(
-                    stripe_executor,
-                    stripe_utils.modify_subscription,
-                    subscription_id,
-                    metadata={"uid": uid, "app_id": app_id},
-                )
-                current_period_end = subscription.get('current_period_end') if subscription else None
-                # Store the customer ID for app subscription so that it is easy to cancel the subscription
-                customer_id = session.get("customer")
-                if customer_id:
-                    await run_blocking(db_executor, set_user_app_sub_customer_id, app_id, uid, customer_id)
-            await run_blocking(db_executor, paid_app, app_id, uid, current_period_end)
-
         # Regular user subscription - check for sub_type metadata or client_reference_id
-        elif client_reference_id or session.get('metadata', {}).get('sub_type'):
+        if client_reference_id or session.get('metadata', {}).get('sub_type'):
             # Get uid from client_reference_id or fallback to metadata
             uid = client_reference_id or session.get('metadata', {}).get('uid')
 
@@ -1353,223 +1264,7 @@ async def _handle_stripe_event(event: dict, background_tasks: BackgroundTasks | 
                     if webhook_ledger_enabled():
                         raise HTTPException(503, "Subscription schedule update must be retried") from None
 
-    if event['type'] in ['invoice.paid', 'invoice.payment_succeeded']:
-        invoice = event['data']['object']
-        subscription_id = invoice.get('subscription')
-        if subscription_id:
-            try:
-                subscription = await run_blocking(
-                    stripe_executor, lambda: stripe.Subscription.retrieve(subscription_id)
-                )
-                metadata = subscription.get('metadata') or {}
-                app_id = metadata.get('app_id')
-                uid = metadata.get('uid')
-                if app_id and uid:
-                    await run_blocking(db_executor, paid_app, app_id, uid, subscription.get('current_period_end'))
-                    logger.info(f"Paid app entitlement renewed for user {uid}. App: {app_id}")
-            except Exception as e:
-                logger.error(f"Error renewing paid app entitlement for subscription {subscription_id}: {e}")
-
     return {"status": "success"}
-
-
-@router.post('/v1/stripe/connect/webhook', tags=['v1', 'stripe', 'webhook'], response_model=PaymentMutationResponse)
-async def stripe_connect_webhook(request: Request, stripe_signature: str = Header(None)):
-    payload = await request.body()
-
-    try:
-        event = stripe_utils.parse_connect_event(payload, stripe_signature)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail="Invalid payload")
-    except stripe.error.SignatureVerificationError as e:
-        raise HTTPException(status_code=400, detail="Invalid signature")
-
-    if event['type'] == 'account.updated':
-        # this event occurs for the connected account, check if the account is fully onboarded to set default method
-        account = event['data']['object']
-        if account['charges_enabled'] and account['details_submitted']:
-            # account is fully onboarded
-            uid = (account.get('metadata') or {}).get('uid')
-            if uid and await run_blocking(db_executor, get_default_payment_method, uid) is None:
-                await run_blocking(db_executor, set_default_payment_method, uid, 'stripe')
-
-    # TODO: handle this event to link transfers?
-    # if event['type'] == 'transfer.created':
-    #     transfer = event['data']['object']
-
-    return {"status": "success"}
-
-
-@router.post("/v1/stripe/connect-accounts", response_model=StripeConnectAccountResponse)
-def create_connect_account_endpoint(
-    country: str | None = Query(default=None), uid: str = Depends(auth.get_current_user_uid)
-):
-    """
-    Create a Stripe Connect account and return the account creation response
-    """
-    try:
-        account_id = get_stripe_connect_account_id(uid)
-
-        if account_id:
-            account = refresh_connect_account_link(account_id)
-        else:
-            # Require a real user record before creating a Stripe Connect account, so a UID that is
-            # valid in auth but missing from Firestore surfaces as a 404 rather than leaving an
-            # orphaned Stripe account (cubic on #8567).
-            if not get_user_profile(uid):
-                raise HTTPException(status_code=404, detail="User not found")
-            if country is None or country.strip() == "":
-                raise HTTPException(status_code=400, detail="Country is required")
-            account = create_connect_account(uid, country)
-            set_stripe_connect_account_id(uid, account['account_id'])
-
-        return account
-    except stripe.error.StripeError as e:
-        logger.error(f"Stripe error creating connect account for {uid}: {sanitize(str(e))}")
-        raise HTTPException(
-            status_code=400,
-            detail=_stripe_client_error_detail(e, "Could not create Stripe account. Please try again."),
-        )
-
-
-@router.get('/v1/stripe/supported-countries', response_model=List[StripeSupportedCountryResponse])
-def get_supported_countries():
-    return stripe_utils.get_supported_countries()
-
-
-@router.get("/v1/stripe/onboarded", response_model=StripeOnboardingStatusResponse, tags=['v1', 'stripe'])
-def check_onboarding_status(uid: str = Depends(auth.get_current_user_uid)):
-    """
-    Check the onboarding status of a Connect account
-    """
-    try:
-        account_id = get_stripe_connect_account_id(uid)
-        if not account_id:
-            return {"onboarding_complete": False}
-        return {"onboarding_complete": is_onboarding_complete(account_id)}
-    except stripe.error.StripeError as e:
-        logger.error(f"Stripe error checking onboarding status for {uid}: {sanitize(str(e))}")
-        raise HTTPException(
-            status_code=400,
-            detail=_stripe_client_error_detail(e, "Could not check onboarding status. Please try again."),
-        )
-
-
-@router.post("/v1/stripe/refresh/{account_id}", response_model=StripeConnectAccountResponse)
-def refresh_account_link_endpoint(request: Request, account_id: str, uid: str = Depends(auth.get_current_user_uid)):
-    """
-    Generate a fresh account link if the previous one expired
-    """
-    user_account_id = get_stripe_connect_account_id(uid)
-    if not user_account_id or user_account_id != account_id:
-        raise HTTPException(status_code=403, detail="Forbidden")
-
-    try:
-        account = refresh_connect_account_link(account_id)
-        return account
-    except stripe.error.StripeError as e:
-        logger.error(f"Stripe error refreshing account link for {account_id}: {sanitize(str(e))}")
-        raise HTTPException(
-            status_code=400,
-            detail=_stripe_client_error_detail(e, "Could not refresh account link. Please try again."),
-        )
-
-
-@router.get("/v1/stripe/return/{account_id}", response_class=HTMLResponse)
-def stripe_return(account_id: str):
-    """
-    Handle the return flow from Stripe Connect account creation.
-    Account onboarding status is updated via webhook and queried by authenticated
-    clients at /v1/stripe/onboarded. This landing page provides user feedback without
-    leaking account onboarding status to unauthenticated callers.
-    """
-    title = "Stripe Account Setup"
-    message = "Your setup session has ended. You can now close this window and return to the app to verify your account status."
-
-    html_content = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Return to App</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-            body {{                
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-                min-height: 100vh;
-                margin: 0;
-                padding: 20px;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-                box-sizing: border-box;
-            }}
-            .heading {{
-                font-size: clamp(20px, 5vw, 24px);
-                font-weight: bold;
-                margin-bottom: 20px;
-                color: #333;
-                text-align: center;
-            }}
-            .message {{
-                font-size: clamp(14px, 4vw, 16px);
-                color: #666;
-                text-align: center;
-                margin-bottom: 30px;
-                max-width: 600px;
-                line-height: 1.5;
-            }}
-            .close-instruction {{
-                font-size: clamp(14px, 4vw, 16px);
-                color: #4CAF50;
-                text-align: center;
-                margin-top: 20px;
-            }}
-        </style>
-    </head>
-    <body>
-        <h1 class="heading">{title}</h1>
-        <p class="message">{message}</p>
-        <p class="close-instruction">You can now close this window and return to the app</p>
-    </body>
-    </html>
-    """
-    return HTMLResponse(content=html_content)
-
-
-@router.post("/v1/paypal/payment-details", response_model=PaymentMutationResponse)
-def save_paypal_payment_details(data: SavePayPalPaymentDetailsRequest, uid: str = Depends(auth.get_current_user_uid)):
-    """
-    Save PayPal payment details (email and paypal.me link)
-    """
-    try:
-        email = data.email.lower()
-        paypalme_url = data.paypalme_url.lower()
-        if paypalme_url and not paypalme_url.startswith('http'):
-            paypalme_url = 'https://' + paypalme_url
-        set_paypal_payment_details(uid, {'email': email, 'paypalme_url': paypalme_url})
-        if get_default_payment_method(uid) is None:
-            set_default_payment_method(uid, 'paypal')
-        return {"status": "success"}
-    except Exception as e:
-        # Broad catch around a Firestore write — unlike the ValidationError/
-        # StripeError sites elsewhere in this file (whose messages are
-        # designed to be user-facing), an unexpected exception here could be
-        # anything, so log the real detail server-side and don't echo it.
-        logger.error(f"Failed to save PayPal payment details for uid={uid}: {e}")
-        raise HTTPException(status_code=400, detail="Could not save PayPal payment details. Please try again.")
-
-
-@router.get("/v1/paypal/payment-details", response_model=Optional[PayPalPaymentDetailsResponse])
-def get_paypal_payment_details_endpoint(uid: str = Depends(auth.get_current_user_uid)):
-    """
-    Get the PayPal payment details for the user
-    """
-    details = get_paypal_payment_details(uid)
-    # remove the starting https:// from the paypalme_url
-    if details:
-        details['paypalme_url'] = details.get('paypalme_url', '').replace('https://', '')
-    return details
 
 
 @router.get("/v1/payments/success", response_class=HTMLResponse)
@@ -1638,102 +1333,3 @@ def portal_return():
             </body>
         </html>
     """)
-
-
-@router.get("/v1/payment-methods/status", response_model=PaymentMethodStatusResponse)
-def get_payment_method_status(uid: str = Depends(auth.get_current_user_uid)):
-    """Get the statuses of the payment methods for the user"""
-    default_payment_method = get_default_payment_method(uid)
-
-    # Check Stripe status
-    stripe_account_id = get_stripe_connect_account_id(uid)
-    stripe_status = 'not_connected'
-    if stripe_account_id:
-        stripe_status = 'connected' if is_onboarding_complete(stripe_account_id) else 'incomplete'
-
-    # Check PayPal status
-    paypal_status = 'connected' if get_paypal_payment_details(uid) else 'not_connected'
-
-    return {"stripe": stripe_status, "paypal": paypal_status, "default": default_payment_method}
-
-
-@router.post("/v1/payment-methods/default", response_model=PaymentMutationResponse)
-def set_default_payment_method_endpoint(
-    data: SetDefaultPaymentMethodRequest, uid: str = Depends(auth.get_current_user_uid)
-):
-    """Set the default payment method for the user"""
-    method = data.method
-    if method not in ['stripe', 'paypal']:
-        raise HTTPException(status_code=400, detail="Invalid method")
-    set_default_payment_method(uid, method)
-    return {"status": "success"}
-
-
-@router.get("/v1/apps/{app_id}/subscription", response_model=AppSubscriptionResponse)
-def get_app_subscription(app_id: str, uid: str = Depends(auth.get_current_user_uid)):
-    """Get user's subscription for a specific app"""
-    try:
-
-        latest_subscription = find_app_subscription(app_id, uid, status_filter='all')
-
-        if latest_subscription:
-            return {
-                "subscription": {
-                    "id": latest_subscription.get('id'),
-                    "status": latest_subscription.get('status'),
-                    "current_period_end": latest_subscription.get('current_period_end'),
-                    "cancel_at_period_end": latest_subscription.get('cancel_at_period_end'),
-                    "price_id": (
-                        latest_subscription.get('items', {}).get('data', [{}])[0].get('price', {}).get('id')
-                        if latest_subscription.get('items', {}).get('data')
-                        else None
-                    ),
-                    "customer_id": latest_subscription.get('customer'),
-                }
-            }
-
-        return {"subscription": None}
-    except Exception as e:
-        logger.error(f"Error getting app subscription: {e}")
-        raise HTTPException(status_code=500, detail="Could not retrieve subscription information")
-
-
-@router.delete("/v1/apps/{app_id}/subscription", response_model=AppSubscriptionCancelResponse)
-def cancel_app_subscription(app_id: str, uid: str = Depends(auth.get_current_user_uid)):
-    """Cancel user's subscription for a specific app"""
-    try:
-
-        target_subscription = find_app_subscription(app_id, uid, status_filter='active')
-
-        if not target_subscription:
-            raise HTTPException(status_code=404, detail="Active subscription not found for this app")
-
-        target_subscription_id = target_subscription.get('id')
-        if not target_subscription_id:
-            raise HTTPException(status_code=404, detail="Invalid subscription data")
-
-        # Cancel the subscription at period end
-        updated_sub = stripe_utils.modify_subscription(
-            target_subscription_id,
-            cancel_at_period_end=True,
-        )
-
-        updated_sub_dict = updated_sub.to_dict()
-
-        return {
-            "status": "success",
-            "message": "Subscription scheduled for cancellation at the end of the current billing period",
-            "cancel_at_period_end": updated_sub_dict.get('cancel_at_period_end'),
-            "current_period_end": updated_sub_dict.get('current_period_end'),
-        }
-    except HTTPException:
-        raise
-    except stripe.error.StripeError as e:
-        logger.error(f"Stripe error canceling app subscription: {sanitize(str(e))}")
-        raise HTTPException(
-            status_code=400,
-            detail=_stripe_client_error_detail(e, "Could not cancel subscription. Please try again."),
-        )
-    except Exception as e:
-        logger.error(f"Error canceling app subscription: {e}")
-        raise HTTPException(status_code=500, detail="Could not cancel subscription")
