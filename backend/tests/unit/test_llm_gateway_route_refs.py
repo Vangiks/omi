@@ -41,17 +41,20 @@ def test_unknown_feature_route_ref_uses_default_explicit_route():
         get_route_ref(feature)
 
 
-def test_pinned_feature_route_ref_preserves_pinned_route_and_options():
-    route_ref = get_route_ref('fair_use')
+def test_pinned_feature_route_ref_preserves_pinned_route_and_options(monkeypatch):
+    # No production feature is pinned today; pin a synthetic one to keep the pinned path covered.
+    monkeypatch.setitem(model_config._PINNED_FEATURES, 'pinned_test_feature', (LUNA_MODEL, 'openai'))
+
+    route_ref = get_route_ref('pinned_test_feature')
 
     assert route_ref == ExplicitRouteRef(
-        feature='fair_use',
+        feature='pinned_test_feature',
         model=LUNA_MODEL,
         provider='openai',
         options={},
     )
-    assert get_model('fair_use') == LUNA_MODEL
-    assert get_provider('fair_use') == 'openai'
+    assert get_model('pinned_test_feature') == LUNA_MODEL
+    assert get_provider('pinned_test_feature') == 'openai'
 
 
 def test_former_gemini_and_openrouter_features_resolve_to_luna():

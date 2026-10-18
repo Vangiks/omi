@@ -8,7 +8,7 @@ from firebase_admin import auth
 from pydantic import EmailStr, TypeAdapter, ValidationError
 
 from config.plan_catalog import allocation_limit
-from database import conversations, fair_use, support, user_usage, users
+from database import conversations, support, user_usage, users
 from models.support import SupportLookupResponse, SupportTraceResponse
 from utils.support_auth import get_support_caller_uid
 from utils.support_trace import project_support_trace
@@ -51,7 +51,6 @@ def lookup_support_account(email: str = Query(...), caller_uid: str = Depends(ge
         subscription = users.get_user_subscription(uid, read_only=True)
         activity = support.get_support_activity(uid)
         usage = user_usage.get_monthly_usage_stats(uid, datetime.now(timezone.utc))
-        stage = fair_use.get_fair_use_state(uid).get('stage', 'none')
         limit = subscription.limits.transcription_seconds
         if limit is None:
             limit = allocation_limit(subscription.plan, 'transcription')
@@ -64,7 +63,6 @@ def lookup_support_account(email: str = Query(...), caller_uid: str = Depends(ge
             transcription_seconds_used=used,
             transcription_seconds_limit=limit,
             transcription_seconds_remaining=None if limit is None else max(0, limit - used),
-            fair_use_stage=stage,
         )
     except Exception:
         raise HTTPException(status_code=503, detail='Support lookup unavailable') from None

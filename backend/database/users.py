@@ -1357,7 +1357,7 @@ def delete_user_data(uid: str):
     # early "User not found" return would falsely mark the deletion complete.
     # This picks up
     # everything the user has written (conversations, deleted_conversations, memories, action_items,
-    # folders, goals, integrations, task_integrations, fcm_tokens, fair_use_*,
+    # folders, goals, integrations, task_integrations, fcm_tokens,
     # hourly_usage, meetings, screen_activity, files, people, chat_sessions,
     # messages, and any future additions).
     for sub in user_ref.collections():

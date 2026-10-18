@@ -237,7 +237,6 @@ def _mirror_cursor_clock(client):
 
 _driver('database.serving_query_reads.list_active_desktop_prompt_snapshots')
 _driver('database.serving_query_reads.list_desktop_release_snapshots')
-_driver('database.serving_query_reads.find_fair_use_case_snapshots', base={'case_ref': 'case-1'})
 _driver(
     'services.conversation_keyframes.reconcile_conversation_keyframe_jobs',
     base={'uid': UID, 'device_id': 'device-1', 'account_generation': 1},

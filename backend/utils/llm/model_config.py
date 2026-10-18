@@ -154,9 +154,7 @@ MODEL_QOS_PROFILES: Dict[str, Dict[str, Tuple[str, str]]] = {
 }
 
 # Pinned features — (model, provider) fixed regardless of profile or env override.
-_PINNED_FEATURES: Dict[str, Tuple[str, str]] = {
-    'fair_use': (os.getenv('FAIR_USE_CLASSIFIER_MODEL', LUNA_MODEL).strip() or LUNA_MODEL, 'openai'),
-}
+_PINNED_FEATURES: Dict[str, Tuple[str, str]] = {}
 
 # BYOK QoS is request-scoped. It is selected only after a provider-scoped user
 # key is found and is never a valid managed profile.

@@ -37,7 +37,6 @@ import routers.users as users_router
 import utils.apps as apps_utils
 import utils.conversations.meeting_context_pack as meeting_context_pack
 import utils.imports.limitless as limitless
-import utils.llm.fair_use_classifier as fair_use_classifier
 import utils.llm.goals as llm_goals
 import utils.other.notifications as notifications_utils
 import utils.retrieval.tool_services.conversations as tool_conversations
@@ -388,10 +387,6 @@ def _run_limitless_lookup(monkeypatch: pytest.MonkeyPatch, capture: HelperCaptur
     trial(capture, limitless.find_legacy_limitless_conversation_id, 'u1', FROZEN_NOW)
 
 
-def _run_fair_use(monkeypatch: pytest.MonkeyPatch, capture: HelperCapture) -> None:
-    trial(capture, fair_use_classifier._prepare_conversation_summaries, 'u1')
-
-
 def _run_goal_context(monkeypatch: pytest.MonkeyPatch, capture: HelperCapture) -> None:
     _stub(monkeypatch, llm_goals, 'vector_search', lambda query, uid, k: [])
     trial(capture, llm_goals._get_goal_context, 'u1', 'title')
@@ -649,14 +644,6 @@ WITNESSES: dict[str, CallerWitness] = {
             ('limitless-legacy-lookup',),
             1,
             _run_limitless_lookup,
-        ),
-        CallerWitness(
-            'utils/llm/fair_use_classifier.py:_prepare_conversation_summaries:database.conversations.get_conversations',
-            'database.conversations.get_conversations',
-            'database.conversations.get_conversations',
-            ('fair-use-classification',),
-            1,
-            _run_fair_use,
         ),
         CallerWitness(
             'utils/llm/goals.py:_get_goal_context:database.conversations.get_conversations',

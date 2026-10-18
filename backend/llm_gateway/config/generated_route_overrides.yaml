@@ -62,9 +62,6 @@ generated_route_overrides:
   - feature: file_chat_vision
     primary: {provider: openai, model: gpt-6-luna}
     provider_options: {reasoning_effort: medium}
-  - feature: fair_use
-    primary: {provider: openai, model: gpt-6-luna}
-    provider_options: {reasoning_effort: medium}
   - feature: goals
     primary: {provider: openai, model: gpt-6-luna}
     provider_options: {reasoning_effort: low}

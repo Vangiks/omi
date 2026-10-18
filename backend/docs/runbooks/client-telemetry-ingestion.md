@@ -25,7 +25,7 @@ only. It does not enable transport, the admin reader, or PostHog retirement.
 ## Auth
 
 - Batches use the existing Firebase bearer token. The account id is never taken from the body.
-- Aggregates require `X-Admin-Key` equal to `ADMIN_KEY`, the same backend gate `fair_use_admin` and `feedback_admin` use. A user bearer token is HTTP 403. The admin proxy must call `verifyAdmin` and then attach the key server-side.
+- Aggregates require `X-Admin-Key` equal to `ADMIN_KEY`, the same backend gate `feedback_admin` uses. A user bearer token is HTTP 403. The admin proxy must call `verifyAdmin` and then attach the key server-side.
 
 ## Coverage the admin read does not invent
 

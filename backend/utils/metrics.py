@@ -1076,7 +1076,7 @@ OMI_LIVE_STT_ACCEPTED_TOTAL = Counter(
 
 # VAD-measured speech seconds for backend-provider live sessions, metered once
 # per speech-delta flush: speech sent to the provider, not wall-clock session
-# length and not fair-use transcription_seconds.
+# length and not transcription_seconds.
 OMI_LIVE_STT_AUDIO_SECONDS_TOTAL = Counter(
     'omi_live_stt_audio_seconds_total',
     'VAD speech seconds flushed for backend-provider live-STT sessions (speech sent, not wall-clock)',

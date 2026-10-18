@@ -569,13 +569,6 @@ INDEX_ONLY_REQUIREMENTS = (
     ),
     # caller: unmapped
     FirestoreIndexRequirement(
-        'fair_use_state_stage_asc_updated_at_desc_name_desc_collection_group',
-        'fair_use_state',
-        'COLLECTION_GROUP',
-        (_asc('stage'), _desc('updated_at'), _desc('__name__')),
-    ),
-    # caller: unmapped
-    FirestoreIndexRequirement(
         'files_id_asc_created_at_desc_name_desc',
         'files',
         'COLLECTION',
@@ -2075,9 +2068,6 @@ FIELD_INDEX_REQUIREMENTS: tuple[FieldIndexRequirement, ...] = MESSAGING_FIELD_RE
     FieldIndexRequirement('conversations_id_group_ascending', 'conversations', 'id', ('ASCENDING',)),
     FieldIndexRequirement('conversations_source_group_ascending', 'conversations', 'source', ('ASCENDING',)),
     FieldIndexRequirement('conversations_status_group_ascending', 'conversations', 'status', ('ASCENDING',)),
-    FieldIndexRequirement(
-        'fair_use_events_case_ref_group_both', 'fair_use_events', 'case_ref', ('ASCENDING', 'DESCENDING')
-    ),
     FieldIndexRequirement(
         'fcm_tokens_app_version_group_both', 'fcm_tokens', 'app_version', ('ASCENDING', 'DESCENDING')
     ),

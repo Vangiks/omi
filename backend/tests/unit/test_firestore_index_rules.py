@@ -582,7 +582,6 @@ def _generated_manifest():
         ('conversations', 'id'),
         ('conversations', 'source'),
         ('conversations', 'status'),
-        ('fair_use_events', 'case_ref'),
         ('fcm_tokens', 'app_version'),
         ('fcm_tokens', 'token'),
         ('llm_usage', 'date'),

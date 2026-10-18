@@ -2,8 +2,7 @@
 Simple per-UID rate limiting config.
 
 Each policy defines (max_requests, window_seconds). One window per policy —
-no multi-tier caps. Fair use already handles budget enforcement; this layer
-prevents abuse and protects backend resources.
+no multi-tier caps. This layer prevents abuse and protects backend resources.
 
 Tuning knobs:
     RATE_LIMIT_BOOST: float multiplier on all limits (default 1.0).

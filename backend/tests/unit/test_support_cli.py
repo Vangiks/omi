@@ -64,7 +64,6 @@ def test_refresh_sends_refresh_grant_and_does_not_print_token(monkeypatch, capsy
             {
                 'email': 'customer@example.com',
                 'uid': 'target',
-                'fair_use_stage': 'none',
                 'transcription_seconds_used': 0,
             }
         )

@@ -1021,13 +1021,6 @@ for _fn in (
         )
     )
 
-_add(DriverEntry('database.fair_use.get_fair_use_events', base={'uid': UID}, neutrals={'limit': _LIMIT}))
-_add(
-    DriverEntry(
-        'database.fair_use.get_flagged_users', domains={'stage_filter': [None, 'stage-1']}, neutrals={'limit': _LIMIT}
-    )
-)
-_add(DriverEntry('database.fair_use.get_violation_counts', base={'uid': UID}))
 _add(
     DriverEntry(
         'database.feedback.list_negative_events', base={'start_at': T0, 'end_at': T1}, neutrals={'limit': _LIMIT}

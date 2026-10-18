@@ -18,7 +18,6 @@ class SupportLookupResponse(BaseModel):
     transcription_seconds_used: float
     transcription_seconds_limit: int | None = None
     transcription_seconds_remaining: float | None = None
-    fair_use_stage: str
 
 
 class SupportTraceRow(BaseModel):

@@ -157,7 +157,6 @@ def router():
         "database.llm_usage": _pkg("database.llm_usage"),
         "database.chat": _pkg("database.chat"),
         "database.notifications": _pkg("database.notifications"),
-        "database.fair_use": _pkg("database.fair_use"),
         "database.webhook_health": _pkg("database.webhook_health"),
         "database.mem_db": _pkg("database.mem_db"),
         "database.firestore_read_metrics": _pkg("database.firestore_read_metrics"),

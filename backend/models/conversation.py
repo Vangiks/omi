@@ -460,8 +460,8 @@ class Conversation(BaseModel):
 
     # True when this conversation was transcribed on a third-party (custom STT)
     # provider, so no Omi transcription credits were consumed. Provenance for
-    # the isolated fair-use lane and the conversation-processing credit gate:
-    # custom-STT still hits LLM/post-processing metering (#7690).
+    # the conversation-processing credit gate: custom-STT still hits
+    # LLM/post-processing metering (#7690).
     uses_custom_stt: bool = False
 
     structured: Structured

@@ -240,7 +240,7 @@ class VADStreamingGate:
         self._last_send_wall_time: Optional[float] = None  # For keepalive timing
         self._keepalive_count = 0
 
-        # Fair-use speech accumulator (#5746)
+        # Speech accumulator for usage recording (#5746)
         self._speech_ms_total: float = 0.0
         self._speech_ms_delta: float = 0.0
 
@@ -413,7 +413,7 @@ class VADStreamingGate:
         else:
             self._chunks_silence += 1
 
-        # Fair-use speech accumulator (#5746)
+        # Speech accumulator for usage recording (#5746)
         if is_speech and self.mode == 'active':
             self._speech_ms_total += chunk_ms
             self._speech_ms_delta += chunk_ms
@@ -650,7 +650,7 @@ class VADStreamingGate:
         """Consume and reset the speech_ms delta since last call.
 
         Used by the usage recording loop to periodically flush speech_ms
-        to Redis/Firestore for fair-use tracking (#5746).
+        to usage records (#5746).
         Thread-safe: called from the same asyncio task that feeds audio.
         """
         delta = int(self._speech_ms_delta)

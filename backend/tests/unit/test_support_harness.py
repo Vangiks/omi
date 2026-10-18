@@ -65,8 +65,6 @@ class Reference:
             if self.store.subscription is None:
                 data.pop('subscription')
             return Snapshot({key: data[key] for key in field_paths if key in data})
-        if self.path == ('users', 'target-customer', 'fair_use_state', 'current'):
-            return Snapshot({'stage': 'none', 'events': ['SECRET-EVENT']})
         raise AssertionError(f'Unexpected Firestore read: {self.path}')
 
     def set(self, row, **kwargs):

@@ -45,7 +45,6 @@ backend/tests/unit/test_dev_api_conversations_poison.py
 backend/tests/unit/test_dev_api_folder_filters.py
 backend/tests/unit/test_dev_api_memories_pagination.py
 backend/tests/unit/test_developer_from_segments_idempotency.py
-backend/tests/unit/test_fair_use_flagged_limit_clamp.py
 backend/tests/unit/test_firestore_read_ops_cache.py
 backend/tests/unit/test_import_job_status_detail_enum.py
 backend/tests/unit/test_import_jobs_malformed.py

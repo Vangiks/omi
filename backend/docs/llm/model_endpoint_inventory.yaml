@@ -73,8 +73,7 @@ model_config_features:
     - file_chat_documents
     provider_search:
     - web_search
-    pinned:
-    - fair_use
+    pinned: []
   gateway_capability_needed: OpenAI-compatible chat-completions lane with provider refs for openai, native Vertex Gemini,
     openrouter, perplexity, and anthropic; OpenAI-compatible /v1/embeddings surface with openai and native Vertex :predict
     adapters.
@@ -307,20 +306,6 @@ surfaces:
   gateway_lane_capability_needed: gateway-owned realtime websocket relay
   migration_status: inventoried_direct_realtime_surface; blocked during OMI_LLM_GATEWAY_FEATURE_MODE=gateway and checked-in
     serving configuration does not permit the exception
-  test_guardrail_coverage: backend/tests/unit/test_llm_gateway_coverage_guardrails.py
-- surface: fair_use_classifier
-  code_path: backend/utils/llm/fair_use_classifier.py:classify_user_purpose
-  entrypoint: fair-use classifier
-  feature: fair_use
-  plan_gating: free_allowlist
-  funding_owner: omi
-  fallback_on_deny: n/a_allowed
-  call_sites:
-  - utils/llm/fair_use_classifier.py::feature:fair_use
-  current_provider_model: openai/fair_use pinned feature
-  request_shape: async plain chat JSON
-  gateway_lane_capability_needed: generated omi:auto:fair-use lane
-  migration_status: get_llm_routed
   test_guardrail_coverage: backend/tests/unit/test_llm_gateway_coverage_guardrails.py
 - surface: production_like_memory_ingestion
   code_path: backend/utils/memory_ingestion/adapters/production_like_model.py:_memory_llm

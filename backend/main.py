@@ -94,7 +94,6 @@ from routers import (
     agent_tools,
     tools,
     metrics,
-    fair_use_admin,
     feedback_admin,
     staged_tasks,
     focus_sessions,
@@ -303,7 +302,6 @@ app.include_router(agent_tools.router)
 app.include_router(tools.router)
 app.include_router(metrics.router)
 app.include_router(client_telemetry.router)
-app.include_router(fair_use_admin.router)
 app.include_router(staged_tasks.router)
 app.include_router(focus_sessions.router)
 app.include_router(advice.router)

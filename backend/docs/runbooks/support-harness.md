@@ -49,7 +49,7 @@ Authorization: Bearer <caller Firebase ID token>
 
 Lookup returns UID, normalized email, optional activity timestamp/platform,
 current UTC calendar-month transcription usage from the existing hourly usage
-meter, optional limit/remaining seconds, and fair-use stage alone. Missing
+meter, and optional limit/remaining seconds alone. Missing
 subscription defaults and legacy plan normalization are read-only. A null limit
 or remaining value means unlimited or unknown; finite zero remains zero.
 

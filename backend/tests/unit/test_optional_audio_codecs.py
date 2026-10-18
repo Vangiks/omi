@@ -113,7 +113,6 @@ def _install_sync_import_stubs(monkeypatch):
     for name in [
         "database._client",
         "database.redis_db",
-        "database.fair_use",
         "database.users",
         "database.user_usage",
         "database.conversations",
@@ -138,7 +137,6 @@ def _install_sync_import_stubs(monkeypatch):
         "utils.speaker_assignment",
         "utils.speaker_identification",
         "utils.stt.speaker_embedding",
-        "utils.fair_use",
         "utils.subscription",
         "utils.log_sanitizer",
         "utils.executors",

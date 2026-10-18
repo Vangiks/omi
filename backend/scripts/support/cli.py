@@ -143,7 +143,6 @@ def print_lookup(payload: dict[str, Any]) -> None:
         'transcription_seconds_used',
         'transcription_seconds_limit',
         'transcription_seconds_remaining',
-        'fair_use_stage',
     )
     for field in fields:
         print(f'{field}: {payload.get(field)}')
