@@ -111,7 +111,6 @@ from routers import (
     desktop_realtime,
     desktop_screen_crisp,
     frame_requests,
-    referrals,
     desktop_tts_updates,
     scores,
     stt,
@@ -266,7 +265,6 @@ app.include_router(integration.router)
 app.include_router(agents.router)
 app.include_router(users.router)
 app.include_router(support.router)
-app.include_router(referrals.router)
 app.include_router(csat.router)
 app.include_router(feedback_admin.router)
 app.include_router(email_preferences.router)
