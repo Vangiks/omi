@@ -865,43 +865,6 @@ describe('census diff (the steady-state cut)', () => {
     expect(h.hardDeleteAbsentTasks).toHaveBeenCalledWith(['gone']) // absent → sweep decides
   })
 
-  // Swarm should-fix regression: a LOCKED item (backend 402 'paid plan required'
-  // on the per-id GET) must not become a per-round zombie that re-bills forever
-  // and starves MAX_CENSUS_LOOKUPS — it is negative-cached until its TTL.
-  it('a 402 (locked) per-id GET is skipped on subsequent syncs until its TTL', async () => {
-    const t0 = 1_700_000_000_000
-    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(t0)
-    let lockedGets = 0
-    h.censusIncomplete = ['locked', 'fresh']
-    h.getSyncedActionItemIds.mockReturnValue([]) // both ids are new locally
-    h.netFetch.mockImplementation(async (url: string, init?: { method?: string }) => {
-      const u = String(url)
-      if ((init?.method ?? 'GET') === 'GET') {
-        if (u.includes('completed=true')) return h.jsonResponse({ ids: [] })
-        if (u.includes('/v1/action-items/ids')) return h.jsonResponse({ ids: h.censusIncomplete })
-        if (u.endsWith('/locked')) {
-          lockedGets++
-          return h.jsonResponse({ detail: 'paid plan required' }, false, 402)
-        }
-        return h.jsonResponse(backendItem({ id: 'fresh' }))
-      }
-      return h.jsonResponse({})
-    })
-    const { engine } = await freshEngine()
-
-    await engine.scheduleBackgroundSync()
-    expect(lockedGets).toBe(1) // tried once…
-    expect(h.syncTaskActionItems).toHaveBeenCalledTimes(1) // …and the fresh id still synced
-
-    nowSpy.mockReturnValue(t0 + 5 * 60_000 + 1) // next window: still inside the TTL
-    await engine.scheduleBackgroundSync()
-    expect(lockedGets).toBe(1) // not re-billed
-
-    nowSpy.mockReturnValue(t0 + 61 * 60_000) // TTL expired (plan may have changed)
-    await engine.scheduleBackgroundSync()
-    expect(lockedGets).toBe(2) // retried
-  })
-
   it('one unreadable id does not abort the round — the rest still sync', async () => {
     h.censusIncomplete = ['bad', 'ok']
     h.netFetch.mockImplementation(async (url: string, init?: { method?: string }) => {
@@ -1064,7 +1027,11 @@ describe('explicit reconcile (strong path, tasks:reconcile)', () => {
 
     // The strong path pages both full listings for content…
     expect(listingCalls().length).toBeGreaterThanOrEqual(2)
-    expect(listingCalls().map(urlOf).every((u) => u.includes('limit=100'))).toBe(true)
+    expect(
+      listingCalls()
+        .map(urlOf)
+        .every((u) => u.includes('limit=100'))
+    ).toBe(true)
     // …censuses for the sweep keep-set (uncapped, unlike the 2000-doc listing
     // cap), and its reconciles are forced (run even at t0, where a throttled
     // call would have skipped).

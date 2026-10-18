@@ -187,7 +187,6 @@ function isTombstoned(backendId: string): boolean {
  *  baseline (cross-account hygiene). */
 export function resetPendingDeletes(): void {
   pendingDeletes.clear()
-  lockedItemSkips.clear()
   lastSyncAt = 0
   lastReconcileAt = 0
   lastCompletedReconcileAt = 0
@@ -392,17 +391,8 @@ async function fetchIdCensus(completed: boolean, external?: AbortSignal): Promis
   return Array.isArray(json.ids) ? (json.ids as string[]) : []
 }
 
-// Ids whose per-id GET returned 402 (backend: locked behind a paid plan — the
-// document is listed truncated but never readable by id). Re-fetching such an id
-// every round is a permanent zombie that also starves MAX_CENSUS_LOOKUPS, so
-// skip it for a TTL; a plan change re-enables it, and a sign-out clears the
-// cache entirely.
-const LOCKED_SKIP_TTL_MS = 60 * 60_000
-const lockedItemSkips = new Map<string, number>()
-
 /** Fetch one action item by id (authoritative doc for a census-new or
- *  bucket-moved id). Returns null on 404 (gone — the reconciles handle absence)
- *  and on 402 (locked: negative-cached so the round stops paying for it).
+ *  bucket-moved id). Returns null on 404 (gone — the reconciles handle absence).
  *  Rethrows other failures so the caller can skip that id without aborting. */
 async function fetchItemById(
   backendId: string,
@@ -415,10 +405,6 @@ async function fetchItemById(
     external
   )
   if (res.status === 404) return null
-  if (res.status === 402) {
-    lockedItemSkips.set(backendId, Date.now() + LOCKED_SKIP_TTL_MS)
-    return null
-  }
   if (!res.ok) throw new HttpError(res.status)
   return (await res.json()) as BackendActionItem
 }
@@ -641,17 +627,7 @@ async function doBackgroundSync(): Promise<void> {
     for (const id of incompleteIds) if (local.get(id) !== false) toFetch.push(id)
     for (const id of completedIds) if (local.get(id) !== true) toFetch.push(id)
     const items: BackendActionItem[] = []
-    // Slice AFTER dropping TTL-active locked skips, so a locked id can never
-    // occupy one of the MAX_CENSUS_LOOKUPS slots and starve genuine new ids.
-    const now0 = Date.now()
-    const lookupQueue = toFetch.filter((id) => {
-      const skipUntil = lockedItemSkips.get(id)
-      if (skipUntil === undefined) return true
-      if (skipUntil > now0) return false
-      lockedItemSkips.delete(id)
-      return true
-    })
-    for (const id of lookupQueue.slice(0, MAX_CENSUS_LOOKUPS)) {
+    for (const id of toFetch.slice(0, MAX_CENSUS_LOOKUPS)) {
       try {
         const item = await fetchItemById(id, external)
         if (item) items.push(item)
