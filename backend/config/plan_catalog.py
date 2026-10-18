@@ -28,7 +28,6 @@ from config.plan_catalog_generated import (  # noqa: F401 - this module is the p
     CATALOG_SHA256,
     DESKTOP_ENTITLED_PLAN_TYPES,
     DESKTOP_PROFILE_DEFAULTS,
-    FAIR_USE_PROFILE_LIMITS,
     LEGACY_WIRE_PLAN_VALUES,
     MEASUREMENT_CONTRACTS,
     MOBILE_PLAN_TYPES,
@@ -48,7 +47,6 @@ from config.plan_catalog_generated import (  # noqa: F401 - this module is the p
     WIRE_PLAN_ALIASES,
     PlanType,
 )
-
 
 # The fork has no billing (#3): every user gets this plan, whatever Firestore holds.
 FULL_ACCESS_PLAN = PlanType.architect
@@ -308,7 +306,6 @@ __all__ = [
     'CATALOG_SHA256',
     'DESKTOP_ENTITLED_PLAN_TYPES',
     'DESKTOP_PROFILE_DEFAULTS',
-    'FAIR_USE_PROFILE_LIMITS',
     'LEGACY_WIRE_PLAN_VALUES',
     'MEASUREMENT_CONTRACTS',
     'MOBILE_PLAN_TYPES',

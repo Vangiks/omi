@@ -9,7 +9,6 @@ from config.plan_catalog import (
     resolve_stripe_price_plan,
     plan_uses_overage,
     DESKTOP_PROFILE_DEFAULTS,
-    FAIR_USE_PROFILE_LIMITS,
 )
 from models.users import Subscription
 
@@ -49,6 +48,5 @@ def legacy_snapshot():
                     for start in (None, 1, 2000000000)
                 ],
                 'desktop_profiles': DESKTOP_PROFILE_DEFAULTS,
-                'fair_use_profiles': FAIR_USE_PROFILE_LIMITS,
             }
         return result

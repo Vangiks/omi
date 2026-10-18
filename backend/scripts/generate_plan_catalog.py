@@ -43,7 +43,6 @@ PLAN_KEYS = {
     'storefronts',
     'desktop_profile',
     'conditional_desktop_profiles',
-    'fair_use_profile',
     'allocations',
     'billing',
 }
@@ -231,25 +230,19 @@ def _validate_allocations(allocations: Any, path: str, decisions: set[str], erro
             _validate_exhaustion(allocation.get('exhaustion'), f'{allocation_path}.exhaustion', decisions, errors)
 
 
-def _validate_allocation_profiles(profiles: Any, errors: list[str]) -> tuple[set[str], set[str]]:
+def _validate_allocation_profiles(profiles: Any, errors: list[str]) -> set[str]:
     desktop_profiles: set[str] = set()
-    fair_use_profiles: set[str] = set()
     if not isinstance(profiles, dict):
         errors.append('catalog.allocation_profiles: expected an object')
-        return desktop_profiles, fair_use_profiles
+        return desktop_profiles
 
-    _unexpected_keys(profiles, {'desktop', 'fair_use'}, 'catalog.allocation_profiles', errors)
-    for profile_group, destination in (
-        ('desktop', desktop_profiles),
-        ('fair_use', fair_use_profiles),
-    ):
-        group = profiles.get(profile_group)
-        if not isinstance(group, dict) or not group:
-            errors.append(f'catalog.allocation_profiles.{profile_group}: expected a non-empty object')
-        else:
-            destination.update(group)
-
+    _unexpected_keys(profiles, {'desktop'}, 'catalog.allocation_profiles', errors)
     desktop = profiles.get('desktop')
+    if not isinstance(desktop, dict) or not desktop:
+        errors.append('catalog.allocation_profiles.desktop: expected a non-empty object')
+    else:
+        desktop_profiles.update(desktop)
+
     if isinstance(desktop, dict):
         for name, profile in desktop.items():
             path = f'catalog.allocation_profiles.desktop.{name}'
@@ -262,25 +255,7 @@ def _validate_allocation_profiles(profiles: Any, errors: list[str]) -> tuple[set
             if not isinstance(profile.get('cloud_screen_vectors'), bool):
                 errors.append(f'{path}.cloud_screen_vectors: expected a boolean')
 
-    fair_use = profiles.get('fair_use')
-    if isinstance(fair_use, dict):
-        for name, profile in fair_use.items():
-            path = f'catalog.allocation_profiles.fair_use.{name}'
-            if not isinstance(profile, dict):
-                errors.append(f'{path}: expected an object')
-                continue
-            _unexpected_keys(profile, {'speech_milliseconds'}, path, errors)
-            limits = profile.get('speech_milliseconds')
-            if not isinstance(limits, dict):
-                errors.append(f'{path}.speech_milliseconds: expected an object')
-                continue
-            windows = {'rolling_day', 'rolling_three_days', 'rolling_week'}
-            _unexpected_keys(limits, windows, f'{path}.speech_milliseconds', errors)
-            for window, value in limits.items():
-                if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
-                    errors.append(f'{path}.speech_milliseconds.{window}: expected a positive integer')
-
-    return desktop_profiles, fair_use_profiles
+    return desktop_profiles
 
 
 def _validate_billing(billing: Any, path: str, is_paid: bool, errors: list[str]) -> None:
@@ -418,7 +393,7 @@ def validate_catalog(catalog: Mapping[str, Any]) -> list[str]:
                 errors.append(f'catalog.open_decisions.{decision_id}: expected an object with a question')
 
     profiles = catalog.get('allocation_profiles')
-    desktop_profiles, fair_use_profiles = _validate_allocation_profiles(profiles, errors)
+    desktop_profiles = _validate_allocation_profiles(profiles, errors)
 
     measurement_contracts = catalog.get('measurement_contracts')
     if not isinstance(measurement_contracts, dict):
@@ -507,8 +482,6 @@ def validate_catalog(catalog: Mapping[str, Any]) -> list[str]:
                     errors.append(f'{conditional_path}.condition: expected a non-empty string')
                 if conditional.get('profile') not in desktop_profiles:
                     errors.append(f'{conditional_path}.profile: unknown desktop profile')
-        if plan.get('fair_use_profile') not in fair_use_profiles:
-            errors.append(f'{path}.fair_use_profile: unknown fair-use profile {plan.get("fair_use_profile")!r}')
         _validate_allocations(plan.get('allocations'), f'{path}.allocations', decisions, errors)
         _validate_billing(plan.get('billing'), f'{path}.billing', bool(plan.get('is_paid')), errors)
         billing = plan.get('billing')
@@ -858,7 +831,6 @@ PRIMARY_BILLING_ENV_VARS: Final[dict[PlanType, dict[str, str]]] = {{
 {primary_env_lines}
 }}
 DESKTOP_PROFILE_DEFAULTS: Final[dict[str, dict[str, Any]]] = {_python_literal(profiles['desktop'])}
-FAIR_USE_PROFILE_LIMITS: Final[dict[str, dict[str, Any]]] = {_python_literal(profiles['fair_use'])}
 
 
 __all__ = [
@@ -871,7 +843,6 @@ __all__ = [
     'CATALOG_SHA256',
     'DESKTOP_ENTITLED_PLAN_TYPES',
     'DESKTOP_PROFILE_DEFAULTS',
-    'FAIR_USE_PROFILE_LIMITS',
     'LEGACY_WIRE_PLAN_VALUES',
     'MEASUREMENT_CONTRACTS',
     'MOBILE_PLAN_TYPES',
