@@ -11,23 +11,6 @@ export interface Employee {
   removed_at: string | null;
 }
 
-export interface StripePayment {
-  subscription_id: string; // Database field name
-  customer_id: string;
-  current_period_end: number; // Unix timestamp (epoch seconds)
-  cancel_at_period_end: boolean;
-  plan: string;
-  status: string;
-}
-
-export interface UserSubscription {
-  subscription_id: string;
-  current_period_end: number; // Unix timestamp (epoch seconds)
-  cancel_at_period_end: boolean;
-  plan: string;
-  status: string;
-}
-
 export interface Organization {
   id: string;
   organisation_id: string;
@@ -37,7 +20,6 @@ export interface Organization {
   is_active?: boolean;
   employees: Employee[];
   max_seats?: number;
-  subscription?: StripePayment; // Database field name
 }
 
 export interface CreateOrganizationData {
@@ -46,7 +28,6 @@ export interface CreateOrganizationData {
   admin_name: string;
   admin_email: string;
   max_seats?: number;
-  stripe_payment_id?: string; // UI field name
 }
 
 export interface UpdateOrganizationData {
@@ -54,7 +35,6 @@ export interface UpdateOrganizationData {
   website?: string;
   max_seats?: number;
   is_active?: boolean;
-  stripe_payment_id?: string; // UI field name
 }
 
 export const useOrganizations = () => {

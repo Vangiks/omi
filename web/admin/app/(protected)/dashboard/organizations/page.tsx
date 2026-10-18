@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useOrganizations, CreateOrganizationData, UpdateOrganizationData } from '@/hooks/useOrganizations';
-import { Building2, Plus, Users, Globe, Calendar, Mail, Edit, CreditCard } from 'lucide-react';
+import { Building2, Plus, Users, Globe, Calendar, Mail, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function OrganizationsPage() {
@@ -24,7 +24,6 @@ export default function OrganizationsPage() {
     admin_name: '',
     admin_email: '',
     max_seats: undefined,
-    stripe_payment_id: '',
   });
   
   // Edit dialog state
@@ -36,7 +35,6 @@ export default function OrganizationsPage() {
     website: '',
     max_seats: undefined,
     is_active: true,
-    stripe_payment_id: '',
   });
 
   const handleCreateOrganization = async (e: React.FormEvent) => {
@@ -53,7 +51,6 @@ export default function OrganizationsPage() {
         admin_name: '',
         admin_email: '',
         max_seats: undefined,
-        stripe_payment_id: '',
       });
       toast({
         title: "Success",
@@ -103,7 +100,6 @@ export default function OrganizationsPage() {
         website: '',
         max_seats: undefined,
         is_active: true,
-        stripe_payment_id: '',
       });
       toast({
         title: "Success",
@@ -127,7 +123,6 @@ export default function OrganizationsPage() {
       website: org.website || '',
       max_seats: org.max_seats || undefined,
       is_active: org.is_active !== false,
-      stripe_payment_id: org.subscription?.subscription_id || '',
     });
     setIsEditDialogOpen(true);
   };
@@ -279,20 +274,6 @@ export default function OrganizationsPage() {
                       Maximum number of employees allowed
                     </p>
                   </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="stripe-payment-id">
-                      Stripe Payment ID
-                    </Label>
-                    <Input
-                      id="stripe-payment-id"
-                      value={formData.stripe_payment_id}
-                      onChange={(e) => setFormData({ ...formData, stripe_payment_id: e.target.value })}
-                      placeholder="pi_xxxxxxxxxxxxxxxx"
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      Automatically fetch payment details and calculate 1-year access
-                    </p>
-                  </div>
                 </div>
               </div>
               <DialogFooter className="gap-2">
@@ -367,20 +348,6 @@ export default function OrganizationsPage() {
                     />
                     <p className="text-sm text-muted-foreground">
                       Maximum number of employees allowed
-                    </p>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="edit-stripe-payment-id">
-                      Stripe Payment ID
-                    </Label>
-                    <Input
-                      id="edit-stripe-payment-id"
-                      value={editFormData.stripe_payment_id}
-                      onChange={(e) => setEditFormData({ ...editFormData, stripe_payment_id: e.target.value })}
-                      placeholder="pi_xxxxxxxxxxxxxxxx"
-                    />
-                    <p className="text-sm text-muted-foreground">
-                      1-year access from when the payment was made
                     </p>
                   </div>
                 </div>
@@ -492,14 +459,6 @@ export default function OrganizationsPage() {
                       <div className="flex items-center space-x-2">
                         <span className="text-sm text-muted-foreground">
                           {org.employees.length}/{org.max_seats} seats used
-                        </span>
-                      </div>
-                    )}
-                    {org.subscription && (
-                      <div className="flex items-center space-x-2">
-                        <CreditCard className="h-4 w-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">
-                          {org.subscription.plan} plan - {org.subscription.status}
                         </span>
                       </div>
                     )}

@@ -38,10 +38,6 @@ vi.mock('@/lib/firebase/admin', () => ({
   getDb: () => ({ collection: vi.fn(() => makeFirestoreNode()) }),
   getAdminAuth: () => ({ getUser: mocks.getUser }),
 }));
-vi.mock('@/lib/stripe', () => ({ getStripe: vi.fn() }));
-vi.mock('@/lib/utils/user-subscription', () => ({
-  updateUserSubscriptionDetails: vi.fn(),
-}));
 vi.mock('@/lib/redis', () => ({
   invalidateEnforcementCache: mocks.invalidateEnforcementCache,
 }));
