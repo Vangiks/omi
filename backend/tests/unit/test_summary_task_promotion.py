@@ -195,16 +195,14 @@ def test_same_commitment_in_two_conversations_keeps_both_provenance_links(harnes
     assert [ref['id'] for ref in task['provenance']] == ['conversation-1', 'conversation-2']
 
 
-@pytest.mark.parametrize(
-    'mutation', ['description', 'due_at', 'capture_owner', 'deleted', 'is_locked', 'different_link']
-)
+@pytest.mark.parametrize('mutation', ['description', 'due_at', 'capture_owner', 'deleted', 'different_link'])
 def test_changed_summary_rejects_before_task_or_resolution_write(harness, mutation):
     client, db = harness
     candidate_id = prepare(client).json()['candidate_id']
     row = db.rows[CONVERSATION_PATH]
     item = row['structured']['action_items'][0]
-    if mutation in {'deleted', 'is_locked'}:
-        row[mutation] = True
+    if mutation == 'deleted':
+        row['deleted'] = True
     elif mutation == 'different_link':
         item['target_task_id'] = 'another-task'
     else:

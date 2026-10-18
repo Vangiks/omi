@@ -1070,8 +1070,7 @@ def delete_memories_batch(
     Authorization parity with DELETE /v3/memories/{memory_id}: every requested id is
     validated with the SAME business rules as the single-delete path. Validation is
     all-or-nothing — if any id fails, nothing is deleted, so the batch route can never
-    bypass the single-delete guardrails (missing/not-owned -> 404, locked paid-plan
-    memory -> 402).
+    bypass the single-delete guardrails (missing/not-owned -> 404).
     """
     # Deduplicate while preserving first-seen order so repeated ids cannot inflate
     # counts or trigger redundant Firestore/Pinecone ops.
@@ -1085,7 +1084,7 @@ def delete_memories_batch(
         # canonical write, preserving the released all-or-nothing contract.
         service.delete_batch(uid, memory_ids)
     except HTTPException:
-        # Preserve service-owned 402/404/413 mappings and observability details.
+        # Preserve service-owned 404/413 mappings and observability details.
         raise
     except (DestructiveGateTakeover, DestructiveOperationInProgress, LegalHoldAuthorityUnavailable) as exc:
         raise account_gate_busy_http_exception() from exc

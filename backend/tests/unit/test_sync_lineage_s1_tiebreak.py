@@ -73,7 +73,6 @@ def row(row_id, start, end, evidence=None, **extra):
         'finished_at': at(end),
         'source': 'omi',
         'client_device_id': 'pendant',
-        'is_locked': False,
         'discarded': False,
         'status': 'completed',
         'external_data': {'recording_session_id': f'SESSION-{row_id}', 'recording_origin_id': ORIGIN},
@@ -98,7 +97,6 @@ def select(rows, *, stamp=None, maps=None, start=T, end=T + 5.0, **kwargs):
         stamped_target=stamp,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
         segment_source_maps=maps if maps is not None else {'SEG': source_map()},
         **kwargs,
     )
@@ -261,7 +259,6 @@ def test_two_visible_rows_without_maps_stay_pending():
         stamped_target=None,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
         segment_source_maps=None,
     )
     assert result.targets == {'SEG': None}
@@ -308,7 +305,6 @@ def test_single_visible_canonical_beats_discarded_only_rivals():
         stamped_target=None,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
         segment_source_maps=None,
     )
     assert result.targets == {'SEG': 'GEN-MERGED'}
@@ -360,7 +356,6 @@ def test_donor_redirect_uses_the_survivor_visibility():
         stamped_target=None,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
         segment_source_maps=None,
     )
     assert result.targets == {'SEG': 'GEN-MERGED'}
@@ -403,7 +398,6 @@ def test_missing_canonical_establishes_no_visibility():
         stamped_target=None,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
         segment_source_maps=None,
     )
     assert result.targets == {'SEG': 'GEN-MERGED'}
@@ -451,7 +445,6 @@ def test_strict_ambiguity_with_tolerant_stamp_stays_pending():
         stamped_target='GEN-TOL',
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
     )
     assert result.targets == {'SEG': None}
     assert result.binding_reasons == {'SEG': 'ambiguous_pending'}
@@ -582,7 +575,6 @@ def test_plan_rechecks_forward_the_source_maps(monkeypatch):
         None,
         'omi',
         'pendant',
-        False,
         'job-1',
         None,
         segment_source_maps=maps,
@@ -607,7 +599,7 @@ def test_resolver_requests_evidence_only_when_admitted(monkeypatch):
         lambda *args, **kwargs: projections.append(kwargs.get('include_capture_evidence')) or (list(rows), None, False),
     )
     spans_map = {'seg.wav': (T, T + 5.0)}
-    kwargs = dict(stamped_target=None, source='omi', client_device_id='pendant', is_locked=False, firestore_client=None)
+    kwargs = dict(stamped_target=None, source='omi', client_device_id='pendant', firestore_client=None)
     reasons = {}
     targets = recording_lineage.resolve_segment_targets(
         'u', ORIGIN, spans_map, segment_source_maps={'seg.wav': source_map()}, binding_reasons=reasons, **kwargs
@@ -671,7 +663,6 @@ def test_resolver_stub_rows_carrying_evidence_still_need_the_gate(monkeypatch):
         stamped_target=None,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
         firestore_client=None,
         binding_reasons=reasons,
         segment_source_maps={'seg.wav': source_map()},
@@ -703,7 +694,6 @@ def test_resolver_outside_uid_cohort_neither_projects_nor_uses_evidence(monkeypa
         stamped_target=None,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
         firestore_client=None,
         binding_reasons=reasons,
         segment_source_maps={'seg.wav': source_map()},

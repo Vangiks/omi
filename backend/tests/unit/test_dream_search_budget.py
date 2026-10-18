@@ -85,33 +85,6 @@ async def test_missing_row_keeps_the_rest_of_the_page(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_locked_conversation_stays_on_a_person_search_page(monkeypatch):
-    def snapshot(uid, key, **kwargs):
-        if key == 'locked':
-            return {'id': 'locked', 'is_locked': True, 'transcript_segments': []}
-        return {
-            'id': 'open',
-            'structured': {'title': 'Synthetic open', 'overview': ''},
-            'transcript_segments': [{'text': 'Synthetic open line', 'person_id': 'late'}],
-        }
-
-    monkeypatch.setattr(reads.conversations, 'get_conversation_raw_snapshot', snapshot)
-    monkeypatch.setattr(reads.conversations, 'decode_transcript_segments_verified', lambda *args, **kwargs: [])
-    monkeypatch.setattr(reads.conversations, 'prepare_conversation_for_read', lambda raw, uid, **kwargs: raw)
-    monkeypatch.setattr(search, 'keyword_search_conversation_ids', lambda **kwargs: ['locked', 'open'])
-    fallbacks = []
-    monkeypatch.setattr(search, 'record_fallback', lambda **kwargs: fallbacks.append(kwargs))
-    source = search.OwnerSearch('synthetic-search-owner')
-    result = await source.search(
-        Search(query='Synthetic', collections=['conversations'], person_ref='people/late', limit=2),
-        byte_budget=8000,
-    )
-    assert result['unavailable_refs'] == ['conversations/locked']
-    assert [hit['ref'] for hit in result['results']] == ['conversations/open']
-    assert result['counts']['failed_paths'] == 0 and result['complete'] is True and fallbacks == []
-
-
-@pytest.mark.asyncio
 async def test_transient_hydration_degrades_the_path(monkeypatch):
     rows = {
         'first': {'content': 'Synthetic first fact'},
@@ -232,19 +205,14 @@ def test_memory_http_exception_is_unavailable_and_visible_memory_remains(monkeyp
         user_review = True
         visibility = 'private'
         invalid_at = None
-        is_locked = False
 
         def model_dump(self, mode='python'):
             return {'content': 'Synthetic visible memory', 'visibility': 'private'}
 
-    class Locked(Visible):
-        is_locked = True
-
     monkeypatch.setattr(reads, 'filter_canonical_default_visible_items', lambda items, **kwargs: items)
-    monkeypatch.setattr(reads, 'memory_item_to_memorydb', lambda item: Locked() if item == 'locked' else Visible())
-    monkeypatch.setattr(reads, 'read_canonical_memory_item', lambda uid, key: 'locked' if key == 'locked' else object())
+    monkeypatch.setattr(reads, 'memory_item_to_memorydb', lambda item: Visible())
+    monkeypatch.setattr(reads, 'read_canonical_memory_item', lambda uid, key: object())
     assert reads.read_record('synthetic-search-owner', 'memory_items/visible')['content'] == 'Synthetic visible memory'
-    assert reads.read_record('synthetic-search-owner', 'memory_items/locked') is None
 
 
 @pytest.mark.asyncio

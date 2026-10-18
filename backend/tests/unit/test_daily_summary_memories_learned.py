@@ -65,11 +65,6 @@ def test_reviewed_true_memory_still_qualifies():
     assert [ref.memory_id for ref in picked] == ['accepted']
 
 
-def test_locked_memory_is_excluded():
-    picked = _select([_memory('keep'), _memory('locked', is_locked=True)])
-    assert [ref.memory_id for ref in picked] == ['keep']
-
-
 def test_invalidated_memory_is_excluded():
     picked = _select([_memory('keep'), _memory('stale', invalid_at=DAY_START + timedelta(hours=2))])
     assert [ref.memory_id for ref in picked] == ['keep']
@@ -272,9 +267,7 @@ def _drive_day_summary_endpoint(monkeypatch, memories_learned):
     seen = {}
     monkeypatch.setattr(users_router.notification_db, 'get_user_time_zone', lambda uid: 'UTC')
     monkeypatch.setattr(users_router.notification_db, 'get_all_tokens', lambda uid: ['tok1'])
-    monkeypatch.setattr(
-        users_router.conversations_db, 'get_conversations', lambda *a, **k: [{'id': 'c1', 'is_locked': False}]
-    )
+    monkeypatch.setattr(users_router.conversations_db, 'get_conversations', lambda *a, **k: [{'id': 'c1'}])
     monkeypatch.setattr(users_router, 'deserialize_conversations', lambda data: [object()])
     # The endpoint owns the memory read and hands it to the generator; stub the
     # read at that seam and let the fake generator echo it back, so the test

@@ -287,25 +287,6 @@ def _prove_window_admission_and_skip(db_client: Any, uid: str, now: datetime) ->
         raise AssertionError("skip outcome did not survive retry")
 
 
-def _prove_selected_source_lock_projection(db_client: Any, uid: str) -> None:
-    ref = db_client.document(f"users/{uid}/conversations/privacy-projection")
-    try:
-        ref.set({"is_locked": False, "transcript": "must not be projected"})
-        if ref.get(field_paths=["is_locked"]).to_dict() != {"is_locked": False}:
-            raise AssertionError("privacy projection transferred unrequested content")
-        daily_sweep._assert_selected_sources_unlocked(db_client, uid, ("privacy-projection",))
-        ref.update({"is_locked": True})
-        try:
-            daily_sweep._assert_selected_sources_unlocked(db_client, uid, ("privacy-projection",))
-        except MemoryExtractionError as error:
-            if error.extractor != "source_locked_before_dispatch":
-                raise
-        else:
-            raise AssertionError("fresh lock did not block the provider boundary")
-    finally:
-        ref.delete()
-
-
 def main() -> int:
     _assert_emulator_only()
     db_client: Any = firestore.Client(project=PROJECT_ID)
@@ -316,7 +297,6 @@ def main() -> int:
         admission_uid = f"daily-memory-sweep-admission-{uuid4().hex}"
         uids.append(admission_uid)
         _prove_window_admission_and_skip(db_client, admission_uid, now)
-        _prove_selected_source_lock_projection(db_client, admission_uid)
         _prove_completed_day_source_scan(db_client, f"daily-memory-sweep-source-{uuid4().hex}")
         # Crash-after-canonical-before-receipt: the pending claimant is safely
         # replayable and canonical apply remains the sole write authority.
@@ -823,7 +803,7 @@ def main() -> int:
 
         print(
             "PASS: daily memory sweep Firestore emulator retry/interruption proof "
-            "(crash/deletion/generation/paid-wipe/pre-dispatch-release-contention/source-digest-binding/legacy-fence/source-projection/accounting-pagination/lost-accounting-refusal/window-admission/pre-lock-preflight/attested-skip/lock-projection)"
+            "(crash/deletion/generation/paid-wipe/pre-dispatch-release-contention/source-digest-binding/legacy-fence/source-projection/accounting-pagination/lost-accounting-refusal/window-admission/pre-lock-preflight/attested-skip)"
         )
         return 0
     finally:

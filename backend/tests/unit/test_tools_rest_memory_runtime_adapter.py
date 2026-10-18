@@ -21,7 +21,6 @@ def test_tools_rest_get_memories_text_uses_universal_service_for_arbitrary_uid(m
                     id="m1",
                     memory_id="m1",
                     content="memory-id=m1",
-                    is_locked=False,
                 )
             ]
 
@@ -47,19 +46,18 @@ def test_tools_rest_get_memories_text_preserves_empty_and_invalid_date_contract(
 
 
 def test_tools_rest_get_memories_text_backfills_after_filtered_first_page(monkeypatch):
-    locked = SimpleNamespace(
+    rejected = SimpleNamespace(
         created_at=datetime.now(timezone.utc),
-        id="locked",
-        memory_id="locked",
-        content="locked",
-        is_locked=True,
+        id="rejected",
+        memory_id="rejected",
+        content="rejected",
+        user_review=False,
     )
     visible = SimpleNamespace(
         created_at=datetime.now(timezone.utc),
         id="visible",
         memory_id="visible",
         content="visible",
-        is_locked=False,
     )
     calls = []
 
@@ -69,14 +67,14 @@ def test_tools_rest_get_memories_text_backfills_after_filtered_first_page(monkey
 
         def read(self, uid, **kwargs):
             calls.append((uid, kwargs))
-            return [[locked, locked], [visible], []][len(calls) - 1]
+            return [[rejected, rejected], [visible], []][len(calls) - 1]
 
     monkeypatch.setattr(memory_services, "MemoryService", _UniversalService)
 
     result = memory_services.get_memories_text(uid="uid", limit=2)
 
     assert '"visible"' in result
-    assert '"locked"' not in result
+    assert '"rejected"' not in result
     assert calls[:2] == [
         ("uid", {"limit": 2, "offset": 0, "now": None}),
         ("uid", {"limit": 500, "offset": 2, "now": None}),
@@ -89,7 +87,6 @@ def test_tools_rest_search_memories_text_uses_universal_service_and_preserves_fo
         content="coffee preference",
         category=SimpleNamespace(value="interesting"),
         created_at=datetime(2026, 6, 19, tzinfo=timezone.utc),
-        is_locked=False,
     )
 
     class _UniversalService:
@@ -133,7 +130,6 @@ def test_tools_rest_temporal_list_filters_suppressed_rows_and_sources(monkeypatc
         memory_id="suppressed",
         content="do not use this",
         created_at=now,
-        is_locked=False,
         arguments={"memory_use": {"suppressed": True}},
     )
     visible = SimpleNamespace(
@@ -141,7 +137,6 @@ def test_tools_rest_temporal_list_filters_suppressed_rows_and_sources(monkeypatc
         memory_id="visible",
         content="use this",
         created_at=now,
-        is_locked=False,
         arguments={},
     )
 
@@ -189,7 +184,6 @@ def test_tools_rest_temporal_list_accepts_older_page_shape_without_truncated(mon
         memory_id="legacy-page",
         content="legacy page shape",
         created_at=datetime(2026, 9, 14, tzinfo=timezone.utc),
-        is_locked=False,
         arguments={},
     )
 
@@ -218,7 +212,6 @@ def test_tools_rest_temporal_ranges_use_evidence_date_for_delayed_sources(monkey
         content='captured in July, processed in September',
         created_at=processed_at,
         as_of=captured_at,
-        is_locked=False,
         arguments={},
     )
 

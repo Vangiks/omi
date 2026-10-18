@@ -76,7 +76,6 @@ def test_every_provenance_rejection_counts_only_its_first_stage():
         generation(L, deleted=True),
         generation(L, source='phone'),
         generation(L, client_device_id='other-phone'),
-        generation(L, is_locked=True),
         generation(L, started_at=at(gen_start(L) + DURATION), finished_at=at(gen_start(L))),
         generation(L, external_data={'recording_session_id': ORIGIN}),
         generation(L),
@@ -89,7 +88,6 @@ def test_every_provenance_rejection_counts_only_its_first_stage():
         stamped_target=None,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
     )
     counts = plan.filter_counts
     assert counts['candidate_count_before'] == len(rows)
@@ -100,7 +98,6 @@ def test_every_provenance_rejection_counts_only_its_first_stage():
         'dropped_deleted',
         'dropped_source',
         'dropped_device',
-        'dropped_lock',
         'dropped_interval',
     ):
         assert counts[key] == 1, key
@@ -112,7 +109,7 @@ def test_every_provenance_rejection_counts_only_its_first_stage():
 
 def test_multi_violation_rows_count_only_the_first_exclusion():
     rows = [
-        generation(L, source='phone', is_locked=True),
+        generation(L, source='phone', client_device_id='other-phone'),
         generation(L, deleted=True, source='phone'),
     ]
     plan = select_segment_targets(
@@ -122,11 +119,10 @@ def test_multi_violation_rows_count_only_the_first_exclusion():
         stamped_target='STAMP',
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
     )
     assert plan.filter_counts['dropped_source'] == 1
     assert plan.filter_counts['dropped_deleted'] == 1
-    assert 'dropped_lock' not in plan.filter_counts
+    assert 'dropped_device' not in plan.filter_counts
 
 
 class _EmptyLineageDb:
@@ -168,7 +164,6 @@ def resolve_no_rows(empty_db, *, stamp='STAMP', reasons=None, **kwargs):
         stamped_target=stamp,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
         binding_reasons=reasons,
         **kwargs,
     )
@@ -198,7 +193,6 @@ def test_stage_counts_are_capped_only_at_emission(caplog):
         stamped_target='STAMP',
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
     )
     assert plan.filter_counts['candidate_count_before'] == 40
     assert plan.filter_counts['dropped_unstamped'] == 40
@@ -216,7 +210,6 @@ def test_stage_counts_are_capped_only_at_emission(caplog):
         ({'external_data': {}}, 'unstamped'),
         ({'source': 'phone'}, 'source'),
         ({'client_device_id': 'other-phone'}, 'device'),
-        ({'is_locked': True}, 'lock'),
         ({'deleted': True}, 'deleted'),
         ({'started_at': at(gen_start(L) + DURATION), 'finished_at': at(gen_start(L))}, 'interval'),
         ({}, 'compatible'),
@@ -278,7 +271,6 @@ def test_probe_never_runs_on_degraded_failed_or_truncated_lookups(empty_lineage_
         stamped_target='STAMP',
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
     )
     assert 'probe' not in empty_lineage_db.calls
 
@@ -365,7 +357,6 @@ def test_binding_reasons_fill_every_token():
         stamped_target='STAMP',
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
     )
     assert select.binding_reasons == {
         chunks[0]['id']: 'stamp_overridden',
@@ -380,7 +371,6 @@ def test_binding_reasons_fill_every_token():
         stamped_target=None,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
     )
     assert unstamped.binding_reasons == {chunks[0]['id']: 'unbound'}
 
@@ -581,7 +571,7 @@ async def test_coordinator_forwards_stamp_fallback_to_assignment(coordinator, mo
     pipeline.record_usage = MagicMock()
     captured = {}
 
-    def capture(path, uid, response, lock, errors, source, is_locked, prefs, cache, target, *args, **kwargs):
+    def capture(path, uid, response, lock, errors, source, prefs, cache, target, *args, **kwargs):
         captured[paths[path]['id']] = (target, kwargs.get('lineage_binding'))
         response['updated_memories'].add(target or 'sync-row')
         return True
@@ -628,7 +618,7 @@ async def test_coordinator_lineage_off_passes_no_binding_kwarg(coordinator, monk
     pipeline.record_usage = MagicMock()
     captured = {}
 
-    def capture(path, uid, response, lock, errors, source, is_locked, prefs, cache, target, *args, **kwargs):
+    def capture(path, uid, response, lock, errors, source, prefs, cache, target, *args, **kwargs):
         captured[paths[path]['id']] = (target, 'lineage_binding' in kwargs)
         response['updated_memories'].add(target or 'sync-row')
         return True

@@ -700,12 +700,12 @@ async def generate_persona_prompt(uid: str, persona: Dict[str, Any]):
         limit=250,
         offset=0,
     )
-    memories = [m.dict() for m in universal_memories if not m.is_locked]
+    memories = [m.dict() for m in universal_memories]
     user_name = await run_blocking(db_executor, get_user_name, uid)
 
-    # Get and condense recent conversations — exclude locked content
+    # Get and condense recent conversations
     all_conversations = await run_blocking(db_executor, get_conversations, uid, limit=10)
-    conversations = deserialize_conversations([c for c in all_conversations if not c.get('is_locked')])
+    conversations = deserialize_conversations(all_conversations)
     conversation_history = conversations_to_string(conversations)
     with track_usage(uid, Features.PERSONA):
         conversation_history = await run_blocking(llm_executor, condense_conversations, [conversation_history])

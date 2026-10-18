@@ -76,8 +76,6 @@ def answer_speaker_tag_prompt(
         raise HTTPException(status_code=400, detail=str(error)) from error
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
-    except PermissionError as error:
-        raise HTTPException(status_code=402, detail='A paid plan is required to access this conversation.') from error
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
 
@@ -97,8 +95,6 @@ def get_speaker_tag_prompt_clip(
     conversation = conversations_db.get_conversation(uid, conversation_id)
     if not conversation or conversation.get('deleted'):
         raise HTTPException(status_code=404, detail='Conversation not found')
-    if conversation.get('is_locked'):
-        raise HTTPException(status_code=402, detail='A paid plan is required to access this conversation.')
     binding = None
     if prompt_id is not None or evidence_id is not None:
         try:

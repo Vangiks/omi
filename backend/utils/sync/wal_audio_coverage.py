@@ -250,7 +250,6 @@ def _live_coverage_envelopes(
     finished_after: datetime,
     source: Any,
     client_device_id: Optional[str],
-    is_locked: bool,
     firestore_client: Any = None,
 ) -> tuple[Optional[list[dict]], str]:
     """Validated live envelopes for one capture origin, or an abstention token.
@@ -280,7 +279,6 @@ def _live_coverage_envelopes(
                 origin_id=clean_text(origin_id),
                 source=wanted_source,
                 client_device_id=device_id,
-                is_locked=is_locked,
             )
             is not None
         ):
@@ -299,7 +297,6 @@ def apply_batch_wal_audio_coverage(
     *,
     source: Any,
     client_device_id: Optional[str],
-    is_locked: bool,
     wav_paths: Sequence[str],
     source_frame_maps: Mapping,
     decoded_frames: Mapping,
@@ -336,7 +333,6 @@ def apply_batch_wal_audio_coverage(
         finished_after=datetime.fromtimestamp(min(started_values) - COVERAGE_DISCOVERY_SECONDS, tz=timezone.utc),
         source=source,
         client_device_id=client_device_id,
-        is_locked=is_locked,
         firestore_client=firestore_client,
     )
     if envelopes is None:
@@ -519,7 +515,6 @@ async def apply_sync_wal_audio_coverage(
             recording_session_id,
             source=source,
             client_device_id=client_device_id,
-            is_locked=False,
             wav_paths=wav_paths,
             source_frame_maps=source_frame_maps,
             decoded_frames=decoded_frames,

@@ -27,7 +27,6 @@ FUNNEL_REASONS = {
             'not_completed',
             'deleted',
             'discarded',
-            'locked',
             'channel_source',
             'private_cloud_disabled',
             'missing_revision',
@@ -46,7 +45,6 @@ FUNNEL_REASONS = {
             'account_deleting',
             'deleted',
             'discarded',
-            'locked',
             'not_completed',
             'revision_changed',
         }

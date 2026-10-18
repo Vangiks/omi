@@ -1094,7 +1094,6 @@ def test_saved_transcript_proof_live_words_once_then_new(real_pipeline, monkeypa
         ORIGIN,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
         wav_paths=[str(wav_path)],
         source_frame_maps={
             str(wav_path): {'claim': claim, 'offsets': [i * FRAME_SAMPLES for i in range(11)], 'incomplete': False}
@@ -1192,7 +1191,6 @@ def _short_tail_batch(monkeypatch, wav_path):
         ORIGIN,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
         wav_paths=[str(wav_path)],
         source_frame_maps={
             str(wav_path): {
@@ -1346,7 +1344,6 @@ def test_receipt_only_full_coverage_preserves_the_wal_untouched(real_pipeline, m
         ORIGIN,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
         wav_paths=[str(wav_path)],
         source_frame_maps={
             str(wav_path): {'claim': claim, 'offsets': [i * FRAME_SAMPLES for i in range(11)], 'incomplete': False}
@@ -1361,8 +1358,8 @@ def test_receipt_only_full_coverage_preserves_the_wal_untouched(real_pipeline, m
     assert _read_payload(str(wav_path)) == b''.join(_frame_bytes(v, FRAME_SAMPLES) for v in range(10))
 
 
-_WHOLE_BATCH_ARGS = ('uid', ORIGIN, 'omi', 'pendant', False, 1759999000.0, 1760000100.0)
-_WHOLE_BATCH_ARGS_REAL = ('u', ORIGIN, 'omi', 'pendant', False, 1759999000.0, 1760000100.0)
+_WHOLE_BATCH_ARGS = ('uid', ORIGIN, 'omi', 'pendant', 1759999000.0, 1760000100.0)
+_WHOLE_BATCH_ARGS_REAL = ('u', ORIGIN, 'omi', 'pendant', 1759999000.0, 1760000100.0)
 
 
 def _s1_spies(pipeline, monkeypatch):
@@ -1460,7 +1457,7 @@ async def test_s1_valid_claims_bind_each_segment_to_planned_target(coordinator, 
     fake_process = pipeline.process_segment
 
     def tracking_process(path, uid, response, lock, errors, *args, **kwargs):
-        bound_targets.append(args[4] if len(args) > 4 else None)
+        bound_targets.append(args[3] if len(args) > 3 else None)
         return fake_process(path, uid, response, lock, errors, *args, **kwargs)
 
     pipeline.process_segment = tracking_process

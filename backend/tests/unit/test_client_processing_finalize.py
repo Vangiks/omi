@@ -1113,7 +1113,6 @@ def _capture_segment_write(monkeypatch: pytest.MonkeyPatch, conv: Any) -> dict[s
 def test_segment_text_edit_clears_projection_in_the_same_write(monkeypatch) -> None:
     snapshot = {
         'data_protection_level': 'standard',
-        'is_locked': False,
         'transcript_segments': [{'id': 's1', 'text': 'old'}, {'id': 's2', 'text': 'keep'}],
         'client_processing': {'structure': {'title': PROJECTION_TITLE}},
         'structured': {'title': 'keep-title', 'overview': 'keep-overview'},
@@ -1139,7 +1138,6 @@ def test_segment_text_edit_clears_projection_in_the_same_write(monkeypatch) -> N
 def test_segment_text_edit_without_projection_does_not_touch_other_fields(monkeypatch) -> None:
     snapshot = {
         'data_protection_level': 'standard',
-        'is_locked': False,
         'transcript_segments': [{'id': 's1', 'text': 'old'}],
         'structured': {'title': 'keep-title', 'overview': 'keep-overview'},
     }
@@ -1161,7 +1159,6 @@ def test_segment_text_edit_without_projection_does_not_touch_other_fields(monkey
 def test_segment_text_edit_does_not_clear_when_mutation_does_not_write(monkeypatch) -> None:
     snapshot = {
         'data_protection_level': 'standard',
-        'is_locked': False,
         'transcript_segments': [{'id': 's1', 'text': 'old'}],
         'client_processing': {'structure': {'title': PROJECTION_TITLE}},
     }
@@ -1827,7 +1824,6 @@ def _t1_segment_dict() -> dict[str, Any]:
 def _t1_snapshot(*, status: str = ConversationStatus.completed.value) -> dict[str, Any]:
     return {
         'data_protection_level': 'standard',
-        'is_locked': False,
         'status': status,
         'transcript_segments': [_t1_segment_dict()],
         'structured': {'title': _SEGMENT_TEXT, 'overview': ''},
@@ -2035,7 +2031,6 @@ def test_sync_admit_stores_when_transcript_is_still_t1(monkeypatch) -> None:
 def test_transactional_bind_drops_legacy_noncanonical_stored_row(monkeypatch, caplog) -> None:
     legacy = {
         'data_protection_level': 'standard',
-        'is_locked': False,
         'status': ConversationStatus.completed.value,
         'transcript_segments': [
             {

@@ -203,7 +203,6 @@ _MCP_ERROR_CODES = frozenset(
     {
         "none",
         "not_found",
-        "paid_plan_required",
         "invalid_arguments",
         "authorization_denied",
         "rate_limited",
@@ -552,10 +551,10 @@ def result_count_for_tool_result(tool_name: object, result: Mapping[str, Any]) -
 def error_category_for_code(code: int, *, authorization_denied: bool = False) -> str:
     if authorization_denied or code == -32003:
         return "authorization_denied"
-    if code in {-32602, -32000, -32001, -32002}:
-        # -32001 (not found) and -32002 (paid-plan/locked) are expected
-        # client/product-gating outcomes, not backend failures; classifying
-        # them as validation keeps the internal-error bucket meaningful.
+    if code in {-32602, -32000, -32001}:
+        # -32001 (not found) is an expected client outcome, not a backend
+        # failure; classifying it as validation keeps the internal-error
+        # bucket meaningful.
         return "validation"
     if code == -32601:
         return "unknown_tool"

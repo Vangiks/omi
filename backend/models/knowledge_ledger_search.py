@@ -59,13 +59,6 @@ def ledger_schema_is_current(row: Any) -> bool:
     return _value(row, "ledger_schema_version") == "knowledge_ledger.v1"
 
 
-def ledger_row_is_locked(row: Any) -> bool:
-    if _value(row, "is_locked") is True:
-        return True
-    promotion = _value(row, "promotion") or {}
-    return isinstance(promotion, Mapping) and promotion.get("is_locked") is True
-
-
 def ledger_row_is_rejected(row: Any) -> bool:
     if _value(row, "user_review") is False:
         return True
@@ -146,7 +139,7 @@ def is_ledger_row_admissible(
     """Return whether one authoritative row may enter a ledger search.
 
     The owner check is intentionally mandatory.  A missing owner, unknown
-    schema/kind, malformed lifecycle, locked/restricted source, or rejected
+    schema/kind, malformed lifecycle, restricted source, or rejected
     row on the default surface fails closed rather than being treated as a
     permissive compatibility case.
     """
@@ -157,7 +150,7 @@ def is_ledger_row_admissible(
         return False
     if not (_value(row, "content") or "").strip():
         return False
-    if ledger_row_is_locked(row) or ledger_row_has_restricted_sensitivity(row):
+    if ledger_row_has_restricted_sensitivity(row):
         return False
     if not ledger_row_source_is_readable(row) or not _is_processed(row) or _is_hidden_or_tombstoned(row):
         return False

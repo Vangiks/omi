@@ -1239,7 +1239,6 @@ def process_segment(
     lock: threading.Lock,
     errors: list,
     source: ConversationSource = ConversationSource.omi,
-    is_locked: bool = False,
     transcription_prefs: dict = None,
     person_embeddings_cache: dict = None,
     target_conversation_id: str = None,
@@ -1440,14 +1439,13 @@ def process_segment(
             transcript_segments=transcript_segments,
             source=source,
             language=language,
-            is_locked=is_locked,
             private_cloud_sync_enabled=private_cloud_sync_enabled,
             client_device_id=client_device_id,
             client_platform=client_platform,
             geolocation=geolocation,
         )
         incoming = Conversation(
-            id=chunk_identity(uid, source, client_device_id, is_locked, timestamp),
+            id=chunk_identity(uid, source, client_device_id, timestamp),
             created_at=started_at,
             structured=build_deterministic_minimum_structured(create_memory),
             **create_memory.model_dump(),
@@ -2011,7 +2009,6 @@ async def _resolve_safety_wal_target(
         recording_session_id,
         source,
         client_device_id,
-        False,
         audio_start_seconds,
         audio_end_seconds,
     )
@@ -2307,7 +2304,6 @@ async def _run_full_pipeline_background_async(  # pyright: ignore[reportGeneralT
                     capture_partition={
                         'source': source,
                         'client_device_id': client_device_id,
-                        'is_locked': False,
                     },
                 )
                 safety_coverage_paths.update(safety_generated)
@@ -2579,8 +2575,6 @@ async def _run_full_pipeline_background_async(  # pyright: ignore[reportGeneralT
                         _bounded_exception_type(e),
                     )
 
-            is_locked = False
-
             # --- Phase 4: Fetch prefs & embeddings ---
             job_phase = 'provider_select'
             transcription_prefs = await run_blocking(db_executor, users_db.get_user_transcription_preferences, uid)
@@ -2671,7 +2665,6 @@ async def _run_full_pipeline_background_async(  # pyright: ignore[reportGeneralT
                         target_conversation_id,
                         source,
                         client_device_id,
-                        is_locked,
                         job_id,
                         segment_binding_reasons,
                         **({'segment_source_maps': segment_source_maps} if segment_source_maps else {}),
@@ -2699,7 +2692,6 @@ async def _run_full_pipeline_background_async(  # pyright: ignore[reportGeneralT
                     segment_lock,
                     segment_errors,
                     source,
-                    is_locked,
                     transcription_prefs,
                     person_embeddings_cache,
                     segment_target,

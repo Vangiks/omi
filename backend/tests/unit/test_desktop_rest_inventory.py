@@ -294,7 +294,6 @@ def test_conversations_search_hydrates_index_hits_before_returning_app_client_ro
 
     assert 'search_results = search_conversations(' in endpoint_source
     assert 'get_conversations_by_id_without_photos(' in endpoint_source
-    assert "if not conversation.get('is_locked')" in endpoint_source
     assert "search_results['items'] = conversations" in endpoint_source
     assert "search_results['total_pages'] =" in endpoint_source
     assert 'return search_conversations(' not in endpoint_source

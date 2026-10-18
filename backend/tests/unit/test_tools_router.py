@@ -3,7 +3,7 @@
 Covers:
 1. get_conversations_text — date parsing, limit caps, empty results
 2. search_conversations_text — query routing, date conversion to timestamps
-3. get_memories_text — date parsing, locked memory filtering
+3. get_memories_text — date parsing
 4. search_memories_text — vector search delegation
 5. get_action_items_text — date parsing, status filtering
 6. create_action_item_text — validation, default due date, past-date rejection
@@ -234,11 +234,7 @@ class FakeMemoryService:
         rows = vector_db.find_similar_memories(uid, query, threshold=0.0, limit=limit)
         ids = [row["memory_id"] for row in rows]
         scores = {row["memory_id"]: float(row.get("score", 0.0)) for row in rows}
-        hydrated = {
-            row["id"]: FakeMemoryDB(**row)
-            for row in memories_db.get_memories_by_ids(uid, ids)
-            if not row.get("is_locked", False)
-        }
+        hydrated = {row["id"]: FakeMemoryDB(**row) for row in memories_db.get_memories_by_ids(uid, ids)}
         return [
             types.SimpleNamespace(memory=hydrated[memory_id], score=scores[memory_id])
             for memory_id in ids
@@ -429,7 +425,6 @@ class FakeMemoryDB:
         self.content = kwargs.get('content', 'test memory')
         self.category = FakeCategory.other
         self.created_at = kwargs.get('created_at', datetime.now(timezone.utc))
-        self.is_locked = kwargs.get('is_locked', False)
 
     @staticmethod
     def get_memories_as_str(memories):
@@ -774,7 +769,7 @@ class TestSearchConversationsText:
         conversation_id = "e8c05000-52f0-4a95-951c-ccd715523429"
         search_mod.parse_exact_conversation_reference.return_value = conversation_id
         conversations_db.get_conversations_by_id.return_value = [
-            {'id': conversation_id, 'transcript_segments': [], 'is_locked': False},
+            {'id': conversation_id, 'transcript_segments': []},
         ]
 
         result = conversations_svc.search_conversations_text(
@@ -792,7 +787,7 @@ class TestSearchConversationsText:
         search_mod.parse_exact_conversation_reference.return_value = conversation_id
         search_mod.conversation_matches_date_range.return_value = False
         conversations_db.get_conversations_by_id.return_value = [
-            {'id': conversation_id, 'transcript_segments': [], 'is_locked': False},
+            {'id': conversation_id, 'transcript_segments': []},
         ]
 
         result = conversations_svc.search_conversations_text(
@@ -830,14 +825,6 @@ class TestGetMemoriesText:
         result = memories_svc.get_memories_text(uid="test-uid")
         assert "No memories found" in result
 
-    def test_filters_locked(self):
-        memories_db.get_memories.return_value = [
-            {'id': 'mem-1', 'content': 'visible', 'is_locked': False, 'created_at': datetime.now(timezone.utc)},
-            {'id': 'mem-2', 'content': 'locked', 'is_locked': True, 'created_at': datetime.now(timezone.utc)},
-        ]
-        result = memories_svc.get_memories_text(uid="test-uid")
-        assert "1 shown" in result
-
     def test_limit_cap(self):
         memories_svc.get_memories_text(uid="test-uid", limit=99999)
         call_kwargs = memories_db.get_memories.call_args
@@ -864,7 +851,7 @@ class TestSearchMemoriesText:
             {'memory_id': 'mem-1', 'score': 0.95},
         ]
         memories_db.get_memories_by_ids.return_value = [
-            {'id': 'mem-1', 'content': 'likes pasta', 'is_locked': False, 'created_at': datetime.now(timezone.utc)},
+            {'id': 'mem-1', 'content': 'likes pasta', 'created_at': datetime.now(timezone.utc)},
         ]
         result = memories_svc.search_memories_text(uid="test-uid", query="food")
         assert "likes pasta" in result
@@ -901,16 +888,6 @@ class TestGetActionItemsText:
         assert "Buy groceries" in result
         assert "Pending" in result
         assert "ai-1" in result
-
-    def test_filters_locked_items(self):
-        action_items_db.get_action_items.return_value = [
-            {'id': 'ai-1', 'description': 'Visible', 'completed': False, 'is_locked': False},
-            {'id': 'ai-2', 'description': 'Locked', 'completed': False, 'is_locked': True},
-        ]
-        result = action_items_svc.get_action_items_text(uid="test-uid")
-        assert "Visible" in result
-        assert "Locked" not in result
-        assert "1 total" in result
 
 
 # ===========================================================================
@@ -973,11 +950,6 @@ class TestUpdateActionItemText:
         action_items_db.get_action_item.return_value = None
         result = action_items_svc.update_action_item_text(uid="test-uid", action_item_id="bad-id")
         assert "not found" in result.lower()
-
-    def test_locked_item_rejected(self):
-        action_items_db.get_action_item.return_value = {'id': 'ai-1', 'description': 'Test', 'is_locked': True}
-        result = action_items_svc.update_action_item_text(uid="test-uid", action_item_id="ai-1", completed=True)
-        assert "paid plan" in result.lower()
 
     def test_no_changes(self):
         action_items_db.get_action_item.return_value = {'id': 'ai-1', 'description': 'Test'}
@@ -1403,87 +1375,6 @@ class TestRateLimitPolicies:
         calls = endpoints_mod.with_rate_limit.call_args_list
         mutate_calls = [c for c in calls if len(c[0]) >= 2 and c[0][1] == "tools:mutate"]
         assert len(mutate_calls) >= 1, "with_rate_limit not called with 'tools:mutate'"
-
-
-# ===========================================================================
-# Tests: Conversation locked item filtering
-# ===========================================================================
-class TestConversationLockedFiltering:
-    def setup_method(self):
-        conversations_db.get_conversations.reset_mock()
-        conversations_db.get_conversations_by_id.reset_mock()
-        vector_db.query_vectors.reset_mock()
-
-    def test_get_conversations_filters_locked(self):
-        """Locked conversations are excluded from get results."""
-        conversations_db.get_conversations.return_value = [
-            {'id': 'conv-1', 'transcript_segments': [], 'is_locked': False},
-            {'id': 'conv-2', 'transcript_segments': [], 'is_locked': True},
-        ]
-        result = conversations_svc.get_conversations_text(uid="test-uid")
-        assert "1 conversations formatted" in result
-
-    def test_get_conversations_all_locked_returns_empty(self):
-        """All locked conversations returns 'no conversations' message."""
-        conversations_db.get_conversations.return_value = [
-            {'id': 'conv-1', 'transcript_segments': [], 'is_locked': True},
-        ]
-        result = conversations_svc.get_conversations_text(uid="test-uid")
-        assert "No conversations found" in result
-
-    def test_search_conversations_filters_locked(self):
-        """Locked conversations are excluded from search results."""
-        vector_db.query_vectors.return_value = ["conv-1", "conv-2"]
-        conversations_db.get_conversations_by_id.return_value = [
-            {'id': 'conv-1', 'transcript_segments': [], 'is_locked': False},
-            {'id': 'conv-2', 'transcript_segments': [], 'is_locked': True},
-        ]
-        result = conversations_svc.search_conversations_text(uid="test-uid", query="test")
-        assert "1 conversations formatted" in result
-
-    def test_search_conversations_all_locked_returns_empty(self):
-        """All locked conversations in search returns 'no conversations' message."""
-        vector_db.query_vectors.return_value = ["conv-1"]
-        conversations_db.get_conversations_by_id.return_value = [
-            {'id': 'conv-1', 'transcript_segments': [], 'is_locked': True},
-        ]
-        result = conversations_svc.search_conversations_text(uid="test-uid", query="test")
-        assert "No conversations found" in result
-
-
-# ===========================================================================
-# Tests: Search memories locked filtering
-# ===========================================================================
-class TestSearchMemoriesLockedFiltering:
-    def setup_method(self):
-        vector_db.find_similar_memories.reset_mock()
-        memories_db.get_memories_by_ids.reset_mock()
-
-    def test_search_memories_filters_locked(self):
-        """Locked memories are excluded from search results."""
-        vector_db.find_similar_memories.return_value = [
-            {'memory_id': 'mem-1', 'score': 0.9},
-            {'memory_id': 'mem-2', 'score': 0.8},
-        ]
-        memories_db.get_memories_by_ids.return_value = [
-            {'id': 'mem-1', 'content': 'visible', 'is_locked': False, 'created_at': datetime.now(timezone.utc)},
-            {'id': 'mem-2', 'content': 'locked', 'is_locked': True, 'created_at': datetime.now(timezone.utc)},
-        ]
-        result = memories_svc.search_memories_text(uid="test-uid", query="test")
-        assert "visible" in result
-        assert "locked" not in result
-        assert "1 shown" in result
-
-    def test_search_memories_all_locked_returns_empty(self):
-        """All locked memories in search returns 'no memories' message."""
-        vector_db.find_similar_memories.return_value = [
-            {'memory_id': 'mem-1', 'score': 0.9},
-        ]
-        memories_db.get_memories_by_ids.return_value = [
-            {'id': 'mem-1', 'content': 'locked', 'is_locked': True, 'created_at': datetime.now(timezone.utc)},
-        ]
-        result = memories_svc.search_memories_text(uid="test-uid", query="test")
-        assert "No memories found" in result
 
 
 # ===========================================================================

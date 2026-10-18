@@ -162,7 +162,6 @@ def _make_folder(folder_id='f1', name='Work'):
 def _make_conversation(conv_id='conv-1'):
     return {
         'id': conv_id,
-        'is_locked': False,
         'structured': {
             'title': 'Test Conversation',
             'overview': 'Test overview',
@@ -601,10 +600,9 @@ class TestDevApiMemoriesHttpLayer:
                 'user_review': 'yes',
             },
             {
-                'id': 'mem-locked-legacy',
+                'id': 'mem-null-legacy',
                 'content': None,
                 'category': None,
-                'is_locked': True,
                 'scoring': 123,
             },
             {
@@ -641,11 +639,11 @@ class TestDevApiMemoriesHttpLayer:
         assert legacy['user_review'] is True
         assert legacy['edited'] is False
 
-        locked_legacy = body[2]
-        assert locked_legacy['id'] == 'mem-locked-legacy'
-        assert locked_legacy['content'] == ''
-        assert locked_legacy['category'] == 'interesting'
-        assert locked_legacy['scoring'] == '123'
+        null_legacy = body[2]
+        assert null_legacy['id'] == 'mem-null-legacy'
+        assert null_legacy['content'] == ''
+        assert null_legacy['category'] == 'interesting'
+        assert null_legacy['scoring'] == '123'
         memory_service.read.assert_called_once_with(
             'uid1', limit=4, offset=7, include_pending_processing=True, budget=ANY
         )

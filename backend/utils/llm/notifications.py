@@ -53,7 +53,7 @@ async def get_relevant_memories(uid: str, limit: int = 100) -> List[MemoryRecord
         limit=limit,
         offset=0,
     )
-    return [m.dict() for m in universal_memories if not m.is_locked]
+    return [m.dict() for m in universal_memories]
 
 
 async def generate_notification_message(uid: str, name: str, plan_type: str = "basic") -> Tuple[str, str]:

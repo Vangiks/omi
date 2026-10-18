@@ -252,7 +252,7 @@ async def test_partial_batch_carries_one_strike_and_keeps_the_healthy_sibling(pi
             retryable=False,
         )
         # The real process_segment releases the assignment slot in finally.
-        args[5].complete(path)
+        args[4].complete(path)
         if path.endswith('a.wav'):
             errors.append('sync_persistence_failed')
             kwargs['deferred_outcome'].update(

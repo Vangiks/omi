@@ -462,7 +462,6 @@ ACTION_ITEMS_LIST_SELECT_FIELDS = (
     'completed_at',
     'superseded_by',
     'conversation_id',
-    'is_locked',
     'exported',
     'export_date',
     'export_platform',
@@ -1408,29 +1407,6 @@ def batch_sync_update_action_items(uid: str, updates: List[Dict[str, Any]]) -> B
     if result.updated_ids:
         bump_action_items_list_version(uid)
     return result
-
-
-def unlock_all_action_items(uid: str, *, limit: Optional[int] = None) -> int:
-    """Unlock all locked rows, or one bounded page when limit is supplied."""
-    action_items_ref = db.collection('users').document(uid).collection(action_items_collection)
-    locked_items_query = action_items_ref.where(filter=FieldFilter('is_locked', '==', True))
-
-    from database.locked_content import unlock_query_rows
-    from database.legal_holds import external_write_fence
-
-    with external_write_fence(uid):
-        total = unlock_query_rows(
-            db,
-            locked_items_query,
-            {'is_locked': False, 'updated_at': datetime.now(timezone.utc)},
-            limit=limit,
-        )
-        # An empty locked query is a duplicate unlock. Bumping would only
-        # invalidate the list cache; no row was rewritten.
-        if total:
-            bump_action_items_list_version(uid)
-        logger.info(f"Unlocked all action items for user {uid}")
-        return total
 
 
 # ============================================================================

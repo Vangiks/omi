@@ -333,7 +333,6 @@ _add(
         neutrals={'replacements': (None, 'optional rename map; not filter-affecting')},
     )
 )
-_add(DriverEntry('database.action_items.unlock_all_action_items', base={'uid': UID}, domains={'limit': [None, 100]}))
 
 _add(
     DriverEntry(
@@ -938,7 +937,6 @@ _add(
         ),
     )
 )
-_add(DriverEntry('database.conversations.unlock_all_conversations', base={'uid': UID}, domains={'limit': [None, 100]}))
 
 _add(
     DriverEntry(
@@ -1679,7 +1677,6 @@ _add(
         neutrals={'limit': _LIMIT, 'budget': _BUDGET},
     )
 )
-_add(DriverEntry('database.memories.unlock_all_memories', base={'uid': UID}, domains={'limit': [None, 100]}))
 
 _add(
     DriverEntry(
@@ -2800,18 +2797,6 @@ _add(
 )
 
 
-_add(DriverEntry('database.locked_content.has_recoverable_locked_content', base={'uid': UID}))
-_add(
-    CoveredByEntry(
-        'database.locked_content.unlock_query_rows',
-        covered_by=(
-            'database.action_items.unlock_all_action_items',
-            'database.conversations.unlock_all_conversations',
-            'database.memories.unlock_all_memories',
-        ),
-        reason='Shared batch mechanics and bounded projection exercised by upgrade/reset unlock drivers',
-    )
-)
 
 
 from database.chat_context import ChatContextStore

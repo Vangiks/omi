@@ -177,8 +177,6 @@ def move_conversation_to_folder(
     conversation = conversations_db.get_conversation(uid, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    if conversation.get('is_locked', False):
-        raise HTTPException(status_code=402, detail="A paid plan is required to access this conversation.")
 
     if request.folder_id:
         folder = folders_db.get_folder(uid, request.folder_id)
@@ -202,13 +200,11 @@ def bulk_move_conversations(
     if not folder:
         raise HTTPException(status_code=404, detail="Folder not found")
 
-    # Validate none of the conversations are locked
+    # Validate all conversations exist
     for conv_id in request.conversation_ids:
         conv = conversations_db.get_conversation(uid, conv_id)
         if not conv:
             raise HTTPException(status_code=404, detail=f"Conversation {conv_id} not found")
-        if conv.get('is_locked', False):
-            raise HTTPException(status_code=402, detail="A paid plan is required to access this conversation.")
 
     moved = folders_db.bulk_move_conversations_to_folder(uid, request.conversation_ids, folder_id)
     return {"status": "ok", "moved_count": moved}

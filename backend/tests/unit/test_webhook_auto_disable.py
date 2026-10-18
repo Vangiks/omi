@@ -2138,7 +2138,6 @@ class TestDevWebhookIntegrationPaths:
             mock_sem.__aexit__ = AsyncMock()
             with patch("utils.webhooks.get_webhook_semaphore", return_value=mock_sem):
                 mock_memory = MagicMock()
-                mock_memory.is_locked = False
                 with (
                     patch("utils.webhooks.conversation_to_dict", return_value={}),
                     patch("utils.webhooks.populate_speaker_names"),
@@ -2172,7 +2171,6 @@ class TestDevWebhookIntegrationPaths:
             patch("utils.webhooks._DEV_WEBHOOK_RETRY_DELAYS", ()),
         ):
             mock_memory = MagicMock()
-            mock_memory.is_locked = False
             with (
                 patch("utils.webhooks.conversation_to_dict", return_value={}),
                 patch("utils.webhooks.populate_speaker_names"),
@@ -2209,7 +2207,6 @@ class TestDevWebhookIntegrationPaths:
             patch("utils.webhooks._DEV_WEBHOOK_RETRY_DELAYS", ()),
         ):
             mock_memory = MagicMock()
-            mock_memory.is_locked = False
             with (
                 patch("utils.webhooks.conversation_to_dict", return_value={}),
                 patch("utils.webhooks.populate_speaker_names"),

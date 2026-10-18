@@ -144,8 +144,7 @@ class LedgerPromptProjectionReceipt(BaseModel):
             if row.uid != uid or row.ledger_schema_version != LEDGER_SCHEMA_VERSION:
                 raise ValueError("ledger prompt projection contains a foreign or unsupported row")
             if (
-                row.is_locked
-                or row.user_review is False
+                row.user_review is False
                 or row.invalid_at is not None
                 or (row.superseded_by or "").strip()
                 or row.is_dismissed
@@ -171,7 +170,6 @@ class LedgerMigrationPublicationError(RuntimeError):
 def _prompt_eligible(row: MemoryDB) -> bool:
     if (
         row.ledger_schema_version != LEDGER_SCHEMA_VERSION
-        or row.is_locked
         or row.user_review is False
         or row.invalid_at is not None
         or (row.superseded_by or "").strip()
@@ -193,7 +191,6 @@ def _legacy_prompt_serving(row: MemoryDB) -> bool:
         tier == "archive"
         or row.invalid_at is not None
         or (row.superseded_by or "").strip()
-        or row.is_locked
         or row.user_review is False
         or row.is_dismissed
         or (row.visibility or "").strip().lower() == "hidden"

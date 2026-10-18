@@ -39,7 +39,6 @@ class MockMemoryDB(BaseModel):
     created_at: datetime
     updated_at: datetime
     visibility: str = 'private'
-    is_locked: bool = False
 
 
 class TestMemoryValidationFiltering:

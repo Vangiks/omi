@@ -120,10 +120,6 @@ def get_conversations_text(
         logger.error(f"get_conversations_text error: {e}")
         return f"Error retrieving conversations: {e}"
 
-    # Filter locked
-    if conversations_data:
-        conversations_data = [c for c in conversations_data if not c.get('is_locked', False)]
-
     if not conversations_data:
         date_info = ""
         if start_dt and end_dt:
@@ -281,10 +277,7 @@ def search_conversations_text(
                 ' ' + chat_transcript_coverage_note(transcript_search.searched) if not exact_conversation_id else ''
             )
 
-        # Filter locked
-        conversations_data = [
-            c for c in conversations_data if not c.get('is_locked', False) and not c.get('discarded', False)
-        ]
+        conversations_data = [c for c in conversations_data if not c.get('discarded', False)]
         # Search indexes can contain stale date metadata; the hydrated document is authoritative.
         conversations_data = [c for c in conversations_data if conversation_matches_date_range(c, starts_at, ends_at)]
         if not conversations_data:

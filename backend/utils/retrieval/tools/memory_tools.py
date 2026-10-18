@@ -246,10 +246,6 @@ def get_memories_tool(
     scan_truncated = False
     try:
         service = MemoryService(db_client=firestore_db)
-        # Product/API reads retain a short locked preview for released clients,
-        # but chat context must never receive paid-plan locked content. Keep the
-        # privacy boundary at this LLM-facing consumer even though all rows now
-        # come through the universal MemoryService.
         target_end = min(max(offset, 0) + limit, 5000)
         scan_offset = 0
         visible: List[MemoryDB] = []
@@ -282,8 +278,7 @@ def get_memories_tool(
                 scan_offset += len(batch)
                 for memory in batch:
                     if (
-                        memory.is_locked
-                        or getattr(memory, 'user_review', None) is False
+                        getattr(memory, 'user_review', None) is False
                         or (belief_model_enabled() and memory_use_suppressed(memory))
                         or not _memory_in_scope(_memory_read_date(memory, temporal=True), start_dt, end_dt)
                     ):
@@ -301,10 +296,8 @@ def get_memories_tool(
                     break
                 scan_offset += len(batch)
                 for memory in batch:
-                    if (
-                        memory.is_locked
-                        or getattr(memory, 'user_review', None) is False
-                        or (belief_model_enabled() and memory_use_suppressed(memory))
+                    if getattr(memory, 'user_review', None) is False or (
+                        belief_model_enabled() and memory_use_suppressed(memory)
                     ):
                         continue
                     if not _memory_in_scope(memory.created_at, start_dt, end_dt):
@@ -503,8 +496,7 @@ def search_memories_tool(
         matches = [
             match
             for match in matches
-            if not match.memory.is_locked
-            and not (belief_model_enabled() and memory_use_suppressed(match.memory))
+            if not (belief_model_enabled() and memory_use_suppressed(match.memory))
             and not (hide_private and is_channel_private_memory(match.memory))
         ]
         if scope_start_dt or scope_end_dt:

@@ -289,22 +289,6 @@ def raise_if_legacy_write_blocked(context: ExternalMemoryWriteContext) -> None:
     del context
 
 
-def _truncate_locked_preview_text(content: str) -> str:
-    if len(content) > 70:
-        return content[:70] + "..."
-    return content
-
-
-def truncate_locked_memory_preview(memory: MemoryDB) -> MemoryDB:
-    """Truncate locked-memory content to the legacy 70-char preview."""
-    if not getattr(memory, 'is_locked', False) or not memory.content:
-        return memory
-    truncated = _truncate_locked_preview_text(memory.content)
-    if truncated == memory.content:
-        return memory
-    return memory.model_copy(update={"content": truncated})
-
-
 def _legacy_memorydb(value: MemoryDB | Dict[str, Any]) -> MemoryDB:
     """Normalize one legacy memory object so direct route serialization stays untiered."""
     if isinstance(value, MemoryDB):
@@ -370,10 +354,6 @@ def _validate_memory_list(memories: List[MemoryPayload]) -> List[MemoryDB]:
     valid_memories: List[MemoryDB] = []
     for memory in memories:
         memory = memory_api_payload(memory, MemoryApiExposure.LEGACY)
-        if memory.get("is_locked", False):
-            content = memory.get("content", "")
-            memory = dict(memory)
-            memory["content"] = _truncate_locked_preview_text(content)
         try:
             valid_memories.append(_legacy_memorydb(memory))
         except ValidationError as exc:
@@ -418,11 +398,7 @@ def _legacy_search_memories(uid: str, query: str, *, limit: int = 5) -> List[Mem
         return []
 
     memories_data = memory_store_read(memories_db.get_memories_by_ids, uid, memory_ids)
-    memories_data = [
-        memory_api_payload(memory, MemoryApiExposure.LEGACY)
-        for memory in memories_data
-        if not memory.get("is_locked", False)
-    ]
+    memories_data = [memory_api_payload(memory, MemoryApiExposure.LEGACY) for memory in memories_data]
 
     results: List[MemorySearchMatch] = []
     for memory_data in memories_data:
@@ -578,7 +554,7 @@ class CanonicalMemoryBackend:
             read_kwargs["view"] = view
         if as_of is not None:
             read_kwargs["as_of"] = as_of
-        return [truncate_locked_memory_preview(memory) for memory in read_canonical_memories(uid, **read_kwargs)]
+        return read_canonical_memories(uid, **read_kwargs)
 
     def _read_keyset_window(
         self,
@@ -665,7 +641,7 @@ class CanonicalMemoryBackend:
         if stopped_early and budget is not None and not budget.truncated:
             budget.mark_exhausted('documents')
         page = collected[bounded_offset : bounded_offset + bounded_limit]
-        return [truncate_locked_memory_preview(memory) for memory in page]
+        return page
 
     def search(
         self,
@@ -705,7 +681,7 @@ class CanonicalMemoryBackend:
             if not item.get("memory_id"):
                 continue
             memory_obj = search_result_to_memorydb(uid, item)
-            if memory_obj.is_locked or memory_obj.user_review is False or memory_obj.invalid_at is not None:
+            if memory_obj.user_review is False or memory_obj.invalid_at is not None:
                 continue
             raw_score = item.get("score") or item.get("relevance_score")
             try:
@@ -817,7 +793,6 @@ class HistoricalMemoryAdapter:
     def _historical_memory(
         raw: MemoryPayload,
         *,
-        include_locked_content: bool = False,
         uid: Optional[str] = None,
     ) -> MemoryDB:
         # Missing visibility is a compatibility case.  Public is the released
@@ -835,8 +810,6 @@ class HistoricalMemoryAdapter:
         # fallback instead of dropping the row during Pydantic validation.
         if payload.get("updated_at") is None and payload.get("created_at") is not None:
             payload["updated_at"] = payload["created_at"]
-        if not include_locked_content and payload.get("is_locked") and isinstance(payload.get("content"), str):
-            payload["content"] = _truncate_locked_preview_text(payload["content"])
         memory = MemoryDB.model_validate(payload)
         # Historical rows are logically grandfathered Long-term records.  This
         # adapter classification is deliberately not a fabricated promotion
@@ -848,14 +821,12 @@ class HistoricalMemoryAdapter:
         cls,
         uid: str,
         raw: MemoryPayload,
-        *,
-        include_locked_content: bool = False,
     ) -> Optional[HistoricalMemoryRecord]:
         memory_id = raw.get("id")
         if not isinstance(memory_id, str) or not memory_id.strip():
             return None
         try:
-            memory = cls._historical_memory(raw, include_locked_content=include_locked_content, uid=uid)
+            memory = cls._historical_memory(raw, uid=uid)
         except ValidationError as exc:
             # Never log ValidationError.__str__ — it embeds input_value (memory content).
             logger.warning(
@@ -1097,7 +1068,6 @@ class HistoricalMemoryAdapter:
         *,
         device_scope_request: Optional[DeviceScopeRequest],
         drop_updated_at_present: bool = False,
-        include_locked_content: bool = False,
     ) -> List[Tuple[Optional[HistoricalMemoryRecord], Tuple[datetime, str]]]:
         slots: List[Tuple[Optional[HistoricalMemoryRecord], Tuple[datetime, str]]] = []
         for raw, scan_cursor in zip(payloads, cursors):
@@ -1112,7 +1082,7 @@ class HistoricalMemoryAdapter:
             decrypted = memories_db.prepare_memory_for_read(raw, uid) or raw
             decrypted = dict(decrypted)
             decrypted['id'] = raw.get('id')
-            record = self._adapt(uid, decrypted, include_locked_content=include_locked_content)
+            record = self._adapt(uid, decrypted)
             if record is None or not self.matches_device(record, device_scope_request):
                 slots.append((None, scan_cursor))
             else:
@@ -1126,7 +1096,6 @@ class HistoricalMemoryAdapter:
         limit: int = 100,
         start_after: Optional[Tuple[datetime, str]] = None,
         device_scope_request: Optional[DeviceScopeRequest] = None,
-        include_locked_content: bool = False,
         budget: Optional[ListReadBudget] = None,
     ) -> Tuple[List[Tuple[Optional[HistoricalMemoryRecord], Tuple[datetime, str]]], bool]:
         """Bounded updated_at-present historical keyset page."""
@@ -1150,7 +1119,6 @@ class HistoricalMemoryAdapter:
             cursors,
             device_scope_request=device_scope_request,
             drop_updated_at_present=False,
-            include_locked_content=include_locked_content,
         )
         return slots, exhausted
 
@@ -1161,7 +1129,6 @@ class HistoricalMemoryAdapter:
         limit: int = 100,
         start_after: Optional[Tuple[datetime, str]] = None,
         device_scope_request: Optional[DeviceScopeRequest] = None,
-        include_locked_content: bool = False,
         budget: Optional[ListReadBudget] = None,
     ) -> Tuple[List[Tuple[Optional[HistoricalMemoryRecord], Tuple[datetime, str]]], bool]:
         """Bounded created_at historical keyset page with updated_at-present filtered out."""
@@ -1185,7 +1152,6 @@ class HistoricalMemoryAdapter:
             cursors,
             device_scope_request=device_scope_request,
             drop_updated_at_present=True,
-            include_locked_content=include_locked_content,
         )
         return slots, exhausted
 
@@ -1223,7 +1189,7 @@ class HistoricalMemoryAdapter:
             record = self._adapt(uid, raw)
             if record is None or not self.matches_device(record, device_scope_request):
                 continue
-            if record.memory.is_locked or record.memory.user_review is False or record.memory.invalid_at is not None:
+            if record.memory.user_review is False or record.memory.invalid_at is not None:
                 continue
             by_id.setdefault(record.memory.id, record)
         return [
@@ -1286,7 +1252,6 @@ class HistoricalMemoryAdapter:
         *,
         page_size: int = 500,
         device_scope_request: Optional[DeviceScopeRequest] = None,
-        include_locked_content: bool = True,
     ) -> Iterator[HistoricalMemoryRecord]:
         """Stream every historical live row through stable dual-keyset scans."""
         page_size = max(1, min(int(page_size or 500), self.MAX_PAGE_SIZE))
@@ -1302,7 +1267,6 @@ class HistoricalMemoryAdapter:
                     limit=page_size,
                     start_after=cursor,
                     device_scope_request=device_scope_request,
-                    include_locked_content=include_locked_content,
                 )
                 if not slots and not exhausted:
                     raise HTTPException(status_code=503, detail="Historical memory scan made no progress")
@@ -1547,7 +1511,7 @@ class _HistoricalRawStream:
                 self.scan_keyset = scan_keyset
                 self._advance_raw_slot()
                 continue
-            memory = truncate_locked_memory_preview(record.memory)
+            memory = record.memory
             reason = self._service.historical_suppression_reason(
                 memory.id,
                 statuses=self._chunk_statuses,
@@ -1778,11 +1742,7 @@ class _CanonicalCursorStream:
             )
             raise MemoryBackingStoreUnavailable("Canonical memory unavailable", stream="canonical") from exc
         self._slots = [
-            (
-                truncate_locked_memory_preview(memory) if memory is not None else None,
-                self._service.scan_cursor_to_stream_keyset(scan_cursor),
-            )
-            for memory, scan_cursor in raw_slots
+            (memory, self._service.scan_cursor_to_stream_keyset(scan_cursor)) for memory, scan_cursor in raw_slots
         ]
         self._slot_index = 0
         self._slots_exhausted = stream_exhausted
@@ -2016,8 +1976,6 @@ class MemoryService:
             raise HTTPException(status_code=422, detail="Memory correction must not be blank")
         if prior.ledger_schema_version != LEDGER_SCHEMA_VERSION or prior.kind != MemoryKind.fact:
             raise HTTPException(status_code=409, detail="Only knowledge ledger facts may be corrected")
-        if memory_item_to_memorydb(prior).is_locked:
-            raise HTTPException(status_code=402, detail="A paid plan is required to access this memory.")
         if prior.visibility not in {"private", "public", "shared"}:
             raise HTTPException(status_code=503, detail="Canonical memory unavailable")
         if prior.status != MemoryItemStatus.active or prior.valid_to is not None or prior.superseded_by:
@@ -2165,8 +2123,6 @@ class MemoryService:
             or memory_item_to_memorydb(selected).user_review is False
         ):
             raise HTTPException(status_code=409, detail="Knowledge ledger history cannot be reopened")
-        if memory_item_to_memorydb(selected).is_locked:
-            raise HTTPException(status_code=402, detail="A paid plan is required to access this memory.")
         if not (selected.content or "").strip() or selected.visibility not in {"private", "public", "shared"}:
             raise HTTPException(status_code=409, detail="Knowledge ledger history cannot be reopened")
 
@@ -2262,8 +2218,6 @@ class MemoryService:
             or not (selected.superseded_by or "").strip()
         ):
             raise HTTPException(status_code=409, detail="Only superseded knowledge ledger facts may be restored")
-        if memory_item_to_memorydb(selected).is_locked:
-            raise HTTPException(status_code=402, detail="A paid plan is required to access this memory.")
         if not (selected.content or "").strip():
             raise HTTPException(status_code=409, detail="Knowledge ledger history cannot be restored")
 
@@ -2309,8 +2263,6 @@ class MemoryService:
                         evidence_id=expected_evidence_id,
                     )
                 ):
-                    if memory_item_to_memorydb(successor).is_locked:
-                        raise HTTPException(status_code=402, detail="A paid plan is required to access this memory.")
                     self._invalidate_prompt_cache(uid)
                     return memory_item_to_memorydb(successor)
                 raise HTTPException(status_code=409, detail="Memory revert operation is no longer current")
@@ -2327,8 +2279,6 @@ class MemoryService:
             or tail.canonical_memory_id
         ):
             raise HTTPException(status_code=409, detail="Knowledge ledger history has no current fact")
-        if memory_item_to_memorydb(tail).is_locked:
-            raise HTTPException(status_code=402, detail="A paid plan is required to access this memory.")
         if tail.visibility not in {"private", "public", "shared"}:
             raise HTTPException(status_code=503, detail="Canonical memory unavailable")
         if (tail.content or "").strip() == (selected.content or "").strip():
@@ -3212,18 +3162,13 @@ class MemoryService:
                 and not memory_matches_device(item, device_scope_request.client_device_id or "")
             ):
                 raise HTTPException(status_code=404, detail="Memory not found")
-            memory = memory_item_to_memorydb(item)
-            if memory.is_locked:
-                raise HTTPException(status_code=402, detail="A paid plan is required to access this memory.")
-            return memory
+            return memory_item_to_memorydb(item)
         status = self._canonical_status(uid, memory_id)
         if status is not None:
             raise HTTPException(status_code=404, detail="Memory not found")
         record = self.history.get(uid, memory_id)
         if record is None:
             raise HTTPException(status_code=404, detail="Memory not found")
-        if record.memory.is_locked:
-            raise HTTPException(status_code=402, detail="A paid plan is required to access this memory.")
         if not HistoricalMemoryAdapter.matches_device(record, device_scope_request):
             raise HTTPException(status_code=404, detail="Memory not found")
         return record.memory
@@ -3568,7 +3513,7 @@ class MemoryService:
                     # ``read_page`` owns identity/source/privacy fences.  The
                     # model-facing product seam also vetoes explicit use
                     # suppression and owner rejection before text matching.
-                    if memory.is_locked or memory.user_review is False:
+                    if memory.user_review is False:
                         continue
                     if belief_model_enabled() and memory_use_suppressed(memory):
                         continue
@@ -3662,8 +3607,6 @@ class MemoryService:
         for memory in rows:
             # archive_requires_explicit_query: this default product search never
             # admits Archive, regardless of physical origin.
-            if memory.is_locked:
-                continue
             if temporal_view != 'released' and not temporal_view_allows_record(
                 memory,
                 view=temporal_view,
@@ -3773,7 +3716,7 @@ class MemoryService:
         ``legacy_migration`` history and explicitly rejected/hidden audit rows
         remain portable without becoming current prompt authority. Privacy
         tombstones and source-purged content stay excluded, while owner-visible
-        locked or sensitive history is preserved.
+        sensitive history is preserved.
         """
         yield from self._iter_export_memories(
             uid,
@@ -3996,8 +3939,6 @@ class MemoryService:
         # an explicit re-accept of a previously rejected active row.
         if record.memory.invalid_at is not None or (record.memory.superseded_by or "").strip():
             raise HTTPException(status_code=404, detail="Memory not found")
-        if record.memory.is_locked:
-            raise HTTPException(status_code=402, detail="A paid plan is required to access this memory.")
         payload = memory_api_payload(record.memory, MemoryApiExposure.LEGACY)
         payload.update(
             {
@@ -4022,11 +3963,6 @@ class MemoryService:
         try:
             canonical_item = read_canonical_memory_item(uid, memory_id, db_client=self.db_client)
             if canonical_item is not None:
-                if memory_item_to_memorydb(canonical_item).is_locked:
-                    raise HTTPException(
-                        status_code=402,
-                        detail="A paid plan is required to access this memory.",
-                    )
                 MEMORY_HISTORICAL_MATERIALIZATION_TOTAL.labels(outcome="not_needed").inc()
                 return False
         except HTTPException:
@@ -4190,11 +4126,6 @@ class MemoryService:
                 _delete_historical_privacy_overrides(uid, lineage_ids, db_client=self.db_client)
                 self._invalidate_prompt_cache(uid)
                 return
-            if memory_item_to_memorydb(canonical_item).is_locked:
-                raise HTTPException(
-                    status_code=402,
-                    detail="A paid plan is required to access this memory.",
-                )
             # Write the historical suppression first. Tombstones are privacy
             # operations, not intake, so this path stays available while the
             # global write fence is paused and a cleanup failure cannot expose
@@ -4211,11 +4142,6 @@ class MemoryService:
                 record = self.history.get(uid, memory_id)
                 if record is None:
                     raise HTTPException(status_code=404, detail="Memory not found")
-                if record.memory.is_locked:
-                    raise HTTPException(
-                        status_code=402,
-                        detail="A paid plan is required to access this memory.",
-                    )
                 # A historical-only deletion does not need to manufacture an
                 # active canonical item.  The durable canonical suppression record
                 # is the authoritative privacy tombstone.
@@ -4251,8 +4177,7 @@ class MemoryService:
     def delete_batch(self, uid: str, memory_ids: List[str]) -> None:
         """Delete canonical and historical memories with all-or-nothing validation.
 
-        Every requested identity is resolved and its paid/locked state is checked
-        before any canonical write. Canonical rows are tombstoned transactionally;
+        Every requested identity is resolved before any canonical write. Canonical rows are tombstoned transactionally;
         historical-only rows receive durable canonical suppression records without
         first creating active canonical items. Physical cleanup happens last.
         """
@@ -4285,11 +4210,6 @@ class MemoryService:
                             detail="Canonical memory privacy cleanup unavailable",
                         ) from exc
                     continue
-                if memory_item_to_memorydb(canonical_item).is_locked:
-                    raise HTTPException(
-                        status_code=402,
-                        detail="A paid plan is required to access this memory.",
-                    )
                 canonical_ids.append(memory_id)
                 continue
 
@@ -4306,11 +4226,6 @@ class MemoryService:
             record = self.history.get(uid, memory_id)
             if record is None:
                 raise HTTPException(status_code=404, detail="Memory not found")
-            if record.memory.is_locked:
-                raise HTTPException(
-                    status_code=402,
-                    detail="A paid plan is required to access this memory.",
-                )
             historical_ids.append(memory_id)
 
         # Suppression is committed before the canonical tombstone and cleanup so
@@ -4654,8 +4569,6 @@ class MemoryService:
             if item.uid != uid or item.status != MemoryItemStatus.active:
                 raise HTTPException(status_code=404, detail='Memory not found')
             metadata = dict(item.promotion or {})
-            if memory_item_to_memorydb(item).is_locked:
-                raise HTTPException(status_code=402, detail='A paid plan is required to access this memory')
             metadata['chat_deleted'] = True
             return {}, {'promotion_audit': metadata}
 

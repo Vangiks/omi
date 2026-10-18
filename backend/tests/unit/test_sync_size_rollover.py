@@ -299,14 +299,12 @@ def test_redirected_anchor_with_no_safe_home_keeps_the_original_write(monkeypatc
     assert _row(store, 'x')['sync_merged_into'] == 'a'
 
 
-@pytest.mark.parametrize('locked', [False, True])
-def test_rollover_respects_capture_partitions(monkeypatch, locked):
-    store = _full_store(monkeypatch, is_locked=locked)
-    intake(store, dict(chunk('other-device', 1060, device='phone'), is_locked=locked))
-    intake(store, dict(chunk('other-lock', 1070), is_locked=not locked))
-    partitions = {cid: deepcopy(_row(store, cid)) for cid in ('a', 'other-device', 'other-lock')}
-    result, created, _ = intake(store, dict(chunk('b', 1060, text='Locked or not, new words.'), is_locked=locked))
-    assert result['id'] == 'b' and created and result['is_locked'] is locked
+def test_rollover_respects_capture_partitions(monkeypatch):
+    store = _full_store(monkeypatch)
+    intake(store, chunk('other-device', 1060, device='phone'))
+    partitions = {cid: deepcopy(_row(store, cid)) for cid in ('a', 'other-device')}
+    result, created, _ = intake(store, chunk('b', 1060, text='Some new words.'))
+    assert result['id'] == 'b' and created
     assert {cid: _row(store, cid) for cid in partitions} == partitions
 
 

@@ -18,7 +18,6 @@ def _memory(content: str, *, memory_id: str, subject_attribution="unknown") -> S
         content=content,
         category=SimpleNamespace(value="interesting"),
         created_at=datetime(2026, 9, 21, 12, 34, 56, tzinfo=timezone.utc),
-        is_locked=False,
         user_review=None,
         subject_attribution=subject_attribution,
         arguments={},

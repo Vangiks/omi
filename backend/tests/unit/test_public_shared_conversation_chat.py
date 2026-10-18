@@ -118,12 +118,11 @@ def test_request_schema_requires_all_three_contract_fields():
     [
         ('', None),
         ('owner-1', None),
-        ('owner-1', {'visibility': 'private', 'is_locked': False}),
-        ('owner-1', {'visibility': 'shared', 'is_locked': True}),
-        ('owner-1', {'visibility': [], 'is_locked': False}),
+        ('owner-1', {'visibility': 'private'}),
+        ('owner-1', {'visibility': []}),
     ],
 )
-def test_shared_resolver_makes_missing_private_revoked_and_locked_indistinguishable(uid, conversation):
+def test_shared_resolver_makes_missing_private_and_revoked_indistinguishable(uid, conversation):
     def lookup_owner(_conversation_id: str) -> str:
         return uid
 
@@ -142,7 +141,7 @@ def test_shared_resolver_makes_missing_private_revoked_and_locked_indistinguisha
 
 @pytest.mark.parametrize('visibility', ['shared', 'public'])
 def test_shared_resolver_accepts_only_shared_or_public_visibility(visibility: str):
-    conversation = {'id': 'conversation-1', 'visibility': visibility, 'is_locked': False}
+    conversation = {'id': 'conversation-1', 'visibility': visibility}
 
     resolved = resolve_shared_public_conversation(
         'conversation-1',
@@ -157,7 +156,6 @@ def test_shared_resolver_accepts_only_shared_or_public_visibility(visibility: st
 def test_shared_resolver_default_never_uses_the_normal_unbounded_conversation_read(monkeypatch):
     conversation = {
         'visibility': 'shared',
-        'is_locked': False,
         'transcript_segments': [{'text': 'bounded', 'is_user': True}],
     }
     monkeypatch.setattr('utils.conversations.shared_chat.redis_db.get_conversation_uid', lambda _id: 'owner-1')
@@ -342,8 +340,7 @@ def test_public_conversation_read_uses_a_field_mask_and_returns_only_bounded_saf
     firestore = _PublicConversationFirestore(
         {
             'visibility': 'shared',
-            'is_locked': False,
-            'transcript_segments_compressed': True,
+                'transcript_segments_compressed': True,
             'transcript_segments': raw_segments,
             'structured': {'overview': 'must not be loaded by the field mask'},
         }
@@ -358,14 +355,12 @@ def test_public_conversation_read_uses_a_field_mask_and_returns_only_bounded_saf
     assert firestore.path == ['users', 'owner-1', 'conversations', 'conversation-1']
     assert firestore.field_paths == [
         'visibility',
-        'is_locked',
         'transcript_segments_compressed',
         'transcript_segments',
         'has_transcript_corrections',
     ]
     assert conversation == {
         'visibility': 'shared',
-        'is_locked': False,
         'transcript_segments': [
             {
                 'text': 'The launch is Friday.',
@@ -859,7 +854,6 @@ def test_route_builds_context_server_side_and_sends_no_tools_or_persistence(monk
 
     conversation = {
         'visibility': 'shared',
-        'is_locked': False,
         'transcript_segments': [{'text': 'The launch is Friday.', 'is_user': True, 'speaker_id': 0}],
     }
     monkeypatch.setenv('PUBLIC_SHARED_CONVERSATION_CHAT_MODE', 'gateway')

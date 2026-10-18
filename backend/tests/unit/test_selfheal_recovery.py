@@ -274,7 +274,6 @@ def test_one_admission_then_rerun_is_refused_idempotently():
         ({'deleted': True}, 'tombstoned'),
         ({'discarded': True}, 'tombstoned'),
         ({'deferred': True}, 'deferred'),
-        ({'is_locked': True}, 'locked'),
         ({'processing_state': 'local_pending'}, 'local_pending'),
         ({'source': 'desktop'}, 'source'),
         ({'source': 'unknown_source'}, 'source'),

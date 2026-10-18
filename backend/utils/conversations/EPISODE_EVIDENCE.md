@@ -59,7 +59,7 @@ After that retry, accept the structurally valid retry (otherwise the initial not
 reject empty retries, drop invalid claim entries and emit bounded violation-class
 fallback telemetry. On response serialization, the backend Conversation model
 keeps only claims whose target resolves and whose exact text remains in that
-field. The same pure filter runs after locked-content render projections.
+field. The same pure filter runs after list render projections.
 Summary/title edits and deleted sections drop stale annotations on read,
 through every existing write path, with no additional reads. Transcript-text edits
 also drop claims referring to the edited speech segment in the already-existing

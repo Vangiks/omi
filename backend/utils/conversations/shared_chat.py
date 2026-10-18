@@ -168,11 +168,7 @@ def resolve_shared_public_conversation(
         raise SharedConversationUnavailable()
 
     visibility = conversation.get('visibility')
-    if (
-        not isinstance(visibility, str)
-        or visibility not in {'shared', 'public'}
-        or conversation.get('is_locked', False)
-    ):
+    if not isinstance(visibility, str) or visibility not in {'shared', 'public'}:
         raise SharedConversationUnavailable()
 
     return ResolvedSharedConversation(uid=uid, conversation=conversation)

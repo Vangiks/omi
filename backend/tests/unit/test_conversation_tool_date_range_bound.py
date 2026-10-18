@@ -139,7 +139,7 @@ class TestExactConversationReference:
         ct.keyword_search_conversation_ids = MagicMock()
         ct.vector_db.query_vectors = MagicMock(return_value=[])
         ct.conversations_db.get_conversations_by_id = MagicMock(
-            return_value=[{"id": conversation_id, "transcript_segments": [], "is_locked": False}]
+            return_value=[{"id": conversation_id, "transcript_segments": []}]
         )
         ct.deserialize_conversation = MagicMock(
             return_value=SimpleNamespace(

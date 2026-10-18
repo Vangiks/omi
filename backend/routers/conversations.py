@@ -152,9 +152,6 @@ def _get_valid_conversation_by_id(uid: str, conversation_id: str, *, follow_sync
         if not conversation or conversations_db.is_soft_deleted(conversation):
             raise HTTPException(status_code=404, detail="Conversation not found")
 
-    if conversation.get('is_locked', False):
-        raise HTTPException(status_code=402, detail="A paid plan is required to access this conversation.")
-
     return conversation
 
 
@@ -969,7 +966,7 @@ def get_conversations_count(
     response_model=Conversation,
     tags=['conversations'],
     description=(
-        "Detail responses include transcript fields when available. Locked or redacted conversations "
+        "Detail responses include transcript fields when available. Redacted conversations "
         "may include an empty transcript_segments array even though transcript data exists."
     ),
 )
@@ -1579,8 +1576,6 @@ def _assign_manual_speaker(
         )
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
-    except PermissionError as error:
-        raise HTTPException(status_code=402, detail='A paid plan is required to access this conversation.') from error
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     conversation = deserialize_conversation(raw)
@@ -1973,7 +1968,6 @@ async def _search_exact_conversation_reference(
         [exact_conversation_id],
         include_discarded=bool(search_request.include_discarded),
     )
-    conversations = [conversation for conversation in conversations if not conversation.get('is_locked')]
     conversations = [
         conversation
         for conversation in conversations
@@ -2118,9 +2112,6 @@ async def search_conversations_endpoint(
     # Preserve merge order (transcript-first on page 1); Firestore fetch may reshuffle.
     by_id = {c.get('id'): c for c in conversations if c.get('id')}
     conversations = [by_id[cid] for cid in conversation_ids if cid in by_id]
-    # Typesense filters locked hits, but the index can lag Firestore. Re-check after hydration
-    # so search never leaks that a locked conversation matched a query.
-    conversations = [conversation for conversation in conversations if not conversation.get('is_locked')]
     # Speaker filtering happens here, not in Typesense: the index has no transcript_segments field, so
     # asking Typesense for one 400'd and 500'd the request. The hydrated Firestore documents do carry
     # transcript_segments, so match against those.
@@ -2133,8 +2124,7 @@ async def search_conversations_endpoint(
         and conversation_matches_date_range(conversation, start_timestamp, end_timestamp)
     ]
     conversations = conversations[:effective_per_page]
-    # Attach grep-style transcript snippets (start/end for seek-to-moment) before list redaction
-    # clears segments on locked rows.
+    # Attach grep-style transcript snippets (start/end for seek-to-moment) before list redaction.
     if (search_request.query or '').strip():
         conversations = attach_match_snippets_to_conversations(conversations, search_request.query)
     redact_conversations_for_list(conversations)
@@ -2244,7 +2234,7 @@ def merge_conversations(
     Merge multiple conversations into a new conversation (async).
 
     Flow:
-    1. Validates conversations (locked? completed?)
+    1. Validates conversations (completed?)
     2. Returns immediately with 200 OK
     3. Background task creates new merged conversation
     4. Background task deletes source conversations

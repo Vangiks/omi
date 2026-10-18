@@ -294,7 +294,6 @@ def _generations(
     *,
     source: Any,
     client_device_id: Optional[str],
-    is_locked: bool,
     diagnostics: Optional[dict[str, int]] = None,
 ) -> list[_Generation]:
     """Provenance-compatible generations of ``origin_id`` with valid intervals.
@@ -315,7 +314,6 @@ def _generations(
             origin_id=origin_id,
             source=wanted_source,
             client_device_id=device_id,
-            is_locked=bool(is_locked),
         )
         if diagnostics is not None:
             diagnostics['candidate_count_before'] = diagnostics.get('candidate_count_before', 0) + 1
@@ -363,7 +361,7 @@ def _unique(matches: list[_Generation]) -> Optional[str]:
     if any(generation.id == canonical and not generation.deleted for generation in matches):
         return canonical
     # Only donors matched: intake follows their redirect to the survivor (smart
-    # merge keeps the source/device/lock partition) and supersedes the audio
+    # merge keeps the source/device partition) and supersedes the audio
     # when that survivor was deleted, so no deleted row is ever recreated.
     return min(generation.id for generation in matches)
 
@@ -460,7 +458,6 @@ def select_segment_targets(
     stamped_target: Optional[str],
     source: Any,
     client_device_id: Optional[str],
-    is_locked: bool,
     truncated_before: Optional[float] = None,
     lookup_failed: bool = False,
     safe_overlap: Optional[bool] = None,
@@ -478,7 +475,6 @@ def select_segment_targets(
             clean_text(origin_id),
             source=source,
             client_device_id=client_device_id,
-            is_locked=is_locked,
             diagnostics=filter_counts,
         )
     )
@@ -644,7 +640,6 @@ def _id_probe(
     *,
     source: Any,
     client_device_id: Optional[str],
-    is_locked: bool,
     firestore_client: Any,
 ) -> str:
     """One metadata-only read of the document whose id is the recording origin.
@@ -662,7 +657,6 @@ def _id_probe(
         origin_id=clean_text(origin_id),
         source=source_value(source),
         client_device_id=clean_text(client_device_id),
-        is_locked=bool(is_locked),
     )
 
 
@@ -674,7 +668,6 @@ def resolve_segment_targets(
     stamped_target: Optional[str],
     source: Any,
     client_device_id: Optional[str],
-    is_locked: bool,
     job_id: Optional[str] = None,
     firestore_client: Any = None,
     binding_reasons: Optional[dict] = None,
@@ -719,7 +712,6 @@ def resolve_segment_targets(
             stamped_target=stamped_target,
             source=source,
             client_device_id=client_device_id,
-            is_locked=is_locked,
             truncated_before=truncated_before,
             lookup_failed=failed,
             safe_overlap=safe_overlap,
@@ -751,7 +743,6 @@ def resolve_segment_targets(
             origin_id,
             source=source,
             client_device_id=client_device_id,
-            is_locked=is_locked,
             firestore_client=firestore_client,
         )
     if plan.outcome == 'lookup_failed' or degraded:
@@ -776,7 +767,6 @@ def plan_segment_targets(
     stamped_target: Optional[str],
     source: Any,
     client_device_id: Optional[str],
-    is_locked: bool,
     job_id: Optional[str],
     binding_reasons: Optional[dict],
     *,
@@ -805,7 +795,6 @@ def plan_segment_targets(
             stamped_target=stamped_target,
             source=source,
             client_device_id=client_device_id,
-            is_locked=is_locked,
             job_id=job_id,
             binding_reasons=pass_reasons,
             segment_source_maps=segment_source_maps,
@@ -888,7 +877,7 @@ def _emit(plan: LineagePlan, job_id: Optional[str], diagnostics: Optional[bool] 
             'event=sync_lineage_resolve outcome=%s reason=%s segments=%d bound=%d stamp_overridden=%d '
             'stamp_fallback=%d unbound=%d generations=%d rows=%d window=%s candidates=%d accepted=%d '
             'dropped_invalid=%d dropped_unstamped=%d dropped_deleted=%d dropped_source=%d '
-            'dropped_device=%d dropped_lock=%d dropped_interval=%d unstamped_origin=%d id_probe=%s '
+            'dropped_device=%d dropped_interval=%d unstamped_origin=%d id_probe=%s '
             'job_ref=%s',
             outcome,
             plan.reason,
@@ -907,7 +896,6 @@ def _emit(plan: LineagePlan, job_id: Optional[str], diagnostics: Optional[bool] 
             emitted('dropped_deleted'),
             emitted('dropped_source'),
             emitted('dropped_device'),
-            emitted('dropped_lock'),
             emitted('dropped_interval'),
             emitted('unstamped_origin'),
             plan.id_probe,

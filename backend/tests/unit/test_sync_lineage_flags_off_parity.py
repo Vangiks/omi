@@ -208,7 +208,6 @@ def test_overlap_targets_counts_and_log_bytes_match_main(frozen, stamp, caplog, 
             stamped_target=stamp,
             source='omi',
             client_device_id='pendant',
-            is_locked=False,
         )
         output.append(
             _bytes(
@@ -249,7 +248,6 @@ def test_resolver_read_calls_results_and_logs_match_main(frozen, monkeypatch, ca
                     stamped_target=None,
                     source='omi',
                     client_device_id='pendant',
-                    is_locked=False,
                     job_id='synthetic-job',
                 )
             probe.assert_not_called()

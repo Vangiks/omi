@@ -80,8 +80,8 @@ def _display_date_for_now(tz_name: Optional[str], at: Optional[datetime] = None)
 # queries on holes it cannot fill.
 _DECLINE_LOCKED = 'locked'
 _DECLINE_NO_CONVERSATIONS = 'no_conversations'
-# The window held conversations, but none this job may summarize (all ``is_locked``, none
-# carried transcript content, or nothing carried summary body content — titles alone).
+# The window held conversations, but none this job may summarize (none carried transcript
+# content, or nothing carried summary body content — titles alone).
 # Distinct from ``no_conversations`` because the owner *was*
 # active: their earlier days are worth walking back for, and the caller may say so.
 _DECLINE_NOTHING_TO_SUMMARIZE = 'nothing_to_summarize'
@@ -117,7 +117,7 @@ def generate_and_store_daily_summary(uid, date_str, start_date_utc, end_date_utc
 
     1. best-effort Redis lock
     2. durable by-date idempotency (existing record → return it, no LLM)
-    3. conversations exist in the window and are not ``is_locked``
+    3. conversations exist in the window
     4. at least one non-discarded conversation has ``transcript_segments``
     5. the bounded day carries more than titles for the prompt: some
        conversation has a non-empty ``structured.overview``, a first app
@@ -183,9 +183,7 @@ def _generate_and_store_daily_summary(
             release_daily_summary_lock(uid, date_str)
             return None, False, _DECLINE_NO_CONVERSATIONS
 
-        conversations = deserialize_conversations(
-            [convo_data for convo_data in conversations_data if not convo_data.get('is_locked')]
-        )
+        conversations = deserialize_conversations(conversations_data)
         if not conversations:
             release_daily_summary_lock(uid, date_str)
             return None, False, _DECLINE_NOTHING_TO_SUMMARIZE
@@ -890,8 +888,8 @@ def _send_summary_notification(user_data: Tuple[Any, ...]) -> None:
         # conversations here would undo the "lose the lock, do no work" guarantee that keeps a
         # contended user from being read twice.
         #
-        # Only an *empty* window means dormant. A day whose conversations were all `is_locked`, or
-        # carried no transcript, still proves the owner was recording — those are the accounts whose
+        # Only an *empty* window means dormant. A day whose conversations carried no transcript
+        # still proves the owner was recording — those are the accounts whose
         # earlier days most need walking back — so `_DECLINE_NOTHING_TO_SUMMARIZE` is deliberately
         # absent from this set.
         if declined in (_DECLINE_LOCKED, _DECLINE_NO_CONVERSATIONS):

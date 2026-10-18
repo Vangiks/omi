@@ -9,9 +9,6 @@ patches the import-cheap db helper with monkeypatch.setattr, and calls the handl
 
 import os
 
-import pytest
-from fastapi import HTTPException
-
 os.environ.setdefault('OPENAI_API_KEY', 'sk-test-not-real')
 os.environ.setdefault('ENCRYPTION_SECRET', 'omi_ZwB2ZNqB2HHpMK6wStk7sTpavJiPTFg7gXUHnc4tFABPU6pZ2c2DKgehtfgi4RZv')
 
@@ -248,52 +245,3 @@ def test_active_description_lookup_continues_after_first_bounded_page(monkeypatc
     assert result['id'] == 'task-0500'
     assert client.query.page_sizes == [500, 1]
     assert client.query.start_after_calls == ['task-0499']
-
-
-def test_batch_delete_rejects_locked_items_before_any_delete(monkeypatch):
-    monkeypatch.setattr(
-        ai_mod.action_items_db,
-        'get_action_items_by_ids',
-        lambda uid, ids: [{'id': ids[0], 'is_locked': True}],
-    )
-    delete_calls = []
-    monkeypatch.setattr(
-        ai_mod.action_items_db,
-        'delete_action_items_batch',
-        lambda uid, ids: delete_calls.append((uid, ids)),
-    )
-
-    with pytest.raises(HTTPException) as error:
-        ai_mod.batch_delete_action_items(ai_mod.BatchDeleteActionItemsRequest(ids=['locked-1']), uid='user-9')
-
-    assert error.value.status_code == 402
-    assert delete_calls == []
-
-
-def test_batch_delete_preflight_chunks_large_id_lists(monkeypatch):
-    """Lock preflight must be chunked so large Select All batches don't hit
-    Firestore batch-get limits or load unbounded document data in one RPC."""
-    preflight_chunks: list[list[str]] = []
-
-    def fake_get(uid, ids):
-        preflight_chunks.append(list(ids))
-        return []
-
-    monkeypatch.setattr(ai_mod.action_items_db, 'get_action_items_by_ids', fake_get)
-    monkeypatch.setattr(
-        ai_mod.action_items_db,
-        'delete_action_items_batch',
-        lambda uid, ids: ids,
-    )
-    monkeypatch.setattr(ai_mod, 'delete_action_item_vectors_batch', lambda *a, **kw: None)
-    monkeypatch.setattr(ai_mod, 'send_action_items_batch_deletion_message', lambda *a, **kw: None)
-
-    # 1,200 IDs should be split into 3 chunks: 500 + 500 + 200
-    big_ids = [f'task-{i}' for i in range(1200)]
-    result = ai_mod.batch_delete_action_items(ai_mod.BatchDeleteActionItemsRequest(ids=big_ids), uid='user-9')
-
-    assert len(preflight_chunks) == 3
-    assert len(preflight_chunks[0]) == 500
-    assert len(preflight_chunks[1]) == 500
-    assert len(preflight_chunks[2]) == 200
-    assert result['deleted_count'] == 1200

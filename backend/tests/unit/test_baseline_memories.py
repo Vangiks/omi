@@ -27,7 +27,6 @@ def _raw_memory(
     *,
     is_baseline: bool = False,
     manually_added: bool = False,
-    is_locked: bool = False,
     user_review=None,
     memory_id: str = "mem-test-1",
 ) -> dict:
@@ -45,7 +44,6 @@ def _raw_memory(
         "manually_added": manually_added,
         "edited": False,
         "deleted": False,
-        "is_locked": is_locked,
         "is_baseline": is_baseline,
     }
 
@@ -254,23 +252,6 @@ class TestBaselineMemoryInjection:
             "baseline" not in memories_str.lower()
         ), "Prompt must not include a baseline section when no baseline memories exist"
         assert "A regular fact" in memories_str
-
-    def test_locked_memories_excluded_from_all_buckets(self, mem_module):
-        """get_prompt_data must skip memories with is_locked=True in all buckets."""
-        raw = [
-            _raw_memory("Locked premium content", is_locked=True),
-            _raw_memory("Normal fact"),
-        ]
-        service = self._service(raw)
-        with (
-            patch.object(mem_module, "MemoryService", return_value=service),
-            patch.object(mem_module, "get_user_name", return_value="Alice"),
-        ):
-            _, baseline, user_made, generated = mem_module.get_prompt_data("user-1")
-
-        all_memories = baseline + user_made + generated
-        assert len(all_memories) == 1, f"Expected 1 unlocked memory, got {len(all_memories)}"
-        assert all_memories[0].content == "Normal fact"
 
     def test_baseline_flag_takes_precedence_over_manually_added(self, mem_module):
         """A memory with both is_baseline=True and manually_added=True must land in the baseline bucket."""

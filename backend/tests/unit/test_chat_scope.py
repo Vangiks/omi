@@ -86,7 +86,6 @@ def test_get_conversations_tool_honors_conversation_scope():
         "structured": {"title": "Scoped", "overview": "hi", "emoji": "🙂", "category": "other"},
         "transcript_segments": [],
         "discarded": False,
-        "is_locked": False,
         "status": "completed",
     }
     with (
@@ -120,7 +119,6 @@ def test_get_conversations_tool_hides_discarded_under_scope():
     conv = {
         "id": "gone",
         "discarded": True,
-        "is_locked": False,
         "created_at": datetime(2026, 8, 1, tzinfo=timezone.utc),
     }
     with (
@@ -152,7 +150,6 @@ def test_get_conversations_tool_fail_closed_on_timeframe_scope():
         "structured": {"title": "Old", "overview": "hi", "emoji": "🙂", "category": "other"},
         "transcript_segments": [],
         "discarded": False,
-        "is_locked": False,
         "status": "completed",
     }
     with (
@@ -197,7 +194,6 @@ def test_search_conversations_tool_refilters_hydrated_hits_to_timeframe():
     stale = {
         "id": "stale",
         "created_at": datetime(2026, 7, 1, tzinfo=timezone.utc),
-        "is_locked": False,
         "discarded": False,
         "structured": {"title": "Old", "overview": "hi", "emoji": "🙂", "category": "other"},
         "transcript_segments": [],
@@ -223,7 +219,6 @@ def test_search_conversations_tool_finds_transcript_only_fact_with_verbatim_evid
         'started_at': datetime(2026, 8, 18, tzinfo=timezone.utc),
         'created_at': datetime(2026, 8, 18, tzinfo=timezone.utc),
         'transcript_segments': [{'text': 'The invoice total was 47 dollars.'}],
-        'is_locked': False,
         'discarded': False,
     }
     parsed = MagicMock(id='spoken-only', transcript_segments=[])
@@ -316,14 +311,12 @@ def test_search_memories_tool_filters_matches_to_timeframe_scope():
     }
 
     in_scope = MagicMock()
-    in_scope.memory.is_locked = False
     in_scope.memory.created_at = datetime(2026, 8, 9, 12, tzinfo=timezone.utc)
     in_scope.memory.content = "IN_SCOPE_FACT"
     in_scope.memory.category = MemoryCategory.interesting
     in_scope.score = 0.9
 
     leaked = MagicMock()
-    leaked.memory.is_locked = False
     leaked.memory.created_at = datetime(2026, 7, 1, tzinfo=timezone.utc)
     leaked.memory.content = "LEAKED"
     leaked.memory.category = MemoryCategory.interesting
@@ -355,7 +348,6 @@ def test_search_memories_tool_excludes_untimed_matches_under_timeframe_scope():
     }
 
     untimed = MagicMock()
-    untimed.memory.is_locked = False
     untimed.memory.created_at = None
     untimed.memory.content = "UNTIMED"
     untimed.memory.category = MemoryCategory.interesting
@@ -383,7 +375,6 @@ def test_get_conversations_tool_rejects_missing_status_under_scope():
     conv = {
         "id": "only-me",
         "discarded": False,
-        "is_locked": False,
         "created_at": datetime(2026, 8, 1, tzinfo=timezone.utc),
     }
     with (
@@ -411,7 +402,6 @@ def test_get_conversations_tool_scoped_offset_does_not_repeat_the_conversation()
         "structured": {"title": "Scoped", "overview": "hi", "emoji": "🙂", "category": "other"},
         "transcript_segments": [],
         "discarded": False,
-        "is_locked": False,
         "status": "completed",
     }
     with (

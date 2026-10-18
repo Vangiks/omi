@@ -270,24 +270,23 @@ def test_unexpected_tool_errors_are_recorded_and_return_retryable_json_rpc_error
     assert "private failure" not in str(events)
 
 
-def test_not_found_and_paid_plan_errors_are_validation_not_internal(monkeypatch):
+def test_not_found_error_is_validation_not_internal(monkeypatch):
     events = []
     monkeypatch.setattr(mcp_transport, "schedule_mcp_tool_call", lambda **event: events.append(event))
 
-    for i, code in enumerate((-32001, -32002)):
-        with patch.object(mcp_transport, "execute_tool", side_effect=mcp_sse.ToolExecutionError("expected", code=code)):
-            mcp_sse.handle_mcp_message(
-                _auth(),
-                {
-                    "jsonrpc": "2.0",
-                    "id": 10 + i,
-                    "method": "tools/call",
-                    "params": {"name": "get_conversation_by_id", "arguments": {}},
-                },
-            )
+    with patch.object(mcp_transport, "execute_tool", side_effect=mcp_sse.ToolExecutionError("expected", code=-32001)):
+        mcp_sse.handle_mcp_message(
+            _auth(),
+            {
+                "jsonrpc": "2.0",
+                "id": 10,
+                "method": "tools/call",
+                "params": {"name": "get_conversation_by_id", "arguments": {}},
+            },
+        )
 
-    assert [event["error_category"] for event in events] == ["validation", "validation"]
-    assert [event["authorization_outcome"] for event in events] == ["not_applicable", "not_applicable"]
+    assert [event["error_category"] for event in events] == ["validation"]
+    assert [event["authorization_outcome"] for event in events] == ["not_applicable"]
 
 
 def test_read_tools_have_named_operations(monkeypatch):

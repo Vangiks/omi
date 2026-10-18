@@ -264,7 +264,6 @@ async def test_other_device_redis_pointer_does_not_steal_durable_continuation(mo
     [
         ('deleted', True),
         ('discarded', True),
-        ('is_locked', True),
         ('client_device_id', 'other'),
         ('status', 'processing'),
     ],

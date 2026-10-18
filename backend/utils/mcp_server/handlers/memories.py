@@ -287,12 +287,6 @@ def memories_page_core(
                 position={"offset": offset + len(result["memories"])},
                 filters=filters,
             )
-    # Apply locked content truncation
-    for memory in result["memories"]:
-        if memory.get('is_locked', False):
-            content = memory.get('content') or ''
-            memory['content'] = (content[:70] + '...') if len(content) > 70 else content
-
     if resume_uml is not None:
         result["next_cursor"] = encode_cursor(
             kind=cursor_kind,

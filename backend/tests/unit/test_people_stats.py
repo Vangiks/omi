@@ -30,10 +30,9 @@ def test_counts_conversations_once_per_person_and_sums_talk_time():
     assert stats["p2"]["conversation_count"] == 1
 
 
-def test_ignores_locked_and_malformed_rows():
+def test_ignores_malformed_rows():
     stats = aggregate_people_stats(
         [
-            _conv(None, {"person_id": "p1", "start": 0, "end": 1}, is_locked=True),
             {"transcript_segments": "oops"},
             _conv(None, None, {"person_id": None}, {"person_id": "p3", "start": 4, "end": 2}),
         ]

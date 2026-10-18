@@ -99,7 +99,7 @@ async def test_two_workers_two_waiters_coalesce_and_expire_without_any_reads(mon
     assert not retry._active
 
 
-@pytest.mark.parametrize('policy', [{'private_cloud_sync_enabled': False}, {'deleted': True}, {'is_locked': True}])
+@pytest.mark.parametrize('policy', [{'private_cloud_sync_enabled': False}, {'deleted': True}])
 async def test_admission_uses_fresh_policy_and_does_not_repair_disallowed_rows(monkeypatch, policy):
     futures, reads = [], []
     release = asyncio.Event()

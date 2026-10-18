@@ -12,7 +12,6 @@ from models.other import Person
 
 from models.client_processing import PROJECTION_FAMILY_FIELDS
 from models.conversation import Conversation
-from models.note_claims import current_note_claims
 from models.transcript_segment import TranscriptSegment, strip_grouping_internal_fields
 from utils.conversations.summary_selection import select_primary_summary
 
@@ -126,7 +125,7 @@ def populate_folder_names(uid: str, conversations: List[Dict[str, Any]]) -> None
 
 
 # ---------------------------------------------------------------------------
-# Redact: locked-content stripping
+# Redact: list and integration projections
 # ---------------------------------------------------------------------------
 
 
@@ -150,21 +149,6 @@ def _strip_match_scores(conv: Dict[str, Any]) -> Dict[str, Any]:
 def redact_conversation_for_list(conv: Dict[str, Any]) -> Dict[str, Any]:
     """Standard list-view redaction: strip detail fields, keep title/overview."""
     _strip_match_scores(conv)
-    if not conv.get('is_locked', False):
-        return _omit_list_note_claims(conv)
-    _omit_list_note_claims(conv)
-    if 'structured' in conv:
-        conv['structured'] = (
-            dict(conv['structured']) if not isinstance(conv['structured'], dict) else conv['structured']
-        )
-        conv['structured']['action_items'] = []
-        conv['structured']['events'] = []
-    conv['apps_results'] = []
-    conv['plugins_results'] = []
-    conv['suggested_summarization_apps'] = []
-    conv['transcript_segments'] = []
-    # Search may attach transcript match_snippets before list redaction; never leak evidence for locked rows.
-    conv['match_snippets'] = []
     return _omit_list_note_claims(conv)
 
 
@@ -180,12 +164,10 @@ def redact_conversation_for_integration(conv: Dict[str, Any]) -> Dict[str, Any]:
     setting the key to ``None`` would add a field that was never part of the
     contract. Classifying a sibling on ``Conversation`` into
     ``PROJECTION_FAMILY_FIELDS`` is what strips it here; the trust-boundary
-    suite then requires every other denylist sink to clear it too. Locked
-    conversations also blank title/overview and drop evidence.
+    suite then requires every other denylist sink to clear it too.
     """
     # Geolocation is private capture metadata and is not part of the public
-    # integration contract. Strip it before either locked or unlocked data is
-    # serialized into an integration response.
+    # integration contract.
     _strip_match_scores(conv)
     conv.pop('geolocation', None)
     # Server-computed capture badge stays on app views, outside the integration contract.
@@ -198,23 +180,6 @@ def redact_conversation_for_integration(conv: Dict[str, Any]) -> Dict[str, Any]:
             segment.pop('audio_capture_start', None)
             segment.pop('audio_capture_end', None)
             segment.pop('audio_source', None)
-    if not conv.get('is_locked', False):
-        return conv
-    if 'structured' in conv:
-        conv['structured'] = (
-            dict(conv['structured']) if not isinstance(conv['structured'], dict) else conv['structured']
-        )
-        conv['structured']['title'] = ''
-        conv['structured']['overview'] = ''
-        conv['structured']['action_items'] = []
-        conv['structured']['events'] = []
-        if isinstance(conv['structured'].get('note_claims'), list):
-            conv['structured']['note_claims'] = current_note_claims(conv['structured'])
-    conv['apps_results'] = []
-    conv['plugins_results'] = []
-    conv['suggested_summarization_apps'] = []
-    conv['transcript_segments'] = []
-    conv['match_snippets'] = []
     return conv
 
 

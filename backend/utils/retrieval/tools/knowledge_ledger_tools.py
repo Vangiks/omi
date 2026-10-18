@@ -297,7 +297,6 @@ def read_current_playbook(uid: str, memory_id: str, *, db_client: Any) -> Option
         or item.subject_scope != MemorySubjectScope.primary_user
         or not item.intent_backed
         or item.valid_to is not None
-        or promotion.get("is_locked") is True
         or promotion.get("user_review") is False
     ):
         return None
@@ -424,8 +423,8 @@ def read_playbook(
 ) -> str:
     """Load the body of one current playbook returned by ``search_knowledge``.
 
-    The lookup is owner-scoped and admits only active, processed, non-rejected,
-    non-locked primary-user ``knowledge_ledger.v1`` documents.  Other ids are
+    The lookup is owner-scoped and admits only active, processed, non-rejected
+    primary-user ``knowledge_ledger.v1`` documents.  Other ids are
     reported as unavailable without revealing whether a row exists.
     """
 

@@ -33,7 +33,6 @@ _CONVERSATION_PREVIEW_FIELDS = (
     'discarded',
     'deleted',
     'dream_duplicate_of',
-    'is_locked',
     'structured.title',
     'structured.overview',
     'user_title',
@@ -52,22 +51,11 @@ class AgentTranscriptReadError(RuntimeError):
 def unavailable_is_transient(error=None):
     if error is None:
         return False
-    if isinstance(error, HTTPException) and error.status_code in {402, 404}:
+    if isinstance(error, HTTPException) and error.status_code == 404:
         return False
     if type(error) is ValueError and str(error) == 'Invalid dream read reference':
         return False
     return True
-
-
-def search_hydration_unavailable(error):
-    """A missing, hidden, or locked row is skipped during search hydration.
-
-    HTTP 423 is the locked-conversation response from `read_record`. A direct
-    read records that lock as transient so settlement can retry it.
-    """
-    if isinstance(error, HTTPException) and error.status_code == 423:
-        return True
-    return not unavailable_is_transient(error)
 
 
 def read_record(uid, ref, *, control_cache=None, diagnostics=None):
@@ -82,8 +70,6 @@ def read_record(uid, ref, *, control_cache=None, diagnostics=None):
         raw = conversations.get_conversation_raw_snapshot(uid, key)
         if not raw or not conversations.is_visible_conversation(raw):
             return None
-        if raw.get('is_locked'):
-            raise HTTPException(423, 'Dream record locked')
         try:
             conversations.decode_transcript_segments_verified(
                 uid,
@@ -126,8 +112,7 @@ def _read_memory_record(uid, key):
     """Owner-visible memory, or None when the row is gone or not visible.
 
     A 404 means the item is missing or not an active visible item (superseded,
-    hidden, tombstoned, archived, invalid). A 402 is the paid-plan lock. Those
-    are permanent. A store fault such as 503 stays an exception so the session
+    hidden, tombstoned, archived, invalid) and is permanent. A store fault such as 503 stays an exception so the session
     can retry it instead of acknowledging the dirty id as consumed.
     """
     try:
@@ -145,8 +130,6 @@ def _read_memory_record(uid, key):
         raise
     if row.user_review is False or row.visibility != 'private' or row.invalid_at is not None:
         return None
-    if row.is_locked:
-        return None
     return row.model_dump(mode='python')
 
 
@@ -155,7 +138,7 @@ def preview_record(uid, ref, *, need_speakers=False):
     collection, separator, key = ref.partition('/')
     if not need_speakers and separator and key and '/' not in key and collection == 'conversations':
         raw = conversations.get_conversation_raw_snapshot(uid, key, field_paths=list(_CONVERSATION_PREVIEW_FIELDS))
-        if not raw or not conversations.is_visible_conversation(raw) or raw.get('is_locked'):
+        if not raw or not conversations.is_visible_conversation(raw):
             return None
         stored = raw.get('structured')
         structured = stored if isinstance(stored, dict) else {}

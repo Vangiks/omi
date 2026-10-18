@@ -72,7 +72,7 @@ def test_negative_truth_review_remains_owner_inspectable_history(adapter):
 
 
 @pytest.mark.parametrize('superseded', [False, True])
-@pytest.mark.parametrize('denial', ['restricted', 'visibility', 'missing_grant', 'unknown_consumer', 'locked'])
+@pytest.mark.parametrize('denial', ['restricted', 'visibility', 'missing_grant', 'unknown_consumer'])
 def test_suppression_or_supersession_cannot_bypass_history_access(adapter, superseded, denial):
     item = history_item(superseded)
     policy = MemoryAccessPolicy.for_omi_chat(archive_capability=False)
@@ -84,8 +84,6 @@ def test_suppression_or_supersession_cannot_bypass_history_access(adapter, super
         policy = MemoryAccessPolicy(consumer=MemoryConsumer.third_party, app_has_default_memory_grant=False)
     elif denial == 'unknown_consumer':
         policy = MemoryAccessPolicy(consumer=MemoryConsumer.unknown)
-    elif denial == 'locked':
-        item = item.model_copy(update={'promotion': {'is_locked': True}})
     assert not adapter._canonical_scan_item_visible(
         item,
         policy=policy,

@@ -185,26 +185,6 @@ def test_retry_replays_exact_response_after_processing_advances_conversation():
     assert len(database.transactions[1].write_paths) == 0
 
 
-def test_retry_replays_before_rechecking_a_new_lock():
-    database = _Firestore(_conversation())
-    first = _apply(database)
-    database.rows[database.conversation_path]['is_locked'] = True
-    database.update_times[database.conversation_path] = COMMIT_REVISION + timedelta(minutes=1)
-
-    replay = _apply(database)
-
-    assert replay == first
-
-
-def test_new_mutation_cannot_bypass_conversation_lock():
-    database = _Firestore(_conversation(is_locked=True))
-
-    with pytest.raises(mutations_db.ConversationMutationLockedError):
-        _apply(database)
-
-    assert len(database.rows) == 1
-
-
 def test_new_mutation_returns_not_found_without_creating_orphan_receipt():
     database = _Firestore(_conversation())
     del database.rows[database.conversation_path]

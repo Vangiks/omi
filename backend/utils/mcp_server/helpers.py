@@ -30,7 +30,7 @@ _parse_mcp_date = parse_mcp_date
 def conversation_participants(conversation: Dict[str, Any]) -> Dict[str, Any]:
     """Expose stored speaker mappings, without guessing names from prose."""
     segments = conversation.get("transcript_segments")
-    if conversation.get("is_locked") or not isinstance(segments, list):
+    if not isinstance(segments, list):
         return {"participants_included": False}
     participants = []
     seen = set()

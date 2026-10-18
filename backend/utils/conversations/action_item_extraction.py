@@ -54,7 +54,6 @@ def action_items_for_write(
             'due_at': action_item.due_at,
             'completed_at': action_item.completed_at,
             'conversation_id': conversation.id,
-            'is_locked': conversation.is_locked,
             **canonical_fields(action_item, conversation),
         }
         for action_item in filter_extracted_items(uid, conversation.structured.action_items)

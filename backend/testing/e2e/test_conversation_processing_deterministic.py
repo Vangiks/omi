@@ -38,7 +38,6 @@ def test_reprocess_route_persists_deterministic_processing_result(client, auth_h
         ],
         "discarded": False,
         "status": "completed",
-        "is_locked": False,
         "data_protection_level": "standard",
     }
     seed_conversation("123", conv_data)

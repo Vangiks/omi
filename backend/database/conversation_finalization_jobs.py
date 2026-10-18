@@ -317,8 +317,6 @@ def recovery_admission_refusal(
         return 'tombstoned'
     if conversation.get('deferred'):
         return 'deferred'
-    if conversation.get('is_locked'):
-        return 'locked'
     processing_state = getattr(conversation.get('processing_state'), 'value', conversation.get('processing_state'))
     if processing_state == 'local_pending':
         return 'local_pending'

@@ -739,8 +739,6 @@ def delete_person_endpoint(memory_id: str, uid: str = Depends(auth.get_current_u
         memory = get_conversation(uid, memory_id)
     if not memory:
         raise HTTPException(status_code=404, detail='Conversation not found')
-    if memory.get('is_locked', False):
-        raise HTTPException(status_code=402, detail='A paid plan is required to access this conversation.')
     memory = deserialize_conversation(memory)
     return {'result': followup_question_prompt(uid, memory.transcript_segments)}
 
@@ -1702,12 +1700,10 @@ def test_daily_summary(
             start_date_utc = datetime.combine(display_date, time.min).replace(tzinfo=pytz.utc)
             end_date_utc = datetime.combine(display_date, time.max).replace(tzinfo=pytz.utc)
 
-    # Get conversations for the date, excluding locked conversations
+    # Get conversations for the date
     conversations_data = conversations_db.get_conversations(
         uid, start_date=start_date_utc, end_date=end_date_utc, date_field='started_at'
     )
-    if conversations_data:
-        conversations_data = [c for c in conversations_data if not c.get('is_locked', False)]
 
     if not conversations_data or len(conversations_data) == 0:
         raise HTTPException(status_code=400, detail=f'No conversations found for {date_str}')
@@ -2056,8 +2052,6 @@ def regenerate_daily_summary(
     conversations_data = conversations_db.get_conversations(
         uid, start_date=start_date_utc, end_date=end_date_utc, date_field='started_at'
     )
-    if conversations_data:
-        conversations_data = [c for c in conversations_data if not c.get('is_locked', False)]
     if not conversations_data:
         raise HTTPException(status_code=400, detail=f'No conversations found for {date_str}')
 

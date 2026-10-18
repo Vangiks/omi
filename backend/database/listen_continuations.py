@@ -146,7 +146,6 @@ def resolve_live_continuation(
                 if (
                     row.get('source') == source
                     and row.get('client_device_id') == device_id
-                    and not row.get('is_locked')
                     and isinstance(finish, datetime)
                     and gap_splits((now - finish).total_seconds(), continuation_timeout(row, timeout))
                 ):

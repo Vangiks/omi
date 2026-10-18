@@ -168,7 +168,6 @@ def _http_error_from_tool_error(exc: ToolExecutionError) -> HTTPException:
             -32602: 400,
             -32000: 400,
             -32001: 404,
-            -32002: 402,
             -32009: 503,
         }.get(exc.code, 500)
     headers = {"Retry-After": _REST_RETRY_AFTER} if status_code in (429, 503) else None
@@ -639,10 +638,8 @@ def search_conversations(
     if not conversations:
         return []
 
-    # conversation_card() applies redact_conversation_for_list in place, so a
-    # locked row reaches the snippet attacher already stripped of transcript.
+    # conversation_card() applies redact_conversation_for_list in place.
     cards = [conversation_card(conv) for conv in conversations]
-    # Snippets after redaction so locked list rows never leak transcript evidence (#6621).
     conversations = attach_match_snippets_to_conversations(conversations, query)
     for conv, card in zip(conversations, cards):
         card["apps_results"] = conv.get("apps_results") or []
@@ -675,9 +672,6 @@ def get_conversation_by_id(
     )
     if conversation is None:
         raise HTTPException(status_code=404, detail="Conversation not found")
-
-    if conversation.get('is_locked', False):
-        raise HTTPException(status_code=402, detail="A paid plan is required to access this conversation.")
 
     populate_speaker_names(uid, [conversation])
 
@@ -825,7 +819,6 @@ def _action_item_http_error(exc: ToolExecutionError) -> HTTPException:
             -32602: 422,
             -32000: 422,
             -32001: 404,
-            -32002: 402,
             # -32009 is the "temporarily unavailable" domain code (index still
             # building, store outage) — it maps to a retryable 503, not a 500.
             -32009: 503,

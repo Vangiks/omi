@@ -123,7 +123,6 @@ def _patch_sync_pipeline(
             transcript_segments=segments,
             discarded=False,
             status=ConversationStatus.completed,
-            is_locked=incoming["is_locked"],
             sync_relevance="keep",
             sync_content_revision=1,
         )
@@ -252,7 +251,6 @@ def test_sync_v2_merges_into_target_conversation_and_reprocesses_once(client, au
             ),
             "discarded": False,
             "status": "completed",
-            "is_locked": False,
             "data_protection_level": "standard",
         },
     )

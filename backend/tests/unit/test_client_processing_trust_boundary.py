@@ -54,7 +54,7 @@ What the DYNAMIC sentinel proves: a Conversation whose projection carries a
 unique token is checked against ``str(structured)``, ``get_transcript()``,
 ``conversations_to_string``, the citation collector + ``Message`` serializer,
 and every integration payload (``conversation_to_dict`` then
-``redact_conversation_for_integration``), locked or not. The token must be
+``redact_conversation_for_integration``). The token must be
 absent from those surfaces. Generated sink cases additionally inject each
 classified field into each denylist sink.
 
@@ -254,7 +254,7 @@ class Reference(NamedTuple):
 # wildcard so the Pydantic field list can evolve without a pin churn.
 #
 # Reviewed production hits: schema + Conversation field + developer request
-# field + process_conversation storage/coordinator seams + locked-integration
+# field + process_conversation storage/coordinator seams + integration
 # redaction + transcript-edit genuine clear + live-capture overlap clear.
 # ``_get_structured``, ``extract_memories``, ``save_structured_vector``,
 # and RAG are absent. ``conversation_to_dict`` is a dump without a named read.
@@ -631,7 +631,6 @@ PINNED_CONVERSATION_FIELDS: FrozenSet[str] = frozenset(
         'processing_memory_id',
         'processing_conversation_id',
         'status',
-        'is_locked',
         'deferred',
         'data_protection_level',
         'folder_id',
@@ -742,7 +741,6 @@ def _make_conversation(
     *,
     projection: bool = True,
     structured_overview: str = '',
-    is_locked: bool = False,
 ) -> Conversation:
     return Conversation(
         id='conv-trust-boundary',
@@ -764,7 +762,6 @@ def _make_conversation(
             )
         ],
         client_processing=_make_projection() if projection else None,
-        is_locked=is_locked,
     )
 
 
@@ -1092,7 +1089,7 @@ def test_every_projection_family_field_is_stripped_by_every_sink(
                 if getattr(conv, field, SENTINEL) is not None:
                     failures.append(f'{sink.name} left {field!r} on the Conversation')
                 continue
-            payload = render_mod.conversation_to_dict(_make_conversation(projection=True, is_locked=False))
+            payload = render_mod.conversation_to_dict(_make_conversation(projection=True))
             payload[field] = SENTINEL
             if sink.fixture_key == 'redact':
                 result = render_mod.redact_conversation_for_integration(payload)
@@ -1147,11 +1144,13 @@ def test_model_dump_copies_projection_and_integration_redaction_drops_it(render_
 
     The AST identifier pin list cannot see this path. The sentinel in the dump
     is the proof that serialization copies the projection; its absence after
-    redaction is the proof no webhook / app payload can leak it — locked or
-    unlocked. Removal, not null: ``None`` would add a key the public contract
-    never had.
+    redaction is the proof no webhook / app payload can leak it. An app's
+    returned message is stored back onto the conversation; an untrusted summary
+    as automation input is the promotion step section 1.1 forbids. Canonical
+    title/overview stay; the projection does not. Removal, not null: ``None``
+    would add a key the public contract never had.
     """
-    conv = _make_conversation(projection=True, is_locked=True)
+    conv = _make_conversation(projection=True)
     dumped = render_mod.conversation_to_dict(conv)
     assert SENTINEL in str(dumped)
     assert dumped.get('client_processing') is not None
@@ -1159,27 +1158,12 @@ def test_model_dump_copies_projection_and_integration_redaction_drops_it(render_
     payload = render_mod.redact_conversation_for_integration(dumped)
     assert 'client_processing' not in payload
     assert SENTINEL not in str(payload)
-    assert payload['structured']['title'] == ''
-    assert payload['structured']['overview'] == ''
-
-
-def test_unlocked_integration_payload_drops_projection(render_mod: ModuleType) -> None:
-    """Unlocked integrations must not receive the projection either.
-
-    An app's returned message is stored back onto the conversation; an
-    untrusted summary as automation input is the promotion step section 1.1
-    forbids. Canonical title/overview stay; the projection does not.
-    """
-    conv = _make_conversation(projection=True, is_locked=False)
-    payload = render_mod.redact_conversation_for_integration(render_mod.conversation_to_dict(conv))
-    assert 'client_processing' not in payload
-    assert SENTINEL not in str(payload)
     assert payload['structured']['title'] == 'Recording title'
 
 
-def test_red_proof_unlocked_passthrough_would_leak_projection(render_mod: ModuleType) -> None:
-    """Mutation: skip the projection strip (old unlocked passthrough) → sentinel is visible."""
-    conv = _make_conversation(projection=True, is_locked=False)
+def test_red_proof_passthrough_would_leak_projection(render_mod: ModuleType) -> None:
+    """Mutation: skip the projection strip → sentinel is visible."""
+    conv = _make_conversation(projection=True)
     dumped = render_mod.conversation_to_dict(conv)
     dumped.pop('geolocation', None)
     assert dumped.get('client_processing') is not None
@@ -1192,12 +1176,12 @@ def test_red_proof_null_assignment_keeps_the_projection_key(render_mod: ModuleTy
     That is the public-contract change the redactor must not make. Production
     removal is asserted by ``'client_processing' not in payload`` above.
     """
-    dumped = render_mod.conversation_to_dict(_make_conversation(projection=True, is_locked=False))
+    dumped = render_mod.conversation_to_dict(_make_conversation(projection=True))
     dumped['client_processing'] = None
     assert 'client_processing' in dumped
     assert dumped['client_processing'] is None
     payload = render_mod.redact_conversation_for_integration(
-        render_mod.conversation_to_dict(_make_conversation(projection=True, is_locked=False))
+        render_mod.conversation_to_dict(_make_conversation(projection=True))
     )
     assert 'client_processing' not in payload
 
@@ -2059,9 +2043,8 @@ def test_red_proof_walrus_alias_fails_rebind_scan() -> None:
 
 
 @pytest.mark.parametrize('coverage', ['unknown', 'incomplete', 'mapped', None])
-@pytest.mark.parametrize('locked', [False, True])
-def test_capture_coverage_stays_on_app_views_and_out_of_integrations(render_mod, projection_sink_fns, coverage, locked):
-    conv = _make_conversation(is_locked=locked)
+def test_capture_coverage_stays_on_app_views_and_out_of_integrations(render_mod, projection_sink_fns, coverage):
+    conv = _make_conversation()
     conv.capture_coverage = coverage
     assert 'capture_coverage' not in render_mod.PROJECTION_FAMILY_FIELDS
     public = render_mod.conversation_to_dict(conv)
@@ -2078,9 +2061,8 @@ def test_capture_coverage_stays_on_app_views_and_out_of_integrations(render_mod,
     assert 'capture_coverage' not in render_mod.redact_conversation_for_integration(public)
 
 
-@pytest.mark.parametrize('locked', [False, True])
-def test_internal_voice_match_scores_are_absent_from_client_and_integration_views(render_mod, locked):
-    conv = _make_conversation(is_locked=locked)
+def test_internal_voice_match_scores_are_absent_from_client_and_integration_views(render_mod):
+    conv = _make_conversation()
     evidence = {'speaker_id': 0, 'stage': 'capture', 'owner_distance': 0.321}
     conv.speaker_match_scores = [evidence]
     conv.transcript_segments[0].speaker_match_scores = evidence
@@ -2093,9 +2075,8 @@ def test_internal_voice_match_scores_are_absent_from_client_and_integration_view
         assert all('speaker_match_scores' not in s for s in public.get('transcript_segments', []))
 
 
-@pytest.mark.parametrize('locked', [False, True])
-def test_internal_owner_diagnostics_are_absent_from_client_and_integration_views(render_mod, locked):
-    conv = _make_conversation(is_locked=locked)
+def test_internal_owner_diagnostics_are_absent_from_client_and_integration_views(render_mod):
+    conv = _make_conversation()
     conv.owner_recognition_diagnostics = {'first_resolver': {'reason': 'private_cloud_disabled', 'uid': 'owner'}}
     assert conv.model_dump()['owner_recognition_diagnostics']['first_resolver']['uid'] == 'owner'
     assert 'owner_recognition_diagnostics' not in conv.model_dump(mode='json')

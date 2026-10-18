@@ -227,7 +227,6 @@ def test_answer_changes_only_played_complete_segment_and_never_enrolls(world, an
         'overlap',
         'receipt',
         'audio',
-        'locked',
         'deleted',
         'discarded',
         'baseline_status',
@@ -251,8 +250,6 @@ def test_stale_answer_is_atomic(world, change):
         raw['manual_speaker_assignments'] = {'generation': 1}
     elif change == 'audio':
         raw['audio_files'][0]['duration'] = 59
-    elif change == 'locked':
-        raw['is_locked'] = True
     elif change == 'deleted':
         raw['deleted'] = True
     elif change == 'discarded':

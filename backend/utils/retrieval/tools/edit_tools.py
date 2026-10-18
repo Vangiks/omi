@@ -62,8 +62,6 @@ def update_conversation(
     row = conversations.get_conversation(uid, conversation_id)
     if not row or row.get('deleted'):
         return tool_error('conversation_not_found', 'Conversation not found for the authenticated owner.')
-    if row.get('is_locked'):
-        return tool_error('conversation_locked', 'Conversation is locked and cannot be edited.')
     before = cast(Dict[str, Any], chat_edits.snapshot(uid, 'conversation', conversation_id))
     observed = conversations.prepare_conversation_for_read(cast(Dict[str, Any], chat_edits.decode(before)), uid) or {}
     structured = dict(observed.get('structured') or {})

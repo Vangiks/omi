@@ -42,21 +42,6 @@ def test_accept_shared_tasks_all_deleted_returns_404(mock_redis, mock_db, sample
 
 @patch("routers.action_items.action_items_db")
 @patch("routers.action_items.redis_db")
-def test_accept_shared_tasks_all_locked_returns_402(mock_redis, mock_db, sample_request, share_data):
-    mock_redis.get_task_share.return_value = share_data
-    mock_db.get_action_item.return_value = {"id": "task-1", "is_locked": True}
-
-    with pytest.raises(HTTPException) as exc_info:
-        accept_shared_action_items(request=sample_request, uid="recipient-user-456")
-
-    assert exc_info.value.status_code == 402
-    assert "locked" in exc_info.value.detail
-    mock_redis.try_accept_task_share.assert_not_called()
-    mock_redis.undo_accept_task_share.assert_not_called()
-
-
-@patch("routers.action_items.action_items_db")
-@patch("routers.action_items.redis_db")
 def test_accept_shared_tasks_self_accept_forbidden(mock_redis, mock_db, sample_request, share_data):
     mock_redis.get_task_share.return_value = share_data
 
@@ -88,7 +73,6 @@ def test_accept_shared_tasks_used_token_conflict(mock_redis, mock_db, sample_req
     mock_db.get_action_item.return_value = {
         "id": "task-1",
         "description": "Task",
-        "is_locked": False,
     }
     mock_redis.try_accept_task_share.return_value = False
 
@@ -117,7 +101,6 @@ def test_accept_shared_tasks_unavailable_claim_returns_503(
     mock_db.get_action_item.side_effect = lambda _uid, task_id: {
         "id": task_id,
         "description": "Buy milk",
-        "is_locked": False,
     }
     mock_redis.try_accept_task_share.return_value = None
 
@@ -138,8 +121,8 @@ def test_accept_shared_tasks_success_creates_and_wakes(mock_redis, mock_db, mock
     mock_redis.get_task_share.return_value = share_data
     mock_redis.try_accept_task_share.return_value = True
     items = {
-        "task-1": {"id": "task-1", "description": "Buy milk", "is_locked": False},
-        "task-2": {"id": "task-2", "description": "Review PR", "is_locked": False},
+        "task-1": {"id": "task-1", "description": "Buy milk"},
+        "task-2": {"id": "task-2", "description": "Review PR"},
     }
     mock_db.get_action_item.side_effect = lambda _uid, task_id: items[task_id]
     mock_db.create_action_items_batch.return_value = ["new-1", "new-2"]
@@ -177,7 +160,6 @@ def test_accept_shared_tasks_creation_failure_rolls_back_token(
     mock_db.get_action_item.return_value = {
         "id": "task-1",
         "description": "Do homework",
-        "is_locked": False,
     }
     mock_db.create_action_items_batch.side_effect = RuntimeError("Database down")
 
@@ -195,7 +177,7 @@ def test_later_source_read_failure_happens_before_any_copy(
 ):
     mock_redis.get_task_share.return_value = share_data
     mock_redis.try_accept_task_share.return_value = True
-    item = {"description": "Task", "is_locked": False}
+    item = {"description": "Task"}
     mock_db.get_action_item.side_effect = [item, item, item, RuntimeError("Source unavailable")]
 
     with pytest.raises(RuntimeError, match="Source unavailable"):
@@ -237,19 +219,18 @@ def test_delivery_starts_after_all_twenty_tasks_are_saved(
     mock_redis.undo_accept_task_share.assert_not_called()
 
 
-@pytest.mark.parametrize('remaining', [None, {"is_locked": True}])
 @patch("routers.action_items.action_items_db")
 @patch("routers.action_items.redis_db")
-def test_no_longer_available_tasks_release_acceptance(mock_redis, mock_db, remaining, sample_request, share_data):
+def test_no_longer_available_tasks_release_acceptance(mock_redis, mock_db, sample_request, share_data):
     mock_redis.get_task_share.return_value = share_data
     mock_redis.try_accept_task_share.return_value = True
-    mock_db.get_action_item.side_effect = [{"description": "Task"}, {"description": "Task"}, remaining, remaining]
+    mock_db.get_action_item.side_effect = [{"description": "Task"}, {"description": "Task"}, None, None]
     mock_db.create_action_items_batch.return_value = []
 
     with pytest.raises(HTTPException) as error:
         accept_shared_action_items(request=sample_request, uid="recipient")
 
-    assert error.value.status_code == 402
+    assert error.value.status_code == 404
     mock_redis.undo_accept_task_share.assert_called_once_with(sample_request.token, "recipient")
 
 

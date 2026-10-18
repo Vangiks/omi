@@ -56,7 +56,6 @@ LEAKING_FIELDS = frozenset(
         'starred',
         'discarded',
         'deferred',
-        'is_locked',
         'uses_custom_stt',
         'updated_at',
         'app_id',

@@ -50,7 +50,6 @@ _PRECEDING_FIELDS = (
     'status',
     'discarded',
     'deleted',
-    'is_locked',
     'structured.title',
     'structured.overview',
     'user_title',

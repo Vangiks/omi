@@ -1,7 +1,7 @@
 """Phase 2 section 1: batch tools, opaque list cursors, grouped screen activity.
 
-Covers ``get_conversations_by_ids`` (single batch read, dedupe/order, locked
-and missing ids, response budget, per-item transcript bounds),
+Covers ``get_conversations_by_ids`` (single batch read, dedupe/order,
+missing ids, response budget, per-item transcript bounds),
 ``create_memories`` (per-item charge including duplicates, per-item errors,
 batch-local dedupe, category handling), ``get_screen_activity`` grouping and
 keyset cursor, and the shared base64url cursor contract across every
@@ -76,7 +76,7 @@ def _import_real_firestore():
     return _import_real_module("google.cloud.firestore")
 
 
-def _conversation(cid, *, locked=False, text="hello"):
+def _conversation(cid, *, text="hello"):
     return {
         "id": cid,
         "created_at": "2026-06-11T10:00:00Z",
@@ -85,7 +85,6 @@ def _conversation(cid, *, locked=False, text="hello"):
         "language": "en",
         "structured": {"title": f"title-{cid}", "overview": "o", "category": "personal", "emoji": "x"},
         "transcript_segments": [{"id": "s1", "text": text, "speaker_id": 0, "is_user": True, "start": 0.0, "end": 1.0}],
-        "is_locked": locked,
     }
 
 
@@ -122,25 +121,6 @@ class TestGetConversationsByIds:
         assert card["transcript_segments"][0]["text"] == "hello"
         assert "structured" in card
         assert "transcript_segments" not in card["structured"]
-
-    def test_locked_item_returns_safe_error_and_never_leaks_transcript(self):
-        rows = {
-            "locked": _conversation("locked", locked=True, text="PRIVATE-TRANSCRIPT"),
-            "open": _conversation("open"),
-        }
-        with patch.object(
-            conversations_handler.conversations_db,
-            "get_mcp_conversations_by_id",
-            side_effect=_batch_fetch(rows),
-        ):
-            result = sse.execute_tool(UID, "get_conversations_by_ids", {"conversation_ids": ["locked", "open"]})
-        locked_item, open_item = result["conversations"]
-        assert locked_item["id"] == "locked"
-        assert locked_item["error"]["code"] == "paid_plan_required"
-        assert "conversation" not in locked_item
-        assert "transcript" not in json.dumps(locked_item)
-        assert "PRIVATE-TRANSCRIPT" not in json.dumps(result)
-        assert open_item["conversation"]["transcript_segments"]
 
     def test_per_item_transcript_bounds_and_truncated_flag(self):
         conv = _conversation("c1")

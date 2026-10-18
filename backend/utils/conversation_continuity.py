@@ -102,7 +102,7 @@ def resumable_continuation(
     finish = row.get('finished_at')
     return (
         row.get('status') == 'in_progress'
-        and not any(row.get(key) for key in ('deleted', 'discarded', 'is_locked'))
+        and not any(row.get(key) for key in ('deleted', 'discarded'))
         and row.get('source') == source
         and row.get('client_device_id') == device_id
         and isinstance(finish, datetime)

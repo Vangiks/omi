@@ -56,7 +56,6 @@ _TERMINAL_OUTCOMES = frozenset(
         'exhausted',
         'superseded',
         'deleted',
-        'locked',
         'discarded',
         'disabled',
         'capacity_exhausted',
@@ -183,8 +182,6 @@ def _transition_terminal(job: dict, outcome: str) -> None:
 def _source_status(conversation: Optional[Mapping[str, Any]]) -> Optional[str]:
     if not conversation or conversation.get('deleted'):
         return 'deleted'
-    if conversation.get('is_locked'):
-        return 'locked'
     if conversation.get('discarded'):
         return 'discarded'
     return None

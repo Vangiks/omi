@@ -180,13 +180,12 @@ def test_injected_evidence_cannot_register_or_edit_an_unseen_target(monkeypatch)
     assert ('conversations', 'read-1') not in fresh['turn_refs'].seen
 
 
-@pytest.mark.parametrize('row,code', [(None, 'conversation_not_found'), ({'is_locked': True}, 'conversation_locked')])
-def test_attached_refs_still_require_owner_lookup(monkeypatch, row, code):
-    monkeypatch.setattr(edit_tools.conversations, 'get_conversation', lambda uid, target: row)
+def test_attached_refs_still_require_owner_lookup(monkeypatch):
+    monkeypatch.setattr(edit_tools.conversations, 'get_conversation', lambda uid, target: None)
     result = edit_tools.update_conversation.invoke(
         {'correction': 'Requested', 'title': 'Title'}, config={'configurable': _config()}
     )
-    assert json.loads(result)['error']['code'] == code
+    assert json.loads(result)['error']['code'] == 'conversation_not_found'
 
 
 def test_reusable_registry_distinguishes_domains():
@@ -347,8 +346,8 @@ def test_memory_cards_and_refs_only_include_whole_admitted_evidence(monkeypatch)
     cfg = _config()
     cfg['chat_scope'] = None
     memories = [
-        SimpleNamespace(id='memory-1', content='Brief fact', created_at=None, is_locked=False),
-        SimpleNamespace(id='memory-2', content='x' * 2000, created_at=None, is_locked=False),
+        SimpleNamespace(id='memory-1', content='Brief fact', created_at=None),
+        SimpleNamespace(id='memory-2', content='x' * 2000, created_at=None),
     ]
 
     class Service:

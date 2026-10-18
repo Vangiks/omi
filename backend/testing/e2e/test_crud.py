@@ -342,7 +342,6 @@ class TestDataShapePreservation:
             "completed",
             "created_at",
             "updated_at",
-            "is_locked",
             "exported",
             "sort_order",
             "indent_level",

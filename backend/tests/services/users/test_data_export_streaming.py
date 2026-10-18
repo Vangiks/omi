@@ -36,7 +36,7 @@ def _stub_all_sections(monkeypatch, **overrides):
         "iter_all_conversations",
         overrides.get(
             "iter_all_conversations",
-            MagicMock(return_value=iter([{"id": "conv1", "is_locked": True}, {"id": "conv2"}])),
+            MagicMock(return_value=iter([{"id": "conv1"}, {"id": "conv2"}])),
         ),
     )
     monkeypatch.setattr(

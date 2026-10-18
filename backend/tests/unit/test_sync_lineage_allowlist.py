@@ -488,7 +488,7 @@ async def test_coordinator_checkpoints_admitted_refresh_debt_before_marking_audi
 
     def append(*args, **kw):
         result = original(*args, **kw)
-        args[2].setdefault('_merged', {})[args[9]] = 'en'
+        args[2].setdefault('_merged', {})[args[8]] = 'en'
         return result
 
     def checkpoint(_job_id, _token, updates):

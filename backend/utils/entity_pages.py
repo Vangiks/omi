@@ -149,7 +149,7 @@ def _facts(
         row = rows.get(memory_id)
         if row is None:
             continue
-        if row.user_review is False or row.is_locked:
+        if row.user_review is False:
             continue
         if row.subject_entity_id not in entity_ids:
             continue

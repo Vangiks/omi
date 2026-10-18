@@ -47,7 +47,6 @@ def _completed_conversation_payload(conversation_id: str, source: str = "omi") -
         ],
         "discarded": False,
         "status": "completed",
-        "is_locked": False,
         "data_protection_level": "standard",
     }
 
@@ -197,7 +196,6 @@ def test_sync_v2_job_runs_pipeline_and_polls_completed_result(client, auth_heade
         lock,
         errors,
         source,
-        is_locked,
         transcription_prefs,
         person_embeddings_cache,
         target_conversation_id,

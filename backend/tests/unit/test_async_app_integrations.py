@@ -327,7 +327,7 @@ class TestDurableExternalIntegrationFanout:
         app = _make_app('app-1', 'https://app.test/hook')
         app.triggers_on_conversation_creation.return_value = True
         conversation = types.SimpleNamespace(
-            id='conversation-1', discarded=False, is_locked=False, source=None, client_platform='ios'
+            id='conversation-1', discarded=False, source=None, client_platform='ios'
         )
         response = MagicMock(status_code=200)
         response.json.return_value = {}
@@ -353,7 +353,7 @@ class TestDurableExternalIntegrationFanout:
     async def test_creation_webhook_payload_strips_geolocation(self):
         app = _make_app('app-1', 'https://app.test/hook')
         app.triggers_on_conversation_creation.return_value = True
-        conversation = types.SimpleNamespace(id='conversation-1', discarded=False, is_locked=False, source=None)
+        conversation = types.SimpleNamespace(id='conversation-1', discarded=False, source=None)
         response = MagicMock(status_code=200)
         response.json.return_value = {}
         client = AsyncMock()
@@ -376,7 +376,7 @@ class TestDurableExternalIntegrationFanout:
         app = _make_app('app-1', 'https://app.test/hook')
         app.triggers_on_conversation_creation.return_value = True
         conversation = types.SimpleNamespace(
-            id='conversation-1', discarded=False, is_locked=False, source=None, client_platform='ios'
+            id='conversation-1', discarded=False, source=None, client_platform='ios'
         )
         response = MagicMock(status_code=503, text='unavailable')
         client = AsyncMock()
@@ -403,7 +403,7 @@ class TestDurableExternalIntegrationFanout:
         """A user's broken app (expired token, deleted target) must not strand the conversation."""
         app = _make_app('app-1', 'https://app.test/hook')
         app.triggers_on_conversation_creation.return_value = True
-        conversation = types.SimpleNamespace(id='conversation-1', discarded=False, is_locked=False, source=None)
+        conversation = types.SimpleNamespace(id='conversation-1', discarded=False, source=None)
         response = MagicMock(status_code=status_code, text='rejected')
         client = AsyncMock()
         client.post = AsyncMock(return_value=response)
@@ -428,7 +428,7 @@ class TestDurableExternalIntegrationFanout:
         """
         app = _make_app('app-1', 'https://app.test/hook')
         app.triggers_on_conversation_creation.return_value = True
-        conversation = types.SimpleNamespace(id='conversation-1', discarded=False, is_locked=False, source=None)
+        conversation = types.SimpleNamespace(id='conversation-1', discarded=False, source=None)
         response = MagicMock(status_code=530, text='origin unreachable')
         client = AsyncMock()
         client.post = AsyncMock(return_value=response)
@@ -469,7 +469,7 @@ class TestSSRFConfigRejection:
     async def test_durable_fanout_private_url_is_config_error_not_delivery_failure(self):
         app = _make_app('app-1', 'https://internal.test/hook')
         app.triggers_on_conversation_creation.return_value = True
-        conversation = types.SimpleNamespace(id='conversation-1', discarded=False, is_locked=False, source=None)
+        conversation = types.SimpleNamespace(id='conversation-1', discarded=False, source=None)
         client = AsyncMock()
         cb = MagicMock()
         cb.allow_request.return_value = True

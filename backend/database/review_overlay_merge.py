@@ -18,7 +18,7 @@ def transfer(uid, source_ids, destination_id, *, firestore_client=None):
         if database.collection('account_deletions').document(uid).get(transaction=tx).exists:
             raise store.ReviewConflict('Account deletion fences correction transfer')
         raw_target = target.get(transaction=tx).to_dict()
-        if not raw_target or raw_target.get('deleted') or raw_target.get('is_locked'):
+        if not raw_target or raw_target.get('deleted'):
             raise store.ReviewConflict('Merged correction destination unavailable')
         segments = decode_transcript_segments_verified(
             uid, raw_target.get('transcript_segments') or [], bool(raw_target.get('transcript_segments_compressed'))
@@ -28,7 +28,7 @@ def transfer(uid, source_ids, destination_id, *, firestore_client=None):
         for source_id in source_ids:
             source_ref = owner.collection('conversations').document(source_id)
             source = source_ref.get(transaction=tx).to_dict() or {}
-            if source.get('deleted') or source.get('is_locked'):
+            if source.get('deleted'):
                 raise store.ReviewConflict('Merge source unavailable')
             if source.get('transcript_corrections_moved_to'):
                 raise store.ReviewConflict('Correction anchors already moved by another merge')

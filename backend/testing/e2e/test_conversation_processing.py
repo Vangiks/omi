@@ -176,7 +176,6 @@ def test_reprocess_route_persists_deterministic_processing_result(client, auth_h
             ],
             "discarded": False,
             "status": "completed",
-            "is_locked": False,
             "data_protection_level": "standard",
         },
     )
@@ -242,7 +241,6 @@ def test_discarded_conversation_filtered(client, auth_headers):
         "transcript_segments": [],
         "discarded": False,
         "status": "completed",
-        "is_locked": False,
     }
     discarded_conv = dict(active_conv, id="discard-test-discarded", discarded=True)
 

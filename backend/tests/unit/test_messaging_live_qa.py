@@ -393,9 +393,7 @@ def test_private_memories_empty_result_is_not_a_claim_no_facts_exist(monkeypatch
     from utils.messaging.projection import SurfaceRuntime, surface_runtime
 
     now = datetime.now(timezone.utc)
-    private = SimpleNamespace(
-        is_locked=False, user_review=True, created_at=now, visibility='private', sensitivity_labels=[]
-    )
+    private = SimpleNamespace(user_review=True, created_at=now, visibility='private', sensitivity_labels=[])
 
     class Service:
         def __init__(self, **kwargs):
@@ -800,9 +798,7 @@ def test_channel_memory_search_empty_does_not_claim_no_facts(monkeypatch):
     from utils.messaging.contracts import Principal
     from utils.messaging.projection import SurfaceRuntime, surface_runtime
 
-    private = SimpleNamespace(
-        is_locked=False, visibility='private', sensitivity_labels=[], content='synthetic private fact'
-    )
+    private = SimpleNamespace(visibility='private', sensitivity_labels=[], content='synthetic private fact')
 
     class Match:
         memory = private

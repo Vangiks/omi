@@ -437,7 +437,7 @@ def test_legacy_ready_print_is_not_retaught(world):
     assert world.extract.await_count == 0
 
 
-@pytest.mark.parametrize('flag', ['deleted', 'is_locked', 'discarded'])
+@pytest.mark.parametrize('flag', ['deleted', 'discarded'])
 def test_legacy_source_lifecycle_never_extracts(world, flag):
     assign(person_id='p', segment_ids=['s0'])
     _drop_durable_markers(world)

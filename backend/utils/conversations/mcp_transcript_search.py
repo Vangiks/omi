@@ -117,7 +117,7 @@ def chat_transcript_excerpts(
     allowed = {
         str(conv['id']): conv
         for conv in conversations
-        if conv.get('id') and not conv.get('is_locked') and not conv.get('discarded')
+        if conv.get('id') and not conv.get('discarded')
     }
     excerpts: Dict[str, str] = {}
     chunks_by_id: Dict[str, Dict[int, str]] = {}

@@ -304,8 +304,6 @@ def browse_conversations_by_speaker(
             rows = list(islice(iterator, request_size))
             scanned += len(rows)
             for row in rows:
-                if row.get('is_locked'):
-                    continue
                 if row.get('discarded') and not include_discarded:
                     continue
                 if conversation_matches_speaker(row, speaker_id):
@@ -397,9 +395,6 @@ def search_conversations(
         memories: List[Dict[str, Any]] = []
         for item in results.get('hits', []):
             doc: Dict[str, Any] = item.get('document', {})
-            # Exclude locked conversations entirely to prevent inference leaks
-            if doc.get('is_locked', False):
-                continue
             try:
                 # Convert all three into locals first, then assign, so a hit that fails partway is
                 # never left half-converted.
@@ -416,8 +411,6 @@ def search_conversations(
             doc['started_at'] = started_at
             doc['finished_at'] = finished_at
             memories.append(doc)
-        # Derive total_pages only from visible (unlocked) items to prevent inference leaks.
-        # is_locked is not a Typesense filter field, so exact global count is unavailable.
         has_more = len(memories) >= per_page
         return {
             'items': memories,

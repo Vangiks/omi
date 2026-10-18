@@ -305,21 +305,20 @@ def test_the_decision_is_per_account_not_a_constant(monkeypatch):
     assert kg_router._legacy_graph_mutation_decision("uid-arbitrary-account") is kg_router.LegacyGraphMutation.ALLOWED
 
 
-def test_rebuild_task_feeds_unlocked_memories_to_the_legacy_rebuild(monkeypatch):
+def test_rebuild_task_feeds_memories_to_the_legacy_rebuild(monkeypatch):
     _legacy_principal(monkeypatch)
 
     class _Memory:
-        def __init__(self, memory_id: str, content: str, is_locked: bool = False):
+        def __init__(self, memory_id: str, content: str):
             self.id = memory_id
             self.content = content
-            self.is_locked = is_locked
 
     class _Service:
         def __init__(self, **_kwargs: Any):
             pass
 
         def read(self, uid: str, **_kwargs: Any):
-            return [_Memory("m1", "one"), _Memory("m2", "locked", is_locked=True)]
+            return [_Memory("m1", "one"), _Memory("m2", "two")]
 
     captured: Dict[str, Any] = {}
     monkeypatch.setattr(kg_router, "MemoryService", _Service)
@@ -331,7 +330,7 @@ def test_rebuild_task_feeds_unlocked_memories_to_the_legacy_rebuild(monkeypatch)
 
     kg_router._rebuild_graph_task(UID, "Ada")
 
-    assert captured["memories"] == [{"id": "m1", "content": "one"}]
+    assert captured["memories"] == [{"id": "m1", "content": "one"}, {"id": "m2", "content": "two"}]
     assert captured["user_name"] == "Ada"
 
 

@@ -242,8 +242,6 @@ async def trigger_external_integrations(
     """
     if not conversation or conversation.discarded:
         return []
-    if conversation.is_locked:
-        return []
 
     client_kind = resolve_client_kind(
         x_app_platform=getattr(conversation, 'client_platform', None),
@@ -447,8 +445,7 @@ def _retrieve_contextual_memories(uid: str, user_context):
         entities=filters.get("entities", []),
         dates=filters.get("dates", []),
     )
-    convos = conversations_db.get_conversations_by_id(uid, memories_id)
-    return [c for c in convos if not c.get('is_locked')]
+    return conversations_db.get_conversations_by_id(uid, memories_id)
 
 
 def _hit_proactive_notification_rate_limits(uid: str, app: App):

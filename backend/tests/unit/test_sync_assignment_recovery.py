@@ -1,8 +1,7 @@
 """Incompatible explicit targets recover temporally; equal partitions behave as before.
 
-Partition compatibility is equality of source, device and lock state. Two locked
-captures are compatible, so locked chunks merge and retry exactly like unlocked
-ones; only a genuine difference is a mismatch.
+Partition compatibility is equality of source and device; only a genuine
+difference is a mismatch.
 """
 
 from copy import deepcopy
@@ -20,7 +19,7 @@ from database import sync_ledger
 from tests.unit.fixtures.strict_firestore_transaction import StrictFirestore
 from tests.unit.test_sync_cloud_tasks import _load_sync_router_for_fast_path
 from tests.unit.test_sync_cross_job_assignment import chunk, conversations, intake
-from utils.sync.assignment import auto_mergeable, capture_mismatch, compatible_capture
+from utils.sync.assignment import capture_mismatch, compatible_capture
 from utils.sync.assignment_errors import SyncAssignmentConflict
 from utils.sync.pipeline import _firestore_error_class
 
@@ -28,21 +27,15 @@ _ALL_TOKENS = {
     'none',
     'source',
     'device',
-    'lock',
     'source_device',
-    'source_lock',
-    'device_lock',
-    'source_device_lock',
 }
 
-# (fields changed on the stored explicit target, incoming is_locked, bounded token)
+# (fields changed on the stored explicit target, bounded token)
 _TARGET_MISMATCHES = [
-    ({'source': 'desktop'}, False, 'source'),
-    ({'client_device_id': 'other-device'}, False, 'device'),
-    ({'client_device_id': None}, False, 'device'),
-    ({'is_locked': True}, False, 'lock'),
-    ({}, True, 'lock'),
-    ({'source': 'desktop', 'is_locked': True}, False, 'source_lock'),
+    ({'source': 'desktop'}, 'source'),
+    ({'client_device_id': 'other-device'}, 'device'),
+    ({'client_device_id': None}, 'device'),
+    ({'source': 'desktop', 'client_device_id': 'other-device'}, 'source_device'),
 ]
 
 
@@ -82,10 +75,7 @@ def test_recovery_switch(monkeypatch, value, expected):
 def test_mismatch_token_is_bounded_and_agrees_with_compatible_capture():
     seen = set()
     states = [
-        {'source': source, 'client_device_id': device, 'is_locked': locked}
-        for source in ('omi', 'desktop')
-        for device in ('pendant', None)
-        for locked in (False, True, None)
+        {'source': source, 'client_device_id': device} for source in ('omi', 'desktop') for device in ('pendant', None)
     ]
     for left in states:
         for right in states:
@@ -94,74 +84,26 @@ def test_mismatch_token_is_bounded_and_agrees_with_compatible_capture():
             assert (token == 'none') is compatible_capture(left, right)
             assert capture_mismatch(right, left) == token
     assert seen == _ALL_TOKENS
-    # Lock is reported only when the lock state differs, never for locked == locked.
-    assert capture_mismatch({'is_locked': True}, {'is_locked': True}) == 'none'
-    assert capture_mismatch({'is_locked': None}, {'is_locked': False}) == 'none'
     # Values never leak into the token.
-    assert (
-        capture_mismatch({'source': 'secret', 'client_device_id': 'private', 'is_locked': True}, {})
-        == 'source_device_lock'
-    )
-
-
-def test_locked_sync_row_remains_auto_mergeable():
-    assert auto_mergeable({'sync_content_revision': 1, 'is_locked': True})
-    assert not auto_mergeable({'sync_content_revision': 1, 'is_locked': True, 'user_title': 'Mine'})
-
-
-@pytest.mark.parametrize('flag', ['true', 'off'])
-@pytest.mark.parametrize('reverse', [False, True])
-def test_two_adjacent_locked_chunks_become_one_conversation(monkeypatch, caplog, flag, reverse):
-    monkeypatch.setenv('SYNC_ASSIGNMENT_RECOVERY_ENABLED', flag)
-    store = StrictFirestore()
-    chunks = [dict(chunk('a', 1000), is_locked=True), dict(chunk('b', 1060), is_locked=True)]
-    for item in reversed(chunks) if reverse else chunks:
-        result, _, _ = intake(store, item)
-    rows = conversations(store)
-    assert len(rows) == 1
-    assert rows[0]['is_locked'] is True and len(rows[0]['transcript_segments']) == 2
-    assert result['id'] == rows[0]['id']
-    assert not _assignment_events(caplog)
-
-
-@pytest.mark.parametrize('flag', ['true', 'off'])
-@pytest.mark.parametrize('revision', [None, 1])
-def test_locked_chunk_appends_to_locked_explicit_target(monkeypatch, caplog, flag, revision):
-    monkeypatch.setenv('SYNC_ASSIGNMENT_RECOVERY_ENABLED', flag)
-    store = StrictFirestore()
-    target = dict(chunk('locked', 1000, text='The first locked part of the talk.'), is_locked=True)
-    if revision:
-        target['sync_content_revision'] = revision
-    store.rows[('users', 'u', 'conversations', 'locked')] = deepcopy(target)
-    incoming = dict(chunk('wal', 1060, text='The second locked part of the talk.'), is_locked=True)
-    result, created, survivors = intake(store, incoming, target_id='locked')
-    assert result['id'] == 'locked' and not created and len(survivors) == 1
-    stored = _row(store, 'locked')
-    assert stored['is_locked'] is True
-    assert [s['text'] for s in stored['transcript_segments']] == [
-        'The first locked part of the talk.',
-        'The second locked part of the talk.',
-    ]
-    assert ('users', 'u', 'conversations', 'wal') not in store.rows
-    assert not _assignment_events(caplog)
+    assert capture_mismatch({'source': 'secret', 'client_device_id': 'private'}, {}) == 'source_device'
 
 
 @pytest.mark.parametrize('flag', ['true', 'off'])
 @pytest.mark.parametrize('scenario', ['own_anchor', 'explicit_target', 'absorbed_by_neighbor'])
-def test_identical_locked_retry_after_commit_before_checkpoint_deduplicates(monkeypatch, caplog, flag, scenario):
+def test_identical_retry_after_commit_before_checkpoint_deduplicates(monkeypatch, caplog, flag, scenario):
     """The assignment committed, the processed-segment checkpoint did not, and the
-    same locked chunk is assigned again. It must deduplicate, not conflict."""
+    same chunk is assigned again. It must deduplicate, not conflict."""
     monkeypatch.setenv('SYNC_ASSIGNMENT_RECOVERY_ENABLED', flag)
     store = StrictFirestore()
-    incoming = dict(chunk('wal', 1060, text='A locked sentence that was already saved.'), is_locked=True)
+    incoming = chunk('wal', 1060, text='A sentence that was already saved.')
     target_id = None
     if scenario == 'explicit_target':
-        target_id = 'locked'
-        store.rows[('users', 'u', 'conversations', 'locked')] = dict(
-            chunk('locked', 1000, text='The first locked part of the talk.'), is_locked=True, sync_content_revision=1
+        target_id = 'target'
+        store.rows[('users', 'u', 'conversations', 'target')] = dict(
+            chunk('target', 1000, text='The first part of the talk.'), sync_content_revision=1
         )
     elif scenario == 'absorbed_by_neighbor':
-        intake(store, dict(chunk('neighbor', 1000, text='An earlier locked sentence.'), is_locked=True))
+        intake(store, chunk('neighbor', 1000, text='An earlier sentence.'))
     first, _, survivors = intake(store, incoming, target_id=target_id)
     assert len(survivors) == 1
     committed = [_spoken(row) for row in conversations(store)]
@@ -170,25 +112,21 @@ def test_identical_locked_retry_after_commit_before_checkpoint_deduplicates(monk
     assert _spoken(retried) == _spoken(first)
     after = conversations(store)
     assert len(after) == 1 and [_spoken(row) for row in after] == committed
-    assert after[0]['is_locked'] is True
     assert not _assignment_events(caplog)
 
 
 @pytest.mark.parametrize('flag', ['true', 'off'])
 @pytest.mark.parametrize(
-    'incoming_locked,field,value,token',
+    'field,value,token',
     [
-        (False, 'is_locked', True, 'lock'),
-        (True, 'is_locked', False, 'lock'),
-        (False, 'source', 'desktop', 'source'),
-        (True, 'source', 'desktop', 'source'),
-        (False, 'client_device_id', 'changed-device', 'device'),
+        ('source', 'desktop', 'source'),
+        ('client_device_id', 'changed-device', 'device'),
     ],
 )
-def test_genuinely_changed_retry_anchor_is_fenced(monkeypatch, caplog, flag, incoming_locked, field, value, token):
+def test_genuinely_changed_retry_anchor_is_fenced(monkeypatch, caplog, flag, field, value, token):
     monkeypatch.setenv('SYNC_ASSIGNMENT_RECOVERY_ENABLED', flag)
     store = StrictFirestore()
-    incoming = dict(chunk('wal', 1000), is_locked=incoming_locked)
+    incoming = chunk('wal', 1000)
     intake(store, incoming)
     _row(store, 'wal')[field] = value
     before = deepcopy(store.rows)
@@ -201,13 +139,12 @@ def test_genuinely_changed_retry_anchor_is_fenced(monkeypatch, caplog, flag, inc
     assert 'changed-device' not in event and 'desktop' not in event
 
 
-@pytest.mark.parametrize('target_fields,incoming_locked,token', _TARGET_MISMATCHES)
+@pytest.mark.parametrize('target_fields,token', _TARGET_MISMATCHES)
 @pytest.mark.parametrize('compatible_neighbor', [False, True])
 def test_incompatible_target_recovers_temporally_and_leaves_the_target_untouched(
     monkeypatch,
     caplog,
     target_fields,
-    incoming_locked,
     token,
     compatible_neighbor,
 ):
@@ -216,8 +153,8 @@ def test_incompatible_target_recovers_temporally_and_leaves_the_target_untouched
     target = dict(chunk('private-target', 1000), **target_fields)
     store.rows[('users', 'u', 'conversations', target['id'])] = deepcopy(target)
     if compatible_neighbor:
-        intake(store, dict(chunk('neighbor', 960), is_locked=incoming_locked))
-    incoming = dict(chunk('wal', 1010), is_locked=incoming_locked)
+        intake(store, chunk('neighbor', 960))
+    incoming = chunk('wal', 1010)
     result, created, survivors = intake(store, incoming, target_id=target['id'], candidate_id=target['id'])
     assert result['id'] == ('neighbor' if compatible_neighbor else 'wal')
     assert created is not compatible_neighbor
@@ -232,18 +169,16 @@ def test_incompatible_target_recovers_temporally_and_leaves_the_target_untouched
     assert target['id'] not in event and 'other-device' not in event and 'desktop' not in event
 
 
-@pytest.mark.parametrize('target_fields,incoming_locked,token', _TARGET_MISMATCHES)
-def test_switch_off_rejects_an_incompatible_target_as_before(
-    monkeypatch, caplog, target_fields, incoming_locked, token
-):
+@pytest.mark.parametrize('target_fields,token', _TARGET_MISMATCHES)
+def test_switch_off_rejects_an_incompatible_target_as_before(monkeypatch, caplog, target_fields, token):
     monkeypatch.setenv('SYNC_ASSIGNMENT_RECOVERY_ENABLED', 'false')
     store = StrictFirestore()
     target = dict(chunk('private-target', 1000), **target_fields)
     store.rows[('users', 'u', 'conversations', target['id'])] = deepcopy(target)
-    intake(store, dict(chunk('neighbor', 960), is_locked=incoming_locked))
+    intake(store, chunk('neighbor', 960))
     before = deepcopy(store.rows)
     with pytest.raises(SyncAssignmentConflict) as exc:
-        intake(store, dict(chunk('wal', 1010), is_locked=incoming_locked), target_id=target['id'])
+        intake(store, chunk('wal', 1010), target_id=target['id'])
     assert exc.value.subtype == 'provenance_mismatch'
     assert store.rows == before
     events = _assignment_events(caplog)

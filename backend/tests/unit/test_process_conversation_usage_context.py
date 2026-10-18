@@ -787,7 +787,6 @@ def test_conversation_action_items_never_fall_back_to_a_task_writer(monkeypatch)
 
     conversation = MagicMock()
     conversation.id = 'conversation-1'
-    conversation.is_locked = False
     conversation.source = ConversationSource.desktop
     conversation.transcript_segments = []
     conversation.structured.action_items = [action_item]

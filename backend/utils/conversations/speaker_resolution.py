@@ -1004,7 +1004,7 @@ def completed_identity_retry_skip_reason(raw: Optional[Mapping[str, Any]]) -> Op
         return 'missing'
     if raw.get('status') != 'completed':
         return 'not_completed'
-    for key, reason in (('deleted', 'deleted'), ('discarded', 'discarded'), ('is_locked', 'locked')):
+    for key, reason in (('deleted', 'deleted'), ('discarded', 'discarded')):
         if raw.get(key):
             return reason
     if raw.get('source') in ('desktop', 'phone', 'phone_call'):

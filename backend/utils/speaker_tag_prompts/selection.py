@@ -222,7 +222,7 @@ def _excerpt(text: str) -> str:
 
 
 def _eligible(conversation: Mapping[str, Any], now: datetime) -> Optional[datetime]:
-    if conversation.get('deleted') or conversation.get('discarded') or conversation.get('is_locked'):
+    if conversation.get('deleted') or conversation.get('discarded'):
         return None
     if conversation.get('status') not in (None, 'completed'):
         return None

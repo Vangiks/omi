@@ -473,52 +473,6 @@ def test_get_memories_created_desc_scan_is_capped_for_hosted_mcp():
     assert service.read.call_count == 2
 
 
-def test_get_memories_locked_null_content_does_not_crash():
-    service = MagicMock()
-    service.read.return_value = [
-        SimpleNamespace(
-            model_dump=lambda mode: {
-                'id': 'm1',
-                'content': None,
-                'is_locked': True,
-            }
-        )
-    ]
-    with (
-        patch.object(
-            sse_memories, 'authorize_memory_external_default_memory_read', return_value=_allowed_empty_result()
-        ),
-        patch.object(sse_memories, 'MemoryService', return_value=service),
-    ):
-        result = sse.execute_tool(UID, 'get_memories', {}, auth_context=_sse_auth_context())
-
-    assert len(result['memories']) == 1
-    assert result['memories'][0]['id'] == 'm1'
-    assert result['memories'][0]['content'] == ''
-
-
-def test_rest_get_memories_locked_null_content_does_not_crash():
-    service = MagicMock()
-    service.read.return_value = [
-        SimpleNamespace(
-            model_dump=lambda mode: {
-                'id': 'm1',
-                'content': None,
-                'is_locked': True,
-            }
-        )
-    ]
-    with (
-        patch.object(rest, 'authorize_memory_external_default_memory_read', return_value=_allowed_empty_result()),
-        patch.object(sse_memories, 'MemoryService', return_value=service),
-    ):
-        result = rest.get_memories(response=SimpleNamespace(headers={}), auth_context=SimpleNamespace(uid=UID))
-
-    assert len(result) == 1
-    assert result[0]['id'] == 'm1'
-    assert result[0]['content'] == ''
-
-
 def _fat_conversation():
     return {
         'id': 'conv-1',
@@ -827,7 +781,7 @@ def test_legacy_api_key_helper_rejects_oauth_tokens():
         assert sse.authenticate_api_key('Bearer omi_oat_test') is None
 
 
-def _action_item(item_id='a1', desc='Email Bob', completed=False, deleted=False, locked=False):
+def _action_item(item_id='a1', desc='Email Bob', completed=False, deleted=False):
     return {
         'id': item_id,
         'description': desc,
@@ -837,7 +791,6 @@ def _action_item(item_id='a1', desc='Email Bob', completed=False, deleted=False,
         'completed_at': None,
         'conversation_id': 'conv-1',
         'deleted': deleted,
-        'is_locked': locked,
     }
 
 
@@ -867,14 +820,6 @@ class TestActionItems:
     def test_tool_rejects_bad_date(self, mock_db):
         with pytest.raises(sse.ToolExecutionError):
             sse.execute_tool(UID, 'get_action_items', {'due_start_date': 'not-a-date'})
-
-    @patch('utils.mcp_server.handlers.action_items.action_items_db')
-    def test_locked_description_truncated(self, mock_db):
-        long_desc = 'x' * 200
-        mock_db.get_action_items.return_value = [_action_item('a1', desc=long_desc, locked=True)]
-        result = sse.execute_tool(UID, 'get_action_items', {})
-        assert result['action_items'][0]['description'].endswith('...')
-        assert len(result['action_items'][0]['description']) == 73
 
 
 class TestGoals:

@@ -255,7 +255,6 @@ def _rebuild_graph_task(uid: str, user_name: str) -> None:
     memories: MemoryPayloads = [
         {"id": memory.id, "content": memory.content}
         for memory in MemoryService(db_client=get_firestore_client()).read(uid, limit=500)
-        if not getattr(memory, "is_locked", False)
     ]
     _run_rebuild_knowledge_graph(uid, memories, user_name)
 

@@ -103,7 +103,7 @@ def witness_snapshot(uid, path, raw):
             'superseded_by',
             'completed',
         ),
-        'conversations': ('status', 'deleted', 'discarded', 'dream_duplicate', 'dream_duplicate_of', 'is_locked'),
+        'conversations': ('status', 'deleted', 'discarded', 'dream_duplicate', 'dream_duplicate_of'),
     }.get(collection, ('name', 'redirect_entity_id'))
     result: dict = {'fields': {key: read_field_state(raw, key) for key in fields}}
     if collection == 'conversations':

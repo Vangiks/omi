@@ -1370,7 +1370,6 @@ async def test_a_webhook_stuck_on_5xx_only_strands_the_conversation_while_retrie
         source=SimpleNamespace(value='omi'),
         external_data=None,
         discarded=False,
-        is_locked=False,
         started_at=datetime(2026, 8, 19, 12, tzinfo=timezone.utc),
         finished_at=datetime(2026, 8, 19, 12, tzinfo=timezone.utc) + timedelta(minutes=10),
         transcript_segments=[SimpleNamespace(text='substantive exchange', start=0, end=60)],
@@ -1990,7 +1989,6 @@ async def test_finalizer_completes_when_an_app_permanently_rejects_the_delivery(
         status=ConversationStatus.processing,
         language='en',
         discarded=False,
-        is_locked=False,
         source=None,
     )
     complete = MagicMock(return_value=True)

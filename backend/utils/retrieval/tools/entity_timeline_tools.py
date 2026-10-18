@@ -425,7 +425,7 @@ def _conversation_matches(record: Dict[str, Any], aliases: EntityAliases) -> boo
 
 
 def _conversation_entry(record: Dict[str, Any], aliases: EntityAliases) -> Optional[TimelineEntry]:
-    if record.get("is_locked") is True or not _conversation_matches(record, aliases):
+    if not _conversation_matches(record, aliases):
         return None
     record_id = str(record.get("id") or "").strip()
     occurred_at = _datetime_value(record.get("started_at") or record.get("created_at"))
@@ -674,13 +674,12 @@ def _iter_authoritative_items(uid: str, *, db_client: Any, limit: int) -> Iterat
 
 
 def _chat_visible_items(items: List[MemoryItem]) -> List[MemoryItem]:
-    """Apply the shared chat policy and the paid-content lock before projection."""
-    visible = filter_canonical_default_visible_items(
+    """Apply the shared chat policy before projection."""
+    return filter_canonical_default_visible_items(
         items,
         policy=MemoryAccessPolicy.for_omi_chat(archive_capability=False),
         now=datetime.now(timezone.utc),
     )
-    return [item for item in visible if (item.promotion or {}).get("is_locked") is not True]
 
 
 @tool

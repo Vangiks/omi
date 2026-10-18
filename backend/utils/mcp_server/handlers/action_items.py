@@ -218,8 +218,6 @@ def complete_action_item(
         raise ToolExecutionError(str(e), code=-32602)
     except mcp_action_items.ActionItemNotFound:
         raise ToolExecutionError("Action item not found", code=-32001)
-    except mcp_action_items.ActionItemLocked:
-        raise ToolExecutionError("A paid plan is required to modify this action item.", code=-32002)
     return {"success": True, "action_item": item}
 
 
@@ -242,8 +240,6 @@ def update_action_item(
         raise ToolExecutionError(str(e), code=-32602)
     except mcp_action_items.ActionItemNotFound:
         raise ToolExecutionError("Action item not found", code=-32001)
-    except mcp_action_items.ActionItemLocked:
-        raise ToolExecutionError("A paid plan is required to modify this action item.", code=-32002)
     return {"success": True, "action_item": item}
 
 
@@ -259,6 +255,4 @@ def delete_action_item(
         mcp_action_items.delete_action_item(uid, action_item_id)
     except mcp_action_items.ActionItemNotFound:
         raise ToolExecutionError("Action item not found", code=-32001)
-    except mcp_action_items.ActionItemLocked:
-        raise ToolExecutionError("A paid plan is required to modify this action item.", code=-32002)
     return {"success": True}

@@ -170,7 +170,6 @@ def _write_short_term_via_conversation_ingress(client, auth_headers, monkeypatch
         ],
         "discarded": False,
         "status": "completed",
-        "is_locked": False,
         "data_protection_level": "standard",
     }
     seed_conversation(PIPELINE_UID, conv_data)

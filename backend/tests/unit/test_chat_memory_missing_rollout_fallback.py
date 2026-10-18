@@ -11,7 +11,6 @@ class _Memory:
     content = "Universal memory"
     category = SimpleNamespace(value="interesting")
     id = "m1"
-    is_locked = False
 
 
 def test_get_memories_tool_reads_arbitrary_uid_through_universal_service(monkeypatch):

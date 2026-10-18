@@ -53,18 +53,17 @@ def test_source_fence_priority_per_target_merge_and_projection_preservation(monk
     assert not conversations.translation_materialization_is_current(UID, doc, segment, 'en', 'viewed_v1')
 
 
-def test_deleted_locked_or_removed_segments_reject_write(monkeypatch):
+def test_deleted_or_removed_segments_reject_write(monkeypatch):
     monkeypatch.setenv('TRANSLATION_DEMAND_GATE_ENABLED', 'true')
     store = store_with_segments({'id': 's', 'text': 'năm', 'translations': []})
-    for field in ('deleted', 'is_locked'):
-        store.rows[PATH][field] = True
-        assert (
-            conversations.materialize_translation(
-                UID, CID, 's', 'năm', 'en', 'year', policy_version='viewed_v1', firestore_client=store
-            )
-            is None
+    store.rows[PATH]['deleted'] = True
+    assert (
+        conversations.materialize_translation(
+            UID, CID, 's', 'năm', 'en', 'year', policy_version='viewed_v1', firestore_client=store
         )
-        store.rows[PATH][field] = False
+        is None
+    )
+    store.rows[PATH]['deleted'] = False
     assert (
         conversations.materialize_translation(
             UID, CID, 'removed', 'năm', 'en', 'year', policy_version='viewed_v1', firestore_client=store

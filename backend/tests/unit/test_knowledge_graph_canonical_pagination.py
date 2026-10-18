@@ -315,28 +315,6 @@ def test_canonical_graph_filters_stale_ineligible_and_restricted_assertions(monk
     assert "stale-generation" not in {memory_id for refs in db.assertion_ref_pages for memory_id in refs}
 
 
-def test_canonical_graph_never_exposes_locked_memory_content(monkeypatch):
-    monkeypatch.setenv("MEMORY_V3_CURSOR_SECRET", "canonical-graph-test-secret")
-    secret = "LOCKED_GRAPH_SECRET_CONTENT"
-    locked_item, locked_assertion = _assertion_and_item("locked", 2, updated_at=NOW.replace(minute=2))
-    locked_item._payload["content"] = secret
-    locked_item._payload["promotion"] = {"user_review": True, "is_locked": True}
-    valid_item, valid_assertion = _assertion_and_item("valid", 1, updated_at=NOW.replace(minute=1))
-    valid_item._payload["content"] = "Visible unlocked canonical memory"
-    db = _FakeDB(
-        [locked_item, valid_item],
-        {"locked": locked_assertion, "valid": valid_assertion},
-    )
-
-    page = kg.get_canonical_knowledge_graph(UID, db_client=db, limit=10)
-
-    assert _page_memory_ids(page) == {"valid"}
-    assert all(secret not in (node.get("label") or "") for node in page.nodes)
-    assert all(secret not in (node.get("label") or "") for node in page.catalog_nodes)
-    assert "locked" not in {memory_id for refs in db.assertion_ref_pages for memory_id in refs}
-    assert all(node["memory_ids"] != ["locked"] for node in page.catalog_nodes)
-
-
 def test_canonical_graph_returns_every_canonical_memory_as_a_catalog_record(monkeypatch):
     monkeypatch.setenv("MEMORY_V3_CURSOR_SECRET", "canonical-graph-test-secret")
     linked_item, linked_assertion = _assertion_and_item("linked", 1, updated_at=NOW.replace(minute=1))

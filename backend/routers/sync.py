@@ -373,8 +373,6 @@ def precache_conversation_audio_endpoint(
     conversation = conversations_db.get_conversation(uid, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    if conversation.get('is_locked', False):
-        raise HTTPException(status_code=402, detail="A paid plan is required to access this conversation.")
 
     return sync_playback.precache_audio_files(uid, conversation_id, conversation.get('audio_files', []))
 
@@ -397,8 +395,6 @@ def get_audio_signed_urls_endpoint(
     )
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    if conversation.get('is_locked', False):
-        raise HTTPException(status_code=402, detail="A paid plan is required to access this conversation.")
 
     return sync_playback.get_audio_signed_urls(
         uid, conversation_id, conversation.get('audio_files', []), conversation=conversation
@@ -463,8 +459,6 @@ def download_audio_file_endpoint(
     conversation = conversations_db.get_conversation(uid, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    if conversation.get('is_locked', False):
-        raise HTTPException(status_code=402, detail="A paid plan is required to access this conversation.")
 
     # Find the audio file in the conversation
     audio_files = conversation.get('audio_files', [])
@@ -710,8 +704,6 @@ async def sync_local_files(
                         trigger_classifier_if_needed(uid, triggered_caps), name=f'sync_fair_use_classifier:{uid}'
                     )
 
-        is_locked = False
-
         response = {'updated_memories': set(), 'new_memories': set()}
         segment_errors = []
         segment_lock = threading.Lock()
@@ -786,11 +778,10 @@ async def sync_local_files(
                     segment_lock,
                     segment_errors,
                     source,
-                    is_locked,
-                    transcription_prefs,
-                    person_embeddings_cache,
-                    conversation_id,
-                    assignment_turnstile,
+                    transcription_prefs=transcription_prefs,
+                    person_embeddings_cache=person_embeddings_cache,
+                    target_conversation_id=conversation_id,
+                    turnstile=assignment_turnstile,
                     private_cloud_sync_enabled=private_cloud_sync_enabled,
                     data_protection_level=data_protection_level,
                     client_device_id=client_device_context.client_device_id,

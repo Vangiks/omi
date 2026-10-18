@@ -249,7 +249,7 @@ def test_pre_stt_orchestration_only_publishes_uncovered_paths(tmp_path, monkeypa
     monkeypatch.setenv('SYNC_SAFETY_WAL_DEDUPE_ENABLED', 'true')
     pcm = pcm_envelope(7, 40)
     path = wav_file(tmp_path, pcm)
-    row = dict(id='live', source='omi', client_device_id='pendant', is_locked=False)
+    row = dict(id='live', source='omi', client_device_id='pendant')
     monkeypatch.setattr(conversations, 'get_conversation', lambda *args: row)
 
     def cut(uid, candidate, source, snapshot):
@@ -290,7 +290,7 @@ def test_incompatible_target_is_never_coverage_authority(tmp_path, monkeypatch):
 
     monkeypatch.setenv('SYNC_SAFETY_WAL_DEDUPE_ENABLED', 'true')
     path = wav_file(tmp_path, pcm_envelope(8, 10))
-    row = dict(id='live', source='desktop', client_device_id='other', is_locked=False)
+    row = dict(id='live', source='desktop', client_device_id='other')
     monkeypatch.setattr(conversations, 'get_conversation', lambda *args: row)
 
     def forbidden(*args):
@@ -310,7 +310,7 @@ def test_incompatible_target_is_never_coverage_authority(tmp_path, monkeypatch):
             db_executor=None,
             storage_executor=None,
             job_ref='synthetic',
-            capture_partition=dict(source='omi', client_device_id='pendant', is_locked=False),
+            capture_partition=dict(source='omi', client_device_id='pendant'),
         )
     ) == ([path], set())
 
@@ -440,7 +440,7 @@ def test_job_reuses_one_listing_and_probe_but_abstains_per_file(tmp_path, storag
     from database import conversations
 
     monkeypatch.setenv('SYNC_SAFETY_WAL_DEDUPE_ENABLED', 'true')
-    row = dict(id='live', source='omi', client_device_id='pendant', is_locked=False)
+    row = dict(id='live', source='omi', client_device_id='pendant')
     get = MagicMock(return_value=row)
     monkeypatch.setattr(conversations, 'get_conversation', get)
     pcm = pcm_envelope(23, 24)

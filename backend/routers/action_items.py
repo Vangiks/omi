@@ -71,7 +71,7 @@ CreateActionItemRequest = ActionItemCreateRequest
 UpdateActionItemRequest = ActionItemUpdateRequest
 
 
-def _batch_mutation_response(result, *, locked_ids: Optional[set[str]] = None) -> dict:
+def _batch_mutation_response(result) -> dict:
     """Preserve legacy success shape unless there is partial-outcome detail.
 
     Mobile clients historically treat batch endpoints as boolean success paths,
@@ -79,11 +79,8 @@ def _batch_mutation_response(result, *, locked_ids: Optional[set[str]] = None) -
     details are only emitted when they carry actionable information.
     """
     body = {"status": "ok", "updated_count": result.updated_count}
-    locked_ids = locked_ids or set()
-    if result.missing_ids or result.noop_ids or locked_ids:
+    if result.missing_ids or result.noop_ids:
         body.update(result.model())
-        if locked_ids:
-            body["locked_ids"] = sorted(locked_ids)
     return body
 
 
@@ -98,7 +95,6 @@ class BatchMutationResponse(BaseModel):
     updated_ids: Optional[List[str]] = None
     missing_ids: Optional[List[str]] = None
     noop_ids: Optional[List[str]] = None
-    locked_ids: Optional[List[str]] = None
 
 
 class BatchDeleteActionItemsResponse(BaseModel):
@@ -173,9 +169,6 @@ def _get_valid_action_item(uid: str, action_item_id: str) -> dict:
     if not action_item:
         raise HTTPException(status_code=404, detail="Action item not found")
 
-    if action_item.get('is_locked', False):
-        raise HTTPException(status_code=402, detail="A paid plan is required to access this action item.")
-
     return action_item
 
 
@@ -232,11 +225,9 @@ def get_pending_sync_items(
 ):
     """Get action items that need sync: pending export + already synced items for bidirectional sync."""
     result = action_items_db.get_pending_apple_reminders_sync(uid)
-    pending_export = [item for item in result["pending_export"] if not item.get('is_locked', False)]
-    synced_items = [item for item in result["synced_items"] if not item.get('is_locked', False)]
     return {
-        "pending_export": _safe_action_item_responses(pending_export, uid=uid, context='pending_export'),
-        "synced_items": _safe_action_item_responses(synced_items, uid=uid, context='synced_items'),
+        "pending_export": _safe_action_item_responses(result["pending_export"], uid=uid, context='pending_export'),
+        "synced_items": _safe_action_item_responses(result["synced_items"], uid=uid, context='synced_items'),
     }
 
 
@@ -251,17 +242,8 @@ def sync_batch_update(request: SyncBatchRequest, uid: str = Depends(auth.get_cur
     if not request.items:
         return {"status": "ok", "updated_count": 0}
 
-    # Pre-fetch items to skip locked ones
-    locked_ids = set()
-    for item in request.items:
-        existing = action_items_db.get_action_item(uid, item.id)
-        if existing and existing.get('is_locked', False):
-            locked_ids.add(item.id)
-
     updates = []
     for item in request.items:
-        if item.id in locked_ids:
-            continue
         update_data = {}
         if item.description is not None:
             update_data['description'] = item.description
@@ -327,7 +309,7 @@ def sync_batch_update(request: SyncBatchRequest, uid: str = Depends(auth.get_cur
             deleted=bool(stored.get('deleted')),
         )
 
-    return _batch_mutation_response(result, locked_ids=locked_ids)
+    return _batch_mutation_response(result)
 
 
 # *****************************
@@ -606,11 +588,6 @@ def get_action_items(
     has_more = truncated or len(action_items) > limit
     action_items = action_items[:limit]
 
-    for item in action_items:
-        if item.get('is_locked', False):
-            description = item.get('description') or ''
-            item['description'] = (description[:70] + '...') if len(description) > 70 else description
-
     response_items = _safe_action_item_responses(action_items, uid=uid)
     if truncated and response is not None:
         response.headers[OMI_LIST_TRUNCATED_HEADER] = OMI_LIST_TRUNCATED_VALUE
@@ -660,7 +637,6 @@ def search_action_items(
         return {"action_items": []}
 
     action_items = action_items_db.get_action_items_by_ids(uid, action_item_ids)
-    action_items = [item for item in action_items if not item.get('is_locked', False)]
     return {"action_items": _safe_action_item_responses(action_items, uid=uid)}
 
 
@@ -875,14 +851,6 @@ def batch_delete_action_items(
     vector store delete and the FCM cancellation message both use their batch
     helpers — no per-id loop on this hot path.
     """
-    # Chunk the locked-task preflight so large Select All batches (up to 10,000
-    # IDs) stay within Firestore's batch-get limits and avoid loading tens of
-    # megabytes of document data in one RPC before any deletion begins.
-    for i in range(0, len(request.ids), 500):
-        existing_items = action_items_db.get_action_items_by_ids(uid, request.ids[i : i + 500])
-        if any(item.get('is_locked', False) for item in existing_items):
-            raise HTTPException(status_code=402, detail="A paid plan is required to delete locked action items.")
-
     deleted_ids = action_items_db.delete_action_items_batch(uid, request.ids)
 
     if deleted_ids:
@@ -909,8 +877,6 @@ def get_conversation_action_items(conversation_id: str, uid: str = Depends(auth.
     conversation = conversations_db.get_conversation(uid, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    if conversation.get('is_locked', False):
-        raise HTTPException(status_code=402, detail="A paid plan is required to access this conversation.")
     action_items = action_items_db.get_action_items_by_conversation(uid, conversation_id)
     response_items = _safe_action_item_responses(action_items, uid=uid, context=f'conversation {conversation_id}')
 
@@ -936,8 +902,6 @@ def get_conversation_action_items_count(conversation_id: str, uid: str = Depends
     conversation = conversations_db.get_conversation(uid, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    if conversation.get('is_locked', False):
-        raise HTTPException(status_code=402, detail="A paid plan is required to access this conversation.")
     return action_items_db.get_action_items_count_by_conversation(uid, conversation_id)
 
 
@@ -1040,13 +1004,11 @@ class AcceptSharedTasksRequest(BaseModel):
 @router.post("/v1/action-items/share", response_model=ShareActionItemsResponse, tags=['action-items'])
 def share_action_items(request: ShareTasksRequest, uid: str = Depends(auth.get_current_user_uid)):
     """Create a shareable link for selected action items."""
-    # Validate all task_ids belong to user and are not locked
+    # Validate all task_ids belong to user
     for task_id in request.task_ids:
         item = action_items_db.get_action_item(uid, task_id)
         if not item:
             raise HTTPException(status_code=404, detail=f"Action item {task_id} not found")
-        if item.get('is_locked', False):
-            raise HTTPException(status_code=402, detail="Cannot share locked action items.")
 
     # Get sender display name
     display_name = get_user_display_name(uid)
@@ -1070,11 +1032,11 @@ def get_shared_action_items(token: str):
     sender_uid = share_data['uid']
     task_ids = share_data['task_ids']
 
-    # Fetch tasks — only expose description + due_at, skip locked items
+    # Fetch tasks — only expose description + due_at
     tasks = []
     for task_id in task_ids:
         item = action_items_db.get_action_item(sender_uid, task_id)
-        if item and not item.get('is_locked', False):
+        if item:
             tasks.append(
                 {
                     "description": item.get('description', ''),
@@ -1103,21 +1065,11 @@ def accept_shared_action_items(request: AcceptSharedTasksRequest, uid: str = Dep
     sender_uid = share_data['uid']
     task_ids = share_data['task_ids']
 
-    # Pre-validate: check which items exist and which are locked
-    eligible_ids = []
-    existing_items_count = 0
-    for task_id in task_ids:
-        item = action_items_db.get_action_item(sender_uid, task_id)
-        if item:
-            existing_items_count += 1
-            if not item.get('is_locked', False):
-                eligible_ids.append(task_id)
-
-    if existing_items_count == 0:
-        raise HTTPException(status_code=404, detail="Shared tasks were deleted or not found")
+    # Pre-validate: check which items still exist
+    eligible_ids = [task_id for task_id in task_ids if action_items_db.get_action_item(sender_uid, task_id)]
 
     if not eligible_ids:
-        raise HTTPException(status_code=402, detail="All shared tasks are locked. A paid plan is required.")
+        raise HTTPException(status_code=404, detail="Shared tasks were deleted or not found")
 
     # Atomically check and mark acceptance to prevent duplicates
     accepted = redis_db.try_accept_task_share(request.token, uid)
@@ -1133,7 +1085,7 @@ def accept_shared_action_items(request: AcceptSharedTasksRequest, uid: str = Dep
     try:
         for task_id in eligible_ids:
             original = action_items_db.get_action_item(sender_uid, task_id)
-            if not original or original.get('is_locked', False):
+            if not original:
                 continue
 
             new_item = {
@@ -1155,10 +1107,10 @@ def accept_shared_action_items(request: AcceptSharedTasksRequest, uid: str = Dep
         redis_db.undo_accept_task_share(request.token, uid)
         raise
 
-    # If race condition caused all items to become locked after pre-check, rollback token
+    # If every item was deleted after the pre-check, roll back the acceptance
     if not created_ids:
         redis_db.undo_accept_task_share(request.token, uid)
-        raise HTTPException(status_code=402, detail="Shared tasks are no longer available.")
+        raise HTTPException(status_code=404, detail="Shared tasks were deleted or not found")
 
     # Derived delivery must not interrupt persistence of the remaining shared tasks.
     for new_id, new_item in zip(created_ids, items_to_create):

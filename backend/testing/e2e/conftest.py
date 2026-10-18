@@ -559,7 +559,6 @@ def sample_conversation_data(fresh_uid):
         ],
         "discarded": False,
         "status": "completed",
-        "is_locked": False,
     }
 
 

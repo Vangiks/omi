@@ -38,8 +38,6 @@ def apply_conversation_sync_mutation(
         )
     except mutations_db.ConversationMutationNotFoundError as error:
         raise HTTPException(status_code=404, detail='Conversation not found') from error
-    except mutations_db.ConversationMutationLockedError as error:
-        raise HTTPException(status_code=402, detail='A paid plan is required to access this conversation.') from error
     except mutations_db.ConversationMutationConflictError as error:
         record_product_event('conversation_sync_mutation', request=http_request, outcome='conflict')
         conflict = ConversationSyncConflictResponse.model_validate(error.response)

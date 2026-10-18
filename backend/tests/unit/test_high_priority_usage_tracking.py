@@ -223,12 +223,11 @@ sys.modules["utils.llms.memory"].get_prompt_memories = MagicMock(return_value=("
 
 # --- Stub utils.memory.memory_service.MemoryService (canonical memory read path) ---
 class _StubMemoryRecord:
-    def __init__(self, content, is_locked=False):
+    def __init__(self, content):
         self.content = content
-        self.is_locked = is_locked
 
     def dict(self):
-        return {'content': self.content, 'is_locked': self.is_locked}
+        return {'content': self.content}
 
 
 class _StubMemoryService:

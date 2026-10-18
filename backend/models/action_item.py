@@ -97,7 +97,6 @@ class CanonicalTaskCreate(BaseModel):
     recurrence_rule: Optional[str] = Field(default=None, max_length=128)
     recurrence_parent_id: Optional[StableId] = None
     conversation_id: Optional[StableId] = None
-    is_locked: bool = False
     exported: bool = False
     export_date: Optional[AwareDatetime] = None
     export_platform: Optional[str] = Field(default=None, max_length=64)
@@ -236,7 +235,6 @@ class ActionItemResponse(BaseModel):
     completed_at: Optional[datetime] = None
     superseded_by: Optional[StableId] = None
     conversation_id: Optional[str] = None
-    is_locked: bool = False
     exported: bool = False
     export_date: Optional[datetime] = None
     export_platform: Optional[str] = None

@@ -431,71 +431,6 @@ class TestSyncEndpointImports:
         assert hasattr(fair_use_mod, 'trigger_classifier_if_needed')
 
 
-class TestCreateConversationLockPropagation:
-    """Test is_locked field on CreateConversation flows through to Conversation."""
-
-    def test_create_conversation_default_unlocked(self):
-        """CreateConversation defaults to is_locked=False."""
-        from models.conversation import CreateConversation
-        from datetime import datetime, timezone
-
-        cc = CreateConversation(
-            started_at=datetime.now(timezone.utc),
-            finished_at=datetime.now(timezone.utc),
-            transcript_segments=[],
-        )
-        assert cc.is_locked is False
-
-    def test_create_conversation_locked(self):
-        """CreateConversation accepts is_locked=True."""
-        from models.conversation import CreateConversation
-        from datetime import datetime, timezone
-
-        cc = CreateConversation(
-            started_at=datetime.now(timezone.utc),
-            finished_at=datetime.now(timezone.utc),
-            transcript_segments=[],
-            is_locked=True,
-        )
-        assert cc.is_locked is True
-
-    def test_locked_propagates_through_dict(self):
-        """is_locked=True appears in .dict() for **kwargs unpacking."""
-        from models.conversation import CreateConversation
-        from datetime import datetime, timezone
-
-        cc = CreateConversation(
-            started_at=datetime.now(timezone.utc),
-            finished_at=datetime.now(timezone.utc),
-            transcript_segments=[],
-            is_locked=True,
-        )
-        d = cc.dict()
-        assert d['is_locked'] is True
-
-    def test_conversation_inherits_lock_from_create(self):
-        """Conversation(**create_dict) inherits is_locked=True."""
-        from models.conversation import Conversation, CreateConversation
-        from models.structured import Structured
-        from datetime import datetime, timezone
-
-        cc = CreateConversation(
-            started_at=datetime.now(timezone.utc),
-            finished_at=datetime.now(timezone.utc),
-            transcript_segments=[],
-            is_locked=True,
-        )
-        cc_dict = cc.dict()
-        cc_dict.pop('calendar_meeting_context', None)
-        conv = Conversation(
-            id='test-id',
-            created_at=datetime.now(timezone.utc),
-            structured=Structured(),
-            **cc_dict,
-        )
-        assert conv.is_locked is True
-
-
 class TestSyncEndpointCodeStructure:
     """Structural tests: verify sync.py gates match expected design."""
 
@@ -505,14 +440,6 @@ class TestSyncEndpointCodeStructure:
 
         sync_path = os.path.join(os.path.dirname(__file__), '..', '..', 'routers', 'sync.py')
         with open(sync_path, encoding='utf-8') as f:
-            return f.read()
-
-    @staticmethod
-    def _read_pipeline_source():
-        import os
-
-        pipeline_path = os.path.join(os.path.dirname(__file__), '..', '..', 'utils', 'sync', 'pipeline.py')
-        with open(pipeline_path, encoding='utf-8') as f:
             return f.read()
 
     @staticmethod
@@ -534,14 +461,9 @@ class TestSyncEndpointCodeStructure:
         )
 
     def test_no_402_block(self):
-        """sync-local-files must not raise 402 (lock instead of block)."""
+        """sync-local-files must not raise 402."""
         source = self._sync_local_files_bodies()
         assert 'status_code=402' not in source
-
-    def test_is_locked_passed_to_create_conversation(self):
-        """sync pipeline passes is_locked to CreateConversation."""
-        source = self._read_pipeline_source()
-        assert 'is_locked=is_locked' in source
 
     def test_hard_restricted_gate_exists(self):
         """sync.py must check hard restriction status once."""
@@ -568,24 +490,6 @@ class TestSyncEndpointCodeStructure:
         """Verify zero-speech guard in code: only records when total_speech_ms > 0."""
         source = self._read_sync_source()
         assert 'total_speech_ms > 0' in source
-
-    def test_soft_cap_does_not_lock(self):
-        """Soft cap trigger must NOT set should_lock — only classifier/stage should lock."""
-        source = self._read_sync_source()
-        # Find the soft cap block: between 'if triggered_caps:' and the next unindented line
-        lines = source.split('\n')
-        in_triggered_block = False
-        for line in lines:
-            stripped = line.strip()
-            if stripped.startswith('if triggered_caps:'):
-                in_triggered_block = True
-                continue
-            if in_triggered_block:
-                if stripped and not stripped.startswith('#') and not line.startswith(' ' * 16):
-                    break  # exited the block
-                assert (
-                    'should_lock' not in stripped
-                ), "soft cap trigger must not set should_lock — matches transcribe.py behavior"
 
 
 class TestSoftCapBoundary:

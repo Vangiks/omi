@@ -276,7 +276,7 @@ def test_owner_relabel_revokes_owner_job(world):
 
 
 @pytest.mark.parametrize('target', ['person', 'owner'])
-@pytest.mark.parametrize('flag,outcome', [('deleted', 'deleted'), ('is_locked', 'locked'), ('discarded', 'discarded')])
+@pytest.mark.parametrize('flag,outcome', [('deleted', 'deleted'), ('discarded', 'discarded')])
 def test_source_lifecycle_flags_terminal_without_extraction(world, flag, outcome, target):
     if target == 'person':
         assign(person_id='p', segment_ids=['s0'])

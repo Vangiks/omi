@@ -250,7 +250,6 @@ def seed_memory(uid: str, memory_data: dict):
     data.setdefault("reviewed", False)
     data.setdefault("manually_added", False)
     data.setdefault("edited", False)
-    data.setdefault("is_locked", False)
     data.setdefault("scoring", "00_999_0000000000")
     data.setdefault("visibility", "public")
     data.setdefault("user_review", True)

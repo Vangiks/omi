@@ -75,8 +75,6 @@ def _is_eligible(memory: "MemoryDB") -> bool:
     if memory.user_review is False:
         # The owner already rejected this fact; re-asking is the bug.
         return False
-    if memory.is_locked:
-        return False
     if memory.invalid_at is not None:
         return False
     if memory.superseded_by:

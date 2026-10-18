@@ -342,12 +342,10 @@ def test_first_page_propagates_non_503_errors():
     import pytest
 
     service = MagicMock()
-    service.read_page.side_effect = HTTPException(
-        status_code=402, detail="A paid plan is required to access this memory."
-    )
+    service.read_page.side_effect = HTTPException(status_code=404, detail="Memory not found")
 
     with pytest.raises(HTTPException) as exc_info:
         _get_first_page(service)
 
-    assert exc_info.value.status_code == 402
+    assert exc_info.value.status_code == 404
     service.read.assert_not_called()

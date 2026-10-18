@@ -17,7 +17,7 @@ from utils import commitment_followup_tasks as scheduler
 from tests.unit.test_proactivity_v2_budget import store
 
 
-def test_mentor_context_preserves_past_conversation_items_and_excludes_locked(monkeypatch):
+def test_mentor_context_preserves_past_conversation_items(monkeypatch):
     newest = {'id': 'newest', 'text': 'Newer context'}
     older = {'id': 'older', 'text': 'Older context'}
     monkeypatch.setattr(integration, 'get_prompt_memories', lambda uid: ('User', '- Known fact'))
@@ -28,7 +28,7 @@ def test_mentor_context_preserves_past_conversation_items_and_excludes_locked(mo
     monkeypatch.setattr(
         integration.conversations_db,
         'get_conversations',
-        lambda *args, **kwargs: [newest, {'id': 'locked', 'is_locked': True}, older],
+        lambda *args, **kwargs: [newest, older],
     )
     monkeypatch.setattr(integration, 'deserialize_conversations', lambda rows: rows)
     calls = []
@@ -279,7 +279,6 @@ async def test_followup_one_call_feed_only_idempotent_no_task_mutation(lane):
         {'conversation_id': None},
         {'status': 'cancelled'},
         {'due_at': datetime.now(timezone.utc) + timedelta(days=1)},
-        {'is_locked': True},
     ],
 )
 async def test_followup_ineligible_task_no_claim(lane, change):

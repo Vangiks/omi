@@ -122,7 +122,6 @@ def test_bridge_roundtrips_real_codecs_and_fences_both_processors(monkeypatch, l
     'field,value',
     [
         ('deleted', True),
-        ('is_locked', True),
         ('source', 'desktop'),
         ('client_device_id', 'other'),
         ('client_device_id', None),

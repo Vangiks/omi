@@ -42,7 +42,6 @@ def select(rows, session_id=SESSION, **kwargs):
         session_id,
         source=kwargs.get('source', 'omi'),
         client_device_id=kwargs.get('client_device_id', 'pendant'),
-        is_locked=kwargs.get('is_locked', False),
         audio_start_seconds=kwargs.get('audio_start_seconds', 1001.0),
         audio_end_seconds=kwargs.get('audio_end_seconds', 1008.0),
     )
@@ -58,7 +57,6 @@ def test_one_compatible_live_conversation_is_the_explicit_target():
         {'client_device_id': 'other-phone'},
         {'source': 'phone'},
         {'client_device_id': ''},
-        {'is_locked': True},
         {'deleted': True},
         {'external_data': {'recording_session_id': 'other-recording'}},
         {'external_data': None},
@@ -99,12 +97,7 @@ def test_ambiguous_recording_session_matches_stay_unbound():
 
 
 def test_missing_audio_interval_stays_unbound():
-    assert (
-        select_recording_session_target(
-            [live_row()], SESSION, source='omi', client_device_id='pendant', is_locked=False
-        )
-        is None
-    )
+    assert select_recording_session_target([live_row()], SESSION, source='omi', client_device_id='pendant') is None
 
 
 def test_blank_recording_session_id_does_not_query():
@@ -114,7 +107,7 @@ def test_blank_recording_session_id_does_not_query():
 
     assert (
         resolve_recording_session_sync_target(
-            'u', '   ', 'omi', 'pendant', False, 1001.0, 1008.0, firestore_client=MustNotQuery()
+            'u', '   ', 'omi', 'pendant', 1001.0, 1008.0, firestore_client=MustNotQuery()
         )
         is None
     )
@@ -129,7 +122,7 @@ def test_recording_session_lookup_failure_stays_unbound(caplog, monkeypatch):
 
     assert (
         resolve_recording_session_sync_target(
-            'private-account-id', SESSION, 'omi', 'pendant', False, 1001.0, 1008.0, firestore_client=Unavailable()
+            'private-account-id', SESSION, 'omi', 'pendant', 1001.0, 1008.0, firestore_client=Unavailable()
         )
         is None
     )
@@ -171,9 +164,7 @@ class _Doc:
 def test_resolve_returns_the_one_stored_match():
     client = _Docs([_Doc(live_row())])
     assert (
-        resolve_recording_session_sync_target(
-            'u', SESSION, 'omi', 'pendant', False, 1001.0, 1008.0, firestore_client=client
-        )
+        resolve_recording_session_sync_target('u', SESSION, 'omi', 'pendant', 1001.0, 1008.0, firestore_client=client)
         == 'live'
     )
     assert client.uid == 'u'
@@ -226,9 +217,7 @@ def test_truncated_candidate_query_cannot_establish_uniqueness():
     rows += [live_row(client_device_id=f'other-{i}') for i in range(5)]
     client = _Docs([_Doc(row) for row in rows])
     assert (
-        resolve_recording_session_sync_target(
-            'u', SESSION, 'omi', 'pendant', False, 1001.0, 1008.0, firestore_client=client
-        )
+        resolve_recording_session_sync_target('u', SESSION, 'omi', 'pendant', 1001.0, 1008.0, firestore_client=client)
         is None
     )
     assert client.query_limit == 6
@@ -309,10 +298,7 @@ def test_missing_recording_session_id_leaves_the_live_conversation_unchanged():
     store = StrictFirestore()
     original = live_row()
     store.rows[('users', 'u', 'conversations', 'live')] = deepcopy(original)
-    assert (
-        select_recording_session_target([original], '', source='omi', client_device_id='pendant', is_locked=False)
-        is None
-    )
+    assert select_recording_session_target([original], '', source='omi', client_device_id='pendant') is None
     result, created, _ = intake(store, chunk('wal', 1030, text=TEXT))
     assert created and result['id'] == 'wal'
     assert store.rows[('users', 'u', 'conversations', 'live')] == original

@@ -20,10 +20,6 @@ class ConversationMutationNotFoundError(LookupError):
     """The target conversation disappeared before its mutation committed."""
 
 
-class ConversationMutationLockedError(PermissionError):
-    """A new mutation cannot change a plan-locked conversation."""
-
-
 class ConversationMutationConflictError(RuntimeError):
     """A durable typed conflict for a mutation that cannot be applied."""
 
@@ -156,8 +152,6 @@ def apply_conversation_sync_mutation(
             raise ConversationMutationNotFoundError(conversation_id)
 
         current = conversation_snapshot.to_dict() or {}
-        if current.get('is_locked', False):
-            raise ConversationMutationLockedError(conversation_id)
         current_revision = _normalized_revision(getattr(conversation_snapshot, 'update_time', None))
         requested_revision = ensure_timezone_aware(base_revision).astimezone(timezone.utc)
 

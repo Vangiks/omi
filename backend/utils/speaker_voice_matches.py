@@ -65,7 +65,6 @@ def _recent_conversations(uid: str, now: datetime) -> list[dict]:
         for conversation in conversations[:MAX_CONVERSATIONS]
         if not conversation.get('deleted')
         and not conversation.get('discarded')
-        and not conversation.get('is_locked')
         and conversation.get('status') == 'completed'
         and (started := _started_at(conversation)) is not None
         and now - LOOKBACK <= started <= now

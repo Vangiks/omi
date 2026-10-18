@@ -172,8 +172,7 @@ def test_overlapping_same_speaker_segments_keep_the_full_span():
 def test_conversations_outside_48h_or_without_audio_are_skipped():
     old = _conversation('old', hours_ago=49, segments=[_segment('a', 0, 0, 9)])
     silent = _conversation('silent', segments=[_segment('a', 0, 0, 9)], audio_files=[])
-    locked = _conversation('locked', segments=[_segment('a', 0, 0, 9)], is_locked=True)
-    assert _select([old, silent, locked]) == []
+    assert _select([old, silent]) == []
 
 
 def test_answered_prompts_are_not_repeated():

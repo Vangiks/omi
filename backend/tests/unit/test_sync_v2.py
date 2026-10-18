@@ -1166,13 +1166,13 @@ class TestAsyncCoordinatorScenarios:
     def test_dg_budget_exhausted_cleans_up_segments(self):
         """DG budget exhaustion must clean up segmented_paths before returning."""
         body = self._get_bg_func_body()
-        dg_section = body[body.index('is_dg_budget_exhausted') : body.index('is_locked = False')]
+        dg_section = body[body.index('is_dg_budget_exhausted') : body.index('# --- Phase 4: Fetch prefs')]
         assert '_cleanup_files, list(segmented_paths)' in dg_section
 
     def test_dg_budget_not_exhausted_continues(self):
         """When DG budget is NOT exhausted, pipeline continues to segment processing."""
         body = self._get_bg_func_body()
-        dg_section_end = body.index('is_locked = False')
+        dg_section_end = body.index('# --- Phase 4: Fetch prefs')
         after_dg = body[dg_section_end:]
         assert 'Phase 4: Fetch prefs' in after_dg
         assert '_process_one_segment' in after_dg
@@ -3171,7 +3171,7 @@ class TestAsyncCoordinatorBehavioral:
             stubs['pipeline'].build_person_embeddings_cache = MagicMock(side_effect=RuntimeError('cache boom'))
             captured_cache = {}
 
-            def _capture_process(path, uid, response, lock, errors, source, is_locked, prefs, cache, *args, **kwargs):
+            def _capture_process(path, uid, response, lock, errors, source, prefs, cache, *args, **kwargs):
                 captured_cache['value'] = cache
                 response['new_memories'].add('m1')
 
@@ -3204,9 +3204,7 @@ class TestAsyncCoordinatorBehavioral:
             stubs['pipeline'].record_usage = MagicMock()
             captured_target = {}
 
-            def _capture_target(
-                path, uid, response, lock, errors, source, is_locked, prefs, cache, target_cid, *args, **kwargs
-            ):
+            def _capture_target(path, uid, response, lock, errors, source, prefs, cache, target_cid, *args, **kwargs):
                 captured_target['value'] = target_cid
                 response['new_memories'].add('m1')
 

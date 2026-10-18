@@ -146,9 +146,8 @@ def test_browse_paginates_and_reports_more():
     assert first["total_pages"] == 2 and second["total_pages"] == 3 and third["total_pages"] == 3
 
 
-def test_browse_skips_locked_and_stops_at_scan_cap():
-    rows = [{"id": "locked", "is_locked": True, "transcript_segments": [{"person_id": "p1"}]}]
-    rows += [{"id": f"n{i}", "transcript_segments": []} for i in range(120)]
+def test_browse_stops_at_scan_cap():
+    rows = [{"id": f"n{i}", "transcript_segments": []} for i in range(120)]
     result = search_mod.browse_conversations_by_speaker(_stream(rows), "p1", page=1, per_page=5, scan_cap=100, batch=50)
     assert result["items"] == []
     assert result["total_pages"] == 2  # cap hit before the end: the client may ask for more

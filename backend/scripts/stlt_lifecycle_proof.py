@@ -154,7 +154,6 @@ def _create_marker(db_client: Any, *, uid: str, marker: str) -> str:
         scoring="high",
         app_id=None,
         conversation_id=None,
-        is_locked=False,
     )
     created = MemoryService(db_client=db_client).create_external_memory(
         uid=uid,

@@ -83,7 +83,6 @@
         "scripts/stt/x_benchmark_parakeet_der.py",
         "scripts/support/find_stripe_entitlement_mismatches.py",
         "scripts/test_live_streaming_backoff.py",
-        "scripts/unlock_soft_cap_locked.py",
         "scripts/users/apps_count.py",
         "scripts/users/chats_analysis.py",
         "scripts/users/memories_fixes.py",

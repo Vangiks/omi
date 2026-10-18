@@ -91,7 +91,6 @@ class MockMemoryDB(MockMemory):
     created_at: datetime
     updated_at: datetime
     visibility: str = 'private'
-    is_locked: bool = False
 
 
 class TestMemoryCategoryAutoEnum:

@@ -98,7 +98,7 @@ def test_json_and_integration_dumps_filter_current_claims(render):
         ]
 
 
-def test_locked_projection_filters_claims_after_redaction(render):
+def test_list_projection_omits_claims_without_mutating_source(render):
     structured = note().model_dump(mode='json')
     structured['action_items'] = [{'description': 'Send invoice'}]
     structured['note_claims'].append(
@@ -109,12 +109,10 @@ def test_locked_projection_filters_claims_after_redaction(render):
             'provenance': 'said',
         }
     )
-    listed = render.redact_conversation_for_list({'is_locked': True, 'structured': structured})
+    listed = render.redact_conversation_for_list({'structured': structured})
     assert 'note_claims' not in listed['structured']
     assert structured['action_items'] == [{'description': 'Send invoice'}]
     assert structured['note_claims']  # Projection must not mutate the source note.
-    integrated = render.redact_conversation_for_integration({'is_locked': True, 'structured': deepcopy(structured)})
-    assert [claim['target'] for claim in integrated['structured']['note_claims']] == ['/sections/0/body_markdown']
 
 
 def test_unedited_claims_and_attribution_preserved():
@@ -129,7 +127,7 @@ def test_legacy_notes_remain_metadata_free(render):
     assert current_note_claims(structured) == []
     assert conversation(structured).model_dump()['structured'] == expected
     assert 'note_claims' not in expected
-    projected = render.redact_conversation_for_integration({'is_locked': True, 'structured': deepcopy(expected)})
+    projected = render.redact_conversation_for_integration({'structured': deepcopy(expected)})
     assert 'note_claims' not in projected['structured']
 
 

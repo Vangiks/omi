@@ -54,7 +54,7 @@ def test_iter_user_data_export_streams_all_top_level_sections(monkeypatch):
     monkeypatch.setattr(
         data_export.conversations_db,
         "iter_all_conversations",
-        MagicMock(return_value=iter([{"id": "conv1", "is_locked": True}, {"id": "conv2"}])),
+        MagicMock(return_value=iter([{"id": "conv1"}, {"id": "conv2"}])),
     )
     monkeypatch.setattr(
         data_export.chat_db,
@@ -67,7 +67,7 @@ def test_iter_user_data_export_streams_all_top_level_sections(monkeypatch):
 
     assert payload == {
         "profile": {"created_at": "2026-01-02T03:04:05+00:00"},
-        "conversations": [{"id": "conv1", "is_locked": True}, {"id": "conv2"}],
+        "conversations": [{"id": "conv1"}, {"id": "conv2"}],
         "memories": [{"id": "mem1"}],
         "memory_review_data": {name: [{"id": f"{name}-1"}] for name in data_export.MEMORY_REVIEW_EXPORT_COLLECTIONS},
         "memory_ledger_data": {name: [{"id": f"{name}-1"}] for name in data_export.MEMORY_LEDGER_EXPORT_COLLECTIONS},

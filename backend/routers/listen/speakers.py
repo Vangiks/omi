@@ -234,7 +234,7 @@ class SpeakerMatcher:
                     reasons[voice] = 'no_scope'
                 elif not donor:
                     reasons[voice] = 'donor_unavailable'
-                elif any(donor.get(k) for k in ('deleted', 'discarded', 'is_locked')):
+                elif any(donor.get(k) for k in ('deleted', 'discarded')):
                     reasons[voice] = 'donor_ineligible'
                 elif self._voice_scopes.get(voice) != owner_carry_scope:
                     reasons[voice] = 'scope_changed'
@@ -340,7 +340,7 @@ class SpeakerMatcher:
                 gate = 'stale_generation'
             elif read_failed or not donor:
                 gate = 'donor_unavailable'
-            elif any(donor.get(k) for k in ('deleted', 'discarded', 'is_locked')):
+            elif any(donor.get(k) for k in ('deleted', 'discarded')):
                 gate = 'donor_ineligible'
             elif owner is None or old_owner is None:
                 gate = 'profile_unavailable'

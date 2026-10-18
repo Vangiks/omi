@@ -44,7 +44,6 @@ def _assert_mobile_conversation_shape(body, expected_id):
     assert body["status"] in {"completed", "processing", "failed"}
     assert isinstance(body.get("discarded", False), bool)
     assert isinstance(body.get("deleted", False), bool)
-    assert isinstance(body.get("is_locked", False), bool)
     assert isinstance(body.get("starred", False), bool)
     assert body.get("visibility") in {"private", "public", "shared", None}
 
@@ -61,7 +60,6 @@ def _assert_mobile_memory_shape(body, expected_content):
     assert isinstance(body.get("edited", False), bool)
     assert isinstance(body.get("deleted", False), bool)
     assert body.get("visibility") in {"public", "private"}
-    assert isinstance(body.get("is_locked", False), bool)
 
 
 def _assert_mobile_action_item_shape(body, expected_description):
@@ -73,7 +71,6 @@ def _assert_mobile_action_item_shape(body, expected_description):
     assert body["due_at"] is None or isinstance(body["due_at"], str)
     assert body["completed_at"] is None or isinstance(body["completed_at"], str)
     assert body["conversation_id"] is None or isinstance(body["conversation_id"], str)
-    assert isinstance(body.get("is_locked", False), bool)
     assert isinstance(body.get("exported", False), bool)
     assert body["export_date"] is None or isinstance(body["export_date"], str)
     assert body["export_platform"] is None or isinstance(body["export_platform"], str)

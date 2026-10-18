@@ -979,7 +979,6 @@ def extract_memories(uid: str, conversation: Conversation) -> None:
         request={
             "conversation_source": str(source),
             "segment_count": len(getattr(conversation, "transcript_segments", None) or []),
-            "locked": bool(getattr(conversation, "is_locked", False)),
         },
     )
     parity_capture.observe(
@@ -1753,7 +1752,6 @@ def _extract_memories_canonical(
                 outcome='degraded',
             )
 
-    is_locked = conversation.is_locked
     parsed_memories: List[Tuple[MemoryDB, List[str], str, List[str]]] = []
     owner_flips_by_memory_id: Dict[str, OwnerFlip] = {}
     capture_decisions_by_memory_id: Dict[str, Tuple[str, bool]] = {}
@@ -1795,7 +1793,6 @@ def _extract_memories_canonical(
             subject_attribution=memory.subject_attribution if has_candidate_subject else subject_attribution,
             client_device_id=getattr(conversation, "client_device_id", None),
         )
-        memory_db_obj.is_locked = is_locked
         memory_db_obj.id = extraction_memory_id(
             uid=uid,
             source_id=conversation.id,
@@ -1870,43 +1867,42 @@ def _extract_memories_canonical(
             },
         )
 
-    if not is_locked:
-        memory_refs = [
-            EvidenceRef(
-                kind=EvidenceKind.memory_item,
-                id=cast(str, memory_db_obj.id),
-                scope=EvidenceScope.canonical,
-            )
-            for memory_db_obj, _, _, _ in parsed_memories[:49]
-        ]
-        evidence_summary = '\n'.join(
-            memory.content.strip() for memory, _, _, _ in parsed_memories if memory.content.strip()
-        )[:2000]
-        try:
-            associate_canonical_evidence(
-                uid,
-                AssociationEvidence(
-                    evidence_id=conversation.id,
-                    summary=evidence_summary,
-                    evidence_refs=[
-                        EvidenceRef(
-                            kind=EvidenceKind.conversation,
-                            id=conversation.id,
-                            scope=EvidenceScope.canonical,
-                        ),
-                        *memory_refs,
-                    ],
-                ),
-                firestore_client=db_client,
-            )
-        except Exception:
-            record_fallback(
-                component='other',
-                from_mode='canonical_memory_workflow_association',
-                to_mode='memory_write_only',
-                reason='other',
-                outcome='degraded',
-            )
+    memory_refs = [
+        EvidenceRef(
+            kind=EvidenceKind.memory_item,
+            id=cast(str, memory_db_obj.id),
+            scope=EvidenceScope.canonical,
+        )
+        for memory_db_obj, _, _, _ in parsed_memories[:49]
+    ]
+    evidence_summary = '\n'.join(
+        memory.content.strip() for memory, _, _, _ in parsed_memories if memory.content.strip()
+    )[:2000]
+    try:
+        associate_canonical_evidence(
+            uid,
+            AssociationEvidence(
+                evidence_id=conversation.id,
+                summary=evidence_summary,
+                evidence_refs=[
+                    EvidenceRef(
+                        kind=EvidenceKind.conversation,
+                        id=conversation.id,
+                        scope=EvidenceScope.canonical,
+                    ),
+                    *memory_refs,
+                ],
+            ),
+            firestore_client=db_client,
+        )
+    except Exception:
+        record_fallback(
+            component='other',
+            from_mode='canonical_memory_workflow_association',
+            to_mode='memory_write_only',
+            reason='other',
+            outcome='degraded',
+        )
 
     record_usage(uid, memories_created=len(parsed_memories))
     return ConversationMemoryExtractionResult(count=len(parsed_memories), source=source, path=PATH_CANONICAL)

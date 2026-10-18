@@ -88,7 +88,6 @@ class MemoryDoc(TypedDict, total=False):
     user_review: Optional[bool]
     reviewed: bool
     edited: bool
-    is_locked: bool
     kg_extracted: bool
     app_id: Optional[str]
     memory_id: Optional[str]  # origin conversation id (legacy memories: == id)
@@ -870,8 +869,7 @@ def delete_memories(uid: str, *, firestore_client: Any = None) -> None:
     user_ref = database.collection(users_collection).document(uid)
     memories_ref = user_ref.collection(memories_collection)
     # Chunk deletes to stay under the Firestore 500-writes-per-batch limit. A user with more than
-    # 500 memories would otherwise make the single batch.commit() raise and delete nothing. Mirrors
-    # the chunking in unlock_all_memories.
+    # 500 memories would otherwise make the single batch.commit() raise and delete nothing.
     batch = database.batch()
     count = 0
     for doc in memories_ref.stream():
@@ -1242,7 +1240,7 @@ def delete_all_memories(uid: str, *, firestore_client: Any = None) -> None:
     memories_ref = user_ref.collection(memories_collection)
     # Chunk deletes to stay under the Firestore 500-writes-per-batch limit. Account deletion and
     # "delete all memories" hit this for any user with more than 500 memories: the single
-    # batch.commit() would raise and remove nothing. Mirrors the chunking in unlock_all_memories.
+    # batch.commit() would raise and remove nothing.
     batch = database.batch()
     count = 0
     for doc in memories_ref.stream():
@@ -1441,54 +1439,6 @@ def delete_memories_for_conversation(uid: str, memory_id: str, *, firestore_clie
     result = ripple_source_deletion(uid, memory_id, firestore_client=firestore_client)
     logger.info(f"delete_memories_for_conversation {memory_id} {len(result['retracted_memory_ids'])}")
     return result
-
-
-class MemoryUnlockCount(int):
-    """Sum of unlocked memory rows, plus whether either bounded page filled up."""
-
-    page_saturated: bool
-
-    def __new__(cls, total: int, *, page_saturated: bool) -> 'MemoryUnlockCount':
-        value = int.__new__(cls, total)
-        value.page_saturated = page_saturated
-        return value
-
-
-@_account_write_gated
-def unlock_all_memories(uid: str, *, firestore_client: Any = None, limit: Optional[int] = None) -> int:
-    """
-    Unlock both released legacy rows and canonical product-memory rows.
-
-    The numeric value is ``legacy_count + canonical_count``. When ``limit`` is
-    set, ``page_saturated`` is true if either collection returned a full page.
-    A 60 + 60 pair is drained; callers must not treat the sum as one page.
-    """
-    database = _get_db(firestore_client)
-    legacy_ref = database.collection(users_collection).document(uid).collection(memories_collection)
-    canonical_ref = database.collection(MemoryCollections(uid=uid).memory_items)
-
-    from database.locked_content import unlock_query_rows
-
-    legacy_count = unlock_query_rows(
-        database,
-        legacy_ref.where(filter=FieldFilter('is_locked', '==', True)),
-        {'is_locked': False},
-        limit=limit,
-    )
-    canonical_count = unlock_query_rows(
-        database,
-        canonical_ref.where(filter=FieldFilter('promotion.is_locked', '==', True)),
-        {'promotion.is_locked': False},
-        limit=limit,
-    )
-    logger.info(
-        "Unlocked all memories for user %s legacy_count=%d canonical_count=%d",
-        uid,
-        legacy_count,
-        canonical_count,
-    )
-    page_saturated = limit is not None and (legacy_count >= limit or canonical_count >= limit)
-    return MemoryUnlockCount(legacy_count + canonical_count, page_saturated=page_saturated)
 
 
 # **************************************

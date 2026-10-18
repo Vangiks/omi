@@ -54,7 +54,6 @@ def test_chat_excerpt_is_rebuilt_from_accessible_conversation_only():
     search = ChatTranscriptSearch(
         [
             {'conversation_id': 'visible', 'chunk_index': 0},
-            {'conversation_id': 'locked', 'chunk_index': 0},
             {'conversation_id': 'discarded', 'chunk_index': 0},
             {'conversation_id': 'missing', 'chunk_index': 0},
             {'conversation_id': 'visible', 'chunk_index': 99},
@@ -64,14 +63,13 @@ def test_chat_excerpt_is_rebuilt_from_accessible_conversation_only():
     excerpts = chat_transcript_excerpts(
         [
             conv('visible', 'The renewal is 47 dollars'),
-            conv('locked', 'secret', is_locked=True),
             conv('discarded', 'erased', discarded=True),
         ],
         search,
     )
     assert list(excerpts) == ['visible']
     assert '47 dollars' in excerpts['visible']
-    assert 'secret' not in str(excerpts) and 'erased' not in str(excerpts)
+    assert 'erased' not in str(excerpts)
 
 
 def test_chat_chunk_search_failure_does_not_claim_transcript_coverage():

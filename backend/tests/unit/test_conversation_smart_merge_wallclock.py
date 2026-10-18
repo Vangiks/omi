@@ -684,7 +684,6 @@ def test_thirteen_fragment_ledger_rejects_and_never_reads_extra_rows(world, wall
         ({'source': 'other'}, 'not_eligible_source'),
         ({'discarded': True}, 'conversation_not_eligible'),
         ({'starred': True}, 'user_managed'),
-        ({'is_locked': True}, 'user_managed'),
         ({'status': 'processing'}, 'conversation_not_eligible'),
         ({'uses_custom_stt': True}, 'refresh_unavailable'),
     ],

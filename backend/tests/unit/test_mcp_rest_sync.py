@@ -12,7 +12,7 @@ Pins:
   and the ``mcp/`` stdio package decode), with pagination state only in the
   ``X-Next-Cursor`` response header;
 - released-client fields and statuses (``apps_results``, transcript
-  ``speaker_name``, POST memory shape, 400/402/403/404/429) survive the
+  ``speaker_name``, POST memory shape, 400/403/404/429) survive the
   delegation to shared MCP handler cores.
 
 ``routers.mcp`` imports cleanly in this environment, so REST tests use real
@@ -650,15 +650,8 @@ class TestRestStatusContract:
         assert body["truncated"] is False
         assert body["apps_results"] == [{"app_id": "app-1", "content": "note"}]
 
-    def test_conversation_detail_locked_402_and_missing_404(self, monkeypatch, client):
+    def test_conversation_detail_missing_404(self, monkeypatch, client):
         monkeypatch.setattr(rest, "populate_speaker_names", lambda uid, convs: None)
-        monkeypatch.setattr(
-            rest.mcp_conversation_handlers.conversations_db,
-            "get_mcp_conversations_by_id",
-            lambda uid, ids, **kw: [_conversation(is_locked=True)],
-        )
-        assert client.get("/v1/mcp/conversations/locked").status_code == 402
-
         monkeypatch.setattr(
             rest.mcp_conversation_handlers.conversations_db,
             "get_mcp_conversations_by_id",
@@ -945,7 +938,6 @@ class TestRestActionItemSpecDelegation:
             (ToolExecutionError("bad", code=-32602), 422),
             (ToolExecutionError("bad", code=-32000), 422),
             (ToolExecutionError("missing", code=-32001), 404),
-            (ToolExecutionError("locked", code=-32002), 402),
             (ToolExecutionError("boom", code=-32010), 500),
         ],
     )
@@ -1056,27 +1048,6 @@ class TestSyncedWriterTimestamps:
         monkeypatch.setattr(action_items_db, "db", fake_db)
         monkeypatch.setattr(action_items_db, "bump_action_items_list_version", lambda uid: None)
         return fake_db, items_collection, written
-
-    def test_unlock_all_action_items_stamps_updated_at(self, sync_db, monkeypatch):
-        import database.action_items as action_items_db
-
-        docs = [SimpleNamespace(reference=SimpleNamespace(id=f"a{i}")) for i in range(3)]
-        _, _, written = self._fake_db(monkeypatch, action_items_db, docs)
-        import database.account_deletion_marker as marker
-
-        miss = SimpleNamespace(exists=False, to_dict=lambda: None)
-        monkeypatch.setattr(
-            marker,
-            'get_data_plane_firestore_client',
-            lambda: SimpleNamespace(document=lambda path: SimpleNamespace(get=lambda *args, **kwargs: miss)),
-        )
-
-        action_items_db.unlock_all_action_items(UID)
-
-        assert [ref_id for ref_id, _ in written] == ["a0", "a1", "a2"]
-        for _, data in written:
-            assert data["is_locked"] is False
-            assert isinstance(data["updated_at"], datetime)
 
     def test_update_action_item_stamps_updated_at(self, sync_db, monkeypatch):
         import database.action_items as action_items_db

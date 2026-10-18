@@ -274,27 +274,6 @@ def test_discard_written_between_decide_and_absorb_rejects_in_transaction(world,
     assert {'source': 'omi', 'discarded': True, 'limit': None, 'transaction': True} in world.preceding_calls
 
 
-def test_row_flipping_discarded_between_decide_and_absorb_rejects(world):
-    """A locked row is a foreign partition while visible; once discarded it
-    still blocks — the barrier filter is device only, never is_locked."""
-    world.add('p', 0, 10)
-    world.add('n', 15, 10)
-    world.add('d', 11, 2, is_locked=True)
-    world.jev_answers = [0.9]
-    world.monkeypatch.setenv(config.SMART_MERGE_MODE_ENV, 'merge')
-    plan = smart_merge._decide(
-        UID, 'n', mode=config.SmartMergeMode.MERGE, trigger=ProcessingTrigger.CAPTURE_END, owner='job'
-    )
-    assert plan is not None and plan.survivor_id == 'p'
-
-    world.raw('d')['discarded'] = True
-    assert smart_merge._absorb(UID, 'n', plan, mode=config.SmartMergeMode.MERGE, owner='job') is False
-
-    assert world.raw('n')['smart_merge_decision']['reason'] == 'intervening_discarded'
-    assert not world.raw('n').get('deleted')
-    assert {'source': 'omi', 'discarded': True, 'limit': None, 'transaction': True} in world.preceding_calls
-
-
 def test_intervening_discarded_keeps_its_own_metric_reason(world):
     world.add('p', 0, 10)
     world.add('d', 11, 2, discarded=True)

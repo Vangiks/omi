@@ -203,7 +203,6 @@ def test_no_usable_voiceprint_returns_empty_without_scan(env, change):
     'override',
     [
         {'discarded': True},
-        {'is_locked': True},
         {'deleted': True},
         {'status': 'in_progress'},
         {'status': None},

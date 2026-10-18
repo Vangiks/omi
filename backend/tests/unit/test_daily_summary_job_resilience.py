@@ -520,7 +520,7 @@ def _loaded_send_path(
         'database._client': AutoMockModule('database._client'),
         'database.conversations': _module(
             'database.conversations',
-            get_conversations=lambda *_a, **_k: [{'is_locked': False}],
+            get_conversations=lambda *_a, **_k: [{'id': 'convo-1'}],
         ),
         'database.notifications': _module(
             'database.notifications',

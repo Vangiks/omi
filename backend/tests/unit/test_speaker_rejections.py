@@ -197,11 +197,7 @@ def test_not_person_records_a_rejection_receipt(world):
     assert receipt(world) != {}
 
 
-def test_locked_and_deleted_conversations_reject(world):
-    world.store.rows[world.path]['is_locked'] = True
-    response = world.client.post(f'/v1/conversations/{CONV}/speakers/4/reject', json={'kind': 'not_me'})
-    assert response.status_code == 402
-    assert receipt(world) == {}
+def test_deleted_conversation_rejects(world):
     world.store.rows[world.path] = dict(id=CONV, deleted=True)
     response = world.client.post(f'/v1/conversations/{CONV}/speakers/4/reject', json={'kind': 'not_me'})
     assert response.status_code == 404

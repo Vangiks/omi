@@ -114,7 +114,6 @@ MCP_CONVERSATION_CARD_FIELD_PATHS = (
     'started_at',
     'finished_at',
     'language',
-    'is_locked',
     'data_protection_level',
     'user_title',
     'structured.title',
@@ -314,7 +313,7 @@ def update_owner_recognition_diagnostics(uid: str, conversation_id: str, diagnos
         if not snapshot.exists:
             return False
         current = snapshot.to_dict() or {}
-        if any(current.get(k) for k in ('deleted', 'is_locked')):
+        if current.get('deleted'):
             return False
         patch = {owner_diagnostics.FIELD: diagnostics}
         _merge_owner_diagnostics(patch, current, ref.path)
@@ -1317,7 +1316,6 @@ def get_public_shared_conversation_bounded(
     snapshot = conversation_ref.get(
         field_paths=[
             'visibility',
-            'is_locked',
             'transcript_segments_compressed',
             'transcript_segments',
             'has_transcript_corrections',
@@ -1330,12 +1328,8 @@ def get_public_shared_conversation_bounded(
         return None
 
     visibility = raw.get('visibility')
-    is_locked = raw.get('is_locked', False)
-    public_conversation: Dict[str, Any] = {
-        'visibility': visibility,
-        'is_locked': is_locked,
-    }
-    if not isinstance(visibility, str) or visibility not in {'shared', 'public'} or is_locked:
+    public_conversation: Dict[str, Any] = {'visibility': visibility}
+    if not isinstance(visibility, str) or visibility not in {'shared', 'public'}:
         return public_conversation
 
     try:
@@ -2935,8 +2929,6 @@ def assign_conversation_speaker(
         if raw.get('deleted'):
             raise LookupError('Conversation not found')
         ref = collection.document(current_id)
-        if raw.get('is_locked'):
-            raise PermissionError('Conversation is locked')
         # Bridge donors use stable segment IDs, never reassigned speaker numbers.
         if source_segments is not None:
             selected_segment_ids = donor_selected_ids(
@@ -3362,7 +3354,7 @@ def materialize_translation(
         if not getattr(snapshot, 'exists', False):
             return None
         current = snapshot.to_dict() or {}
-        if is_soft_deleted(current) or current.get('is_locked'):
+        if is_soft_deleted(current):
             return None
         segments = _decode_transcript_segments_strict(
             uid, current.get('transcript_segments', []), bool(current.get('transcript_segments_compressed'))
@@ -3620,26 +3612,6 @@ def set_conversation_starred(uid: str, conversation_id: str, starred: bool):
     user_ref = db.collection('users').document(uid)
     conversation_ref = user_ref.collection(conversations_collection).document(conversation_id)
     conversation_ref.update({'starred': starred})
-
-
-def unlock_all_conversations(uid: str, *, limit: Optional[int] = None) -> int:
-    """Unlock all locked rows, or one bounded page when limit is supplied."""
-    conversations_ref = db.collection('users').document(uid).collection(conversations_collection)
-    locked_conversations_query = conversations_ref.where(filter=FieldFilter('is_locked', '==', True))
-
-    from database.locked_content import unlock_query_rows
-    from database.legal_holds import external_write_fence
-
-    with external_write_fence(uid):
-        total = unlock_query_rows(
-            db,
-            locked_conversations_query,
-            {'is_locked': False},
-            limit=limit,
-            on_commit=lambda: invalidate_people_stats_cache(uid),
-        )
-        logger.info(f"Unlocked all conversations for user {uid}")
-        return total
 
 
 # ****************************************
@@ -3973,7 +3945,6 @@ def promote_final_pass_if_current(
             not snapshot.exists
             or deleting.exists
             or is_soft_deleted(current)
-            or current.get('is_locked')
             or current.get('discarded')
             or current.get('status') != 'completed'
             or firestore_revision_datetime(snapshot.update_time) != expected_updated_at

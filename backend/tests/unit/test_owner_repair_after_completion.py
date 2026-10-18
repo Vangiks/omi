@@ -131,7 +131,6 @@ async def test_eight_passes_and_128_candidates_include_all_rechecks(monkeypatch)
     [
         ({'deleted': True}, 'deleted'),
         ({'discarded': True}, 'discarded'),
-        ({'is_locked': True}, 'locked'),
         ({'source': 'desktop'}, 'channel_source'),
         ({'private_cloud_sync_enabled': False}, 'private_cloud_disabled'),
         ({'updated_at': None}, 'missing_revision'),

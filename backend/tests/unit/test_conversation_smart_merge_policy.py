@@ -106,7 +106,6 @@ def test_fragment_metadata_is_bounded_before_it_reaches_jev_or_the_ledger():
         {'visibility': 'shared'},
         {'has_photos': True},
         {'manual_speaker_assignments': {'0': 'self'}},
-        {'is_locked': True},
         {'capture_group': {'id': 'g'}},
         {'external_data': {'duplicate_capture_of': 'other'}},
     ],
@@ -146,7 +145,6 @@ def test_partition_treats_unknown_device_as_its_own_partition():
         ).reason
         is None
     )
-    assert policy.check_pair(survivor, s_segments, dict(new, is_locked=True), n_segments).reason == 'no_predecessor'
 
 
 @pytest.mark.parametrize(

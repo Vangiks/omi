@@ -26,7 +26,6 @@ LINEAGE_FIELD_PATHS = (
     'finished_at',
     'source',
     'client_device_id',
-    'is_locked',
     'deleted',
     'discarded',
     'sync_merged_into',
