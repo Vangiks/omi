@@ -308,8 +308,6 @@ function served(shape: Shape, config = manifest): boolean {
 }
 
 const dynamicFiles = {
-  "app/api/omi/fair-use/flagged/route.ts":
-    "aefe1efc684ab222398480099ab3ca1ea8a91072e6fb26cc9a2984ead97d6456",
   "lib/services/gateway-ledger.ts":
     "7968ba2d236bfeb8f26f403c43d6cb37d78051140662f1cfabb12bea6d646e2f",
 } as const;
@@ -335,21 +333,6 @@ function dynamicShapes(file: string, source: string): Shape[] {
     sums: [],
     sites: new Set(),
   });
-  if (file === "app/api/omi/fair-use/flagged/route.ts") {
-    expect(source).toMatch(/collectionGroup\(['"]fair_use_state['"]\)/);
-    expect(source).toMatch(/where\(['"]stage['"],\s*['"]==['"],\s*stage\)/);
-    expect(source).toMatch(
-      /where\(['"]stage['"],\s*['"]in['"],\s*\[['"]warning['"],\s*['"]throttle['"],\s*['"]restrict['"]\]\)/
-    );
-    expect(source).toMatch(/orderBy\(['"]updated_at['"],\s*['"]desc['"]\)/);
-    const builders = extract(source).uncovered;
-    expect(builders).toHaveLength(3);
-    return ["==", "in"].map((op) => ({
-      ...blank("fair_use_state", "COLLECTION_GROUP"),
-      filters: [["stage", op]],
-      orders: [["updated_at", "DESCENDING"]],
-    }));
-  }
   expect(source).toMatch(/const COLLECTION = ["']llm_gateway_attempts["']/);
   expect(source).toMatch(/const COST_FIELD = ["']estimated_cost_micro_usd["']/);
   expect(source).toMatch(/query = query\.where\(field, ["']==["'], value\)/);
@@ -457,11 +440,6 @@ describe("server Firestore manifest contract: static chains, aliases, and review
 
   it("removing an additive single-field override refuses the group scans it serves", () => {
     const cases: [string, string, string][] = [
-      [
-        "app/api/omi/fair-use/case/[caseRef]/route.ts",
-        "fair_use_events",
-        "case_ref",
-      ],
       ["app/api/omi/stats/infra-costs/route.ts", "llm_usage", "date"],
     ];
     for (const [relative, collection, field] of cases) {

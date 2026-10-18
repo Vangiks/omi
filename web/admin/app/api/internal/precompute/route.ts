@@ -1,10 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  computeProfitability,
-  parseProfitabilityParams,
-  profitabilityCacheKey,
-} from "@/app/api/omi/stats/profitability/route";
-import {
   computeInfraCosts,
   infraCostsCacheKey,
 } from "@/app/api/omi/stats/infra-costs/route";
@@ -24,26 +19,6 @@ import {
   computeOnboarding,
   onboardingCacheKey,
 } from "@/app/api/omi/stats/onboarding/posthog/route";
-import {
-  computeRevenue,
-  revenueCacheKey,
-} from "@/app/api/omi/stats/revenue/route";
-import {
-  computeMrrTrends,
-  mrrTrendsCacheKey,
-} from "@/app/api/omi/stats/mrr-trends/route";
-import {
-  computeSubscriptionTrends,
-  subscriptionTrendsCacheKey,
-} from "@/app/api/omi/stats/subscription-trends/route";
-import {
-  computeSubscriptions,
-  subscriptionsCacheKey,
-} from "@/app/api/omi/stats/subscriptions/route";
-import {
-  computeAppSubscriptions,
-  appSubscriptionsCacheKey,
-} from "@/app/api/omi/stats/app-subscriptions/route";
 import { computeKFactor } from "@/app/api/omi/stats/k-factor/posthog/route";
 import {
   computeActivation,
@@ -70,8 +45,6 @@ export const maxDuration = 3600;
 //
 // Params MUST match the dashboard's default/initial query so the GET handlers
 // hit the cache. From app/(protected)/dashboard/page.tsx:
-//   profitability: days=30 (no desktop_cost/mobile_cost — the honest default
-//     path: cost comes from billing, not from a per-user assumption)
 //   infra-costs:   days=30 (overhead_monthly omitted → default 57447)
 //   daily-new-users: days=all
 //   macos-versions: (no params)
@@ -79,18 +52,14 @@ export const maxDuration = 3600;
 //   onboarding/posthog: days=30
 //   mobileOnboarding (onboarding/mobile): days=30
 //   mobileOnboardingTutorial (onboarding/mobile/tutorial): days=30
-//   revenue / subscriptions / app-subscriptions: (no params)
-//   mrr-trends / subscription-trends: months=12
 //   k-factor/posthog: days=30 (no payload cache — posthogResults caches the query)
 //
 // Sequential on purpose: PostHog is aggressively rate-limited, so we must NOT
 // fire these concurrently.
-const PROFIT_DAYS = 30;
 const INFRA_DAYS = 30;
 const DAILY_NEW_USERS_DAYS = "all";
 const NOTIFICATIONS_DAYS = 30;
 const ONBOARDING_DAYS = 30;
-const TRENDS_MONTHS = 12;
 const K_FACTOR_DAYS = 30;
 // Activation fans out one aggregation query per macOS signup in the window, so
 // it belongs here behind the long timeout rather than on the request path.
@@ -134,24 +103,6 @@ export async function POST(request: NextRequest) {
     }
     ms[name] = Date.now() - t0;
   };
-
-  // Profitability. Params go through the GET handler's own parser with only
-  // `days` set, so the key written here is byte-identical to the key a request
-  // carrying no cost params looks up.
-  await run("profitability", async () => {
-    const { days, desktopCost, mobileCost } = parseProfitabilityParams(
-      new URLSearchParams({ days: String(PROFIT_DAYS) })
-    );
-    const payload = await computeProfitability({
-      days,
-      desktopCost,
-      mobileCost,
-    });
-    await setPayload(
-      profitabilityCacheKey(days, desktopCost, mobileCost),
-      payload
-    );
-  });
 
   // Infra costs
   await run("infraCosts", async () => {
@@ -208,36 +159,6 @@ export async function POST(request: NextRequest) {
       mobileOnboardingCacheKey("tutorial", ONBOARDING_DAYS),
       payload
     );
-  });
-
-  // Revenue
-  await run("revenue", async () => {
-    const payload = await computeRevenue();
-    await setPayload(revenueCacheKey(), payload);
-  });
-
-  // MRR trends
-  await run("mrrTrends", async () => {
-    const payload = await computeMrrTrends(TRENDS_MONTHS);
-    await setPayload(mrrTrendsCacheKey(TRENDS_MONTHS), payload);
-  });
-
-  // Subscription trends
-  await run("subscriptionTrends", async () => {
-    const payload = await computeSubscriptionTrends(TRENDS_MONTHS);
-    await setPayload(subscriptionTrendsCacheKey(TRENDS_MONTHS), payload);
-  });
-
-  // Subscriptions
-  await run("subscriptions", async () => {
-    const payload = await computeSubscriptions();
-    await setPayload(subscriptionsCacheKey(), payload);
-  });
-
-  // App subscriptions
-  await run("appSubscriptions", async () => {
-    const payload = await computeAppSubscriptions();
-    await setPayload(appSubscriptionsCacheKey(), payload);
   });
 
   // k-factor: no payload cache — calling compute warms its posthogResults
