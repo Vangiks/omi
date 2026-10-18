@@ -884,6 +884,12 @@ async def _handle_stripe_event(event: dict, background_tasks: BackgroundTasks | 
         session = event['data']['object']
         client_reference_id = session.get('client_reference_id')
 
+        # Paid apps are gone, but an old app payment link in Stripe can still complete a
+        # checkout. It must not be read as a plan purchase.
+        if session.get('metadata', {}).get('app_id'):
+            logger.info(f"Ignoring checkout for a removed paid app: {session.get('id')}")
+            return {"status": "success"}
+
         # Regular user subscription - check for sub_type metadata or client_reference_id
         if client_reference_id or session.get('metadata', {}).get('sub_type'):
             # Get uid from client_reference_id or fallback to metadata

@@ -352,6 +352,17 @@ def test_checkout_session_completed_normal_path_unchanged(lane):
     ]
 
 
+def test_checkout_from_a_leftover_app_payment_link_changes_no_subscription(lane):
+    lane.stripe_obj = event(EVENTS[1], 'active')['data']['object']
+    lane.event = _checkout_event()
+    lane.event['data']['object']['metadata'] = {'app_id': 'creator-fixture'}
+    response = _post_webhook()
+    assert response.status_code == 200
+    assert response.json()['status'] == 'success'
+    assert lane.current is None
+    assert _call_names(lane) == []
+
+
 @pytest.mark.parametrize('fence_type', ['deletion_gate', 'data_plane_read'])
 def test_checkout_session_completed_retries_unlock_after_fence_clears(lane, monkeypatch, fence_type):
     blocked = {'on': True}
