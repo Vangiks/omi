@@ -1,9 +1,6 @@
 import os
-import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
-
-import stripe
 
 import database.users as users_db
 import database.user_usage as user_usage_db
@@ -15,17 +12,14 @@ from config.plan_catalog import (
     PAID_PLAN_TYPES,
     PLAN_DISPLAY_NAMES,
     PRIMARY_BILLING_ENV_VARS,
-    RECOGNIZED_STRIPE_PRICE_INTERVALS,
     allocation_limit,
     full_access_subscription,
     get_plan_allocation,
     resolve_stripe_price_plan,
 )
-from models.users import PlanType, SubscriptionStatus, Subscription, PlanLimits, TrialMetadata
+from models.users import PlanType, Subscription, PlanLimits, TrialMetadata
 from utils.byok import get_byok_key, get_byok_uid, get_cached_byok_state, has_validated_byok_keys
-from utils.log_sanitizer import sanitize
 from utils.plan_wire_capabilities import understands_plan_identity
-from utils.observability.fallback import record_fallback
 import logging
 
 logger = logging.getLogger(__name__)
@@ -152,7 +146,7 @@ def get_paid_plan_definitions() -> List[Dict[str, Any]]:
     """All plan definitions.
 
     Unlimited is kept as legacy so existing subscribers keep their access
-    and Stripe webhooks still resolve, but it's filtered out of the "new user"
+    and their stored plans still resolve, but it's filtered out of the "new user"
     purchase catalog via `filter_plans_for_user`.
     """
     return [
@@ -224,7 +218,7 @@ _MOBILE_PLATFORM_TOKENS = {'ios', 'android'}
 
 # The web storefront (X-App-Platform: web). It's an always-latest client that
 # renders the full new catalog (Plus + Unlimited + Operator + Architect) and is
-# the primary Stripe checkout surface; only deprecated Neo is hidden there.
+# the primary checkout surface; only deprecated Neo is hidden there.
 WEB_PLATFORMS = {'web'}
 
 
@@ -420,97 +414,9 @@ def legacy_plan_features(plan: PlanType) -> List[str]:
 
 
 def get_plan_type_from_price_id(price_id: str) -> PlanType:
-    """Resolve retained and configured Stripe prices through the catalog."""
+    """Resolve retained and configured plan prices through the catalog."""
 
     return resolve_stripe_price_plan(price_id)
-
-
-def price_ids_match_plan_and_interval(
-    current_price_id: Optional[str], target_price_id: Optional[str], current_interval: Optional[str] = None
-) -> bool:
-    if not current_price_id or not target_price_id:
-        return False
-    try:
-        if get_plan_type_from_price_id(current_price_id) != get_plan_type_from_price_id(target_price_id):
-            return False
-    except ValueError:
-        return False
-
-    target_interval = RECOGNIZED_STRIPE_PRICE_INTERVALS.get(target_price_id)
-    for definition in get_paid_plan_definitions():
-        if target_price_id == definition['monthly_price_id']:
-            target_interval = 'month'
-        elif target_price_id == definition['annual_price_id']:
-            target_interval = 'year'
-        if target_interval:
-            break
-    if not target_interval:
-        return False
-
-    if not current_interval:
-        current_interval = RECOGNIZED_STRIPE_PRICE_INTERVALS.get(current_price_id)
-    if not current_interval:
-        for definition in get_paid_plan_definitions():
-            if current_price_id == definition['monthly_price_id']:
-                current_interval = 'month'
-            elif current_price_id == definition['annual_price_id']:
-                current_interval = 'year'
-            if current_interval:
-                break
-    if not current_interval:
-        try:
-            current_price = stripe.Price.retrieve(current_price_id)
-            recurring = getattr(current_price, 'recurring', None)
-            if recurring is not None:
-                current_interval = getattr(recurring, 'interval', None)
-        except Exception as e:
-            logger.error(f"Error retrieving current price interval: {sanitize(str(e))}")
-            return False
-    return current_interval == target_interval
-
-
-def is_purchasable_price_id(price_id: str) -> bool:
-    """True only if price_id is a currently-purchasable plan price (the active catalog).
-
-    Unlike get_plan_type_from_price_id, this deliberately excludes the retained recognition
-    ledger: retained prices exist for current subscribers' renewals and reconciliation, not as
-    new checkout or upgrade targets. Use this at the checkout/upgrade request boundary so a
-    caller cannot select a hidden or deprecated price by posting its ID directly.
-    """
-    if not price_id:
-        return False
-    for definition in get_paid_plan_definitions():
-        if price_id in (definition["monthly_price_id"], definition["annual_price_id"]):
-            return True
-    return False
-
-
-def validate_stripe_price_ids():
-    """Validate configured Stripe price IDs at startup outside the dev environment."""
-    if os.getenv('OMI_ENV_STAGE', '').strip().lower() == 'dev':
-        record_fallback(
-            component='other',
-            from_mode='stripe_price_validation',
-            to_mode='dev_skip',
-            reason='policy',
-            outcome='degraded',
-            log=logger,
-        )
-        logger.info('Skipping Stripe price validation during dev startup.')
-        return
-
-    for definition in get_paid_plan_definitions():
-        for interval in ('monthly', 'annual'):
-            price_id = definition[f'{interval}_price_id']
-            if not price_id:
-                continue
-            try:
-                stripe.Price.retrieve(price_id)
-            except Exception as e:
-                logger.error(
-                    f"STARTUP: Stripe price validation failed for {definition['plan_id']} {interval} "
-                    f"(price_id={price_id}): {sanitize(str(e))} — this plan will be invisible to users"
-                )
 
 
 _basic_tier_seconds_raw = allocation_limit(PlanType.basic, 'transcription')
@@ -861,180 +767,6 @@ def get_plan_features(plan: PlanType, simplified: bool = False) -> List[str]:
     return [transcription_feature, chat_feature, "Unlimited memories and insights"]
 
 
-def _has_active_stripe_subscription(uid: str) -> bool:
-    """Check Stripe directly for active subscriptions owned by this user.
-
-    This catches cases where Firestore hasn't been updated yet (e.g. webhook
-    write hasn't propagated) but Stripe already has an active subscription.
-    """
-    customer_id = users_db.get_stripe_customer_id(uid)
-    if not customer_id:
-        return False
-    try:
-        subs = stripe.Subscription.list(customer=customer_id, status='active', limit=5)
-        for sub in subs.data:
-            sub_dict: Dict[str, Any] = sub.to_dict()  # type: ignore[reportDeprecated]  # stripe public serialization API
-            if sub_dict.get('cancel_at_period_end'):
-                continue
-            if sub_dict.get('metadata', {}).get('uid') == uid:
-                return True
-    except Exception as e:
-        logger.error(f"Error checking Stripe for active subscriptions: {e}")
-        return True  # fail-closed: block checkout if Stripe is unreachable
-    return False
-
-
-def find_active_paid_subscription_for_user(uid: str) -> Optional[Subscription]:
-    """Resolve the user's current active *paid* subscription straight from Stripe.
-
-    Lists the customer's active subscriptions and returns the first one that
-    maps to a paid plan (matching this uid's metadata when present). Returns
-    None if there's no customer, no active paid sub, or Stripe is unreachable.
-
-    Used to (a) self-heal a Firestore record stuck on `basic` whose stored
-    subscription id points at an old/canceled sub, and (b) stop an old
-    subscription's cancellation webhook from clobbering an active plan when the
-    user canceled one sub and started another near-simultaneously (possibly on a
-    different Stripe customer).
-    """
-    customer_id = users_db.get_stripe_customer_id(uid)
-    if not customer_id:
-        return None
-    try:
-        subs = stripe.Subscription.list(customer=customer_id, status='active', limit=10)
-    except Exception as e:
-        logger.error(f"[find_active_paid_subscription_for_user] Stripe lookup failed for uid={uid}: {e}")
-        return None
-
-    for sub in subs.data:
-        d: Dict[str, Any] = sub.to_dict()  # type: ignore[reportDeprecated]  # stripe public serialization API
-        sub_uid = d.get('metadata', {}).get('uid')
-        if sub_uid and sub_uid != uid:
-            continue
-        items: List[Dict[str, Any]] = d.get('items', {}).get('data') or []
-        if not items or not items[0].get('price'):
-            continue
-        price_id: Any = items[0]['price'].get('id')
-        try:
-            plan = get_plan_type_from_price_id(price_id)
-        except ValueError:
-            continue
-        if not is_paid_plan(plan):
-            continue
-        return Subscription(
-            plan=plan,
-            status=SubscriptionStatus.active,
-            stripe_subscription_id=d.get('id'),
-            current_price_id=price_id,
-            current_period_end=d.get('current_period_end'),
-            current_period_start=d.get('current_period_start'),
-            cancel_at_period_end=d.get('cancel_at_period_end', False),
-            limits=get_plan_limits(plan),
-        )
-    return None
-
-
-def is_pending_cancellation(subscription: Optional[Subscription], now: Optional[int] = None) -> bool:
-    if not subscription or not subscription.cancel_at_period_end:
-        return False
-    if not subscription.current_period_end:
-        return True
-    return subscription.current_period_end > (now or int(time.time()))
-
-
-def can_user_make_payment(uid: str, target_price_id: Optional[str] = None) -> Tuple[bool, str]:
-    """
-    Checks if a user can make a new payment based on their current subscription status.
-
-    Args:
-        uid: User ID
-        target_price_id: Optional target price ID to check if this is an upgrade/downgrade
-
-    Returns:
-        tuple: (can_pay: bool, reason: str)
-    """
-    subscription = users_db.get_user_valid_subscription(uid)
-
-    # If no subscription or basic plan, check Stripe as source of truth
-    # to guard against Firestore read-after-write lag
-    if not subscription or subscription.plan == PlanType.basic:
-        if _has_active_stripe_subscription(uid):
-            return False, "User already has an active subscription (pending sync)"
-        # A cancel-at-period-end subscription is still active until the period
-        # ends but is skipped by _has_active_stripe_subscription (it continues
-        # past cancel_at_period_end subs). Enforce the same defer-plan-change rule
-        # so a different target price can't be checked out before the current
-        # period ends, while allowing same-price reactivation.
-        pending_cancel_sub = find_active_paid_subscription_for_user(uid)
-        if pending_cancel_sub is not None and is_pending_cancellation(pending_cancel_sub):
-            if target_price_id and not price_ids_match_plan_and_interval(
-                pending_cancel_sub.current_price_id, target_price_id
-            ):
-                return False, "Plan changes are available after the current subscription ends"
-            return True, "User can reactivate the current subscription"
-        return True, "User can make payment"
-
-    # If unlimited plan but inactive, user can pay
-    if is_paid_plan(subscription.plan) and subscription.status == SubscriptionStatus.inactive:
-        return True, "User can make payment"
-
-    # If subscription is canceled (cancel_at_period_end=True), allow resubscription
-    # This handles the case where user canceled but period hasn't ended yet
-    if is_pending_cancellation(subscription):
-        if target_price_id:
-            current_price_id = subscription.current_price_id
-            if not current_price_id and subscription.stripe_subscription_id:
-                try:
-                    stripe_sub = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
-                    stripe_sub_dict = stripe_sub.to_dict() if stripe_sub else {}
-                    items = stripe_sub_dict.get('items', {}).get('data', [])
-                    if items:
-                        current_price_id = items[0].get('price', {}).get('id')
-                except Exception as e:
-                    logger.error(f"Error retrieving current price ID: {sanitize(str(e))}")
-
-            if price_ids_match_plan_and_interval(current_price_id, target_price_id):
-                return True, "User can reactivate the current subscription"
-
-            return False, "Plan changes are available after the current subscription ends"
-
-        return True, "User can resubscribe (current subscription is scheduled for cancellation)"
-
-    # If unlimited plan and active, check if this is a plan change
-    if is_paid_plan(subscription.plan) and subscription.status == SubscriptionStatus.active:
-        if subscription.current_period_end:
-            period_end_dt = datetime.fromtimestamp(subscription.current_period_end, tz=timezone.utc)
-
-            # If subscription has expired, user can pay
-            if period_end_dt <= datetime.now(timezone.utc):
-                return True, "User's subscription has expired, can make new payment"
-
-            # If target price is provided, check if it's different from current plan
-            if target_price_id:
-                current_price_id = None
-                # Try to get current price ID from Stripe subscription
-                if subscription.stripe_subscription_id:
-                    try:
-                        stripe_sub = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
-                        if stripe_sub:
-                            stripe_sub_dict: Dict[str, Any] = stripe_sub.to_dict()  # type: ignore[reportDeprecated]  # stripe public serialization API
-                            if stripe_sub_dict['items']['data']:
-                                current_price_id = stripe_sub_dict['items']['data'][0]['price']['id']
-                    except Exception as e:
-                        logger.error(f"Error retrieving current price ID: {e}")
-
-                # If different price, allow upgrade/downgrade
-                if current_price_id and current_price_id != target_price_id:
-                    return True, "User can upgrade/downgrade to different plan"
-                elif not current_price_id:
-                    return True, "User can make payment (current price unknown)"
-
-            # Same plan, active subscription
-            return False, "User already has an active subscription for this plan"
-
-    return True, "User can make payment"
-
-
 def get_monthly_usage_for_subscription(uid: str) -> Dict[str, Any]:
     """
     Gets the current monthly usage for subscription purposes, considering the launch date from env variables.
@@ -1072,53 +804,3 @@ def transcription_allowance_seconds(plan: PlanType) -> Optional[int]:
     number there; only a divergent overlay (dev's) stops applying.
     """
     return allocation_limit(plan, 'transcription')
-
-
-def reconcile_basic_plan_with_stripe(uid: str, subscription: Subscription | None) -> Subscription | None:
-    """
-    If Firestore says `basic` but there is a Stripe subscription with a future period end
-    that actually maps to an unlimited plan, fix it once by reconciling with Stripe.
-    """
-    if not subscription or subscription.plan != PlanType.basic:
-        return subscription
-
-    try:
-        if subscription.stripe_subscription_id and subscription.current_period_end:
-            period_end_dt = datetime.fromtimestamp(subscription.current_period_end, tz=timezone.utc)
-            if period_end_dt >= datetime.now(timezone.utc):
-                stripe_sub = stripe.Subscription.retrieve(subscription.stripe_subscription_id)
-                stripe_sub_dict: Optional[Dict[str, Any]] = stripe_sub.to_dict() if stripe_sub else None  # type: ignore[reportDeprecated]  # stripe public serialization API
-                if stripe_sub_dict:
-                    items: List[Dict[str, Any]] = stripe_sub_dict.get('items', {}).get('data') or []
-                    price_id: Optional[str] = None
-                    if items and items[0].get('price'):
-                        price_id = items[0]['price'].get('id')
-
-                    stripe_status = stripe_sub_dict.get('status')
-                    if stripe_status in ('active', 'trialing') and price_id:
-                        try:
-                            plan_type = get_plan_type_from_price_id(price_id)
-                        except ValueError:
-                            plan_type = None
-
-                        if plan_type and is_paid_plan(plan_type):
-                            subscription.plan = plan_type
-                            subscription.status = SubscriptionStatus.active
-                            subscription.current_period_end = stripe_sub_dict.get('current_period_end')
-                            subscription.current_period_start = stripe_sub_dict.get('current_period_start')
-                            subscription.cancel_at_period_end = stripe_sub_dict.get('cancel_at_period_end', False)
-                            subscription.current_price_id = price_id
-                            subscription.limits = get_plan_limits(plan_type)
-                            users_db.update_user_subscription(uid, subscription.model_dump())
-                            return subscription
-
-        active = find_active_paid_subscription_for_user(uid)
-        if active:
-            users_db.update_user_subscription(uid, active.model_dump())
-            return active
-
-    except Exception as e:
-        # Don't break user flows on reconciliation issues; just log and continue with existing data.
-        logger.error(f"[reconcile_basic_plan_with_stripe] Error reconciling Stripe subscription for user {uid}: {e}")
-
-    return subscription

@@ -137,7 +137,6 @@ class TestBYOKSubscriptionEntitlements:
         monkeypatch.setattr(users.users_db, 'is_byok_active', lambda _uid: True)
         monkeypatch.setattr(users, 'request_has_llm_byok_key', lambda: False)
         monkeypatch.setattr(users, 'get_user_subscription', lambda _uid: subscription, raising=False)
-        monkeypatch.setattr(users, 'reconcile_basic_plan_with_stripe', lambda _uid, _subscription: None)
         monkeypatch.setattr(users, 'get_user_valid_subscription', lambda _uid: subscription, raising=False)
         monkeypatch.setattr(
             users,
@@ -147,9 +146,7 @@ class TestBYOKSubscriptionEntitlements:
         monkeypatch.setattr(users, 'get_plan_features', lambda _plan, simplified: [])
         monkeypatch.setattr(users, 'should_show_new_plans', lambda _platform, _version: True)
         monkeypatch.setattr(users, 'get_monthly_usage_for_subscription', lambda _uid: {})
-        monkeypatch.setattr(users, 'get_paid_plan_definitions', lambda: [])
         monkeypatch.setattr(users, 'has_ever_purchased', lambda _uid, _subscription: False, raising=False)
-        monkeypatch.setattr(users, 'filter_plans_for_user', lambda _definitions, _plan, **_kwargs: [])
         monkeypatch.setattr(users, 'should_hide_subscription_ui', lambda _uid, _platform, _version: False)
         monkeypatch.setattr(
             users,
@@ -187,7 +184,6 @@ class TestBYOKSubscriptionEntitlements:
         monkeypatch.setattr(users.users_db, 'is_byok_active', lambda _uid: True)
         monkeypatch.setattr(users, 'request_has_llm_byok_key', lambda: False)
         monkeypatch.setattr(users, 'get_user_subscription', lambda _uid: subscription, raising=False)
-        monkeypatch.setattr(users, 'reconcile_basic_plan_with_stripe', lambda _uid, _subscription: None)
         monkeypatch.setattr(users, 'get_user_valid_subscription', lambda _uid: subscription, raising=False)
         monkeypatch.setattr(
             users,
@@ -197,9 +193,7 @@ class TestBYOKSubscriptionEntitlements:
         monkeypatch.setattr(users, 'get_plan_features', lambda _plan, simplified: [])
         monkeypatch.setattr(users, 'should_show_new_plans', lambda _platform, _version: True)
         monkeypatch.setattr(users, 'get_monthly_usage_for_subscription', lambda _uid: {})
-        monkeypatch.setattr(users, 'get_paid_plan_definitions', lambda: [])
         monkeypatch.setattr(users, 'has_ever_purchased', lambda _uid, _subscription: False, raising=False)
-        monkeypatch.setattr(users, 'filter_plans_for_user', lambda _definitions, _plan, **_kwargs: [])
         monkeypatch.setattr(users, 'should_hide_subscription_ui', lambda _uid, _platform, _version: False)
         monkeypatch.setattr(
             users,

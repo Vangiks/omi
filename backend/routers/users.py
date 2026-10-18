@@ -82,7 +82,6 @@ from models.users import (
     SubscriptionStatus,
     PlanLimits,
     PlanType,
-    PricingOption,
     PhoneCallQuota,
     TrialMetadata,
     LocationContextConsentResponse,
@@ -97,22 +96,16 @@ from utils.subscription import (
     get_chat_quota_snapshot,
     get_basic_plan_limits,
     get_default_basic_subscription,
-    get_paid_plan_definitions,
     get_plan_display_name,
     get_plan_limits,
     get_plan_features,
     get_monthly_usage_for_subscription,
     neo_grandfather_until,
-    reconcile_basic_plan_with_stripe,
-    filter_plans_for_user,
     should_show_new_plans,
-    adapt_plans_for_legacy_client,
     wire_plan_for_client,
-    legacy_plan_features,
     get_trial_metadata,
 )
 from database import user_usage as user_usage_db
-from utils import stripe as stripe_utils
 from utils.cloud_tasks import (
     AccountDeletionTaskAuthentication,
     get_account_deletion_tasks_max_attempts,
@@ -1285,25 +1278,10 @@ def _user_subscription_response(
             show_subscription_ui=False,
             phone_call_quota=unlimited_phone_quota,
         )
-    # First, reconcile any "basic but actually unlimited" inconsistencies against Stripe once.
-    raw_subscription = get_user_subscription(uid)
-    reconcile_basic_plan_with_stripe(uid, raw_subscription)
-
-    # Then re-evaluate using our normal "valid subscription" semantics.
     subscription = get_user_valid_subscription(uid)
     if not subscription:
         # Return default basic plan if no valid subscription
         subscription = get_default_basic_subscription()
-
-    # Get current price ID from Stripe if subscription exists
-    if subscription.stripe_subscription_id:
-        try:
-            stripe_sub = stripe_utils.stripe.Subscription.retrieve(subscription.stripe_subscription_id)
-            stripe_sub_dict = stripe_sub.to_dict()
-            if stripe_sub_dict and stripe_sub_dict.get('items', {}).get('data'):
-                subscription.current_price_id = stripe_sub_dict['items']['data'][0]['price']['id']
-        except Exception as e:
-            logger.error(f"Error retrieving current price ID: {e}")
 
     # Populate dynamic fields for the response
     subscription.limits = get_plan_limits(subscription.plan)
@@ -1346,80 +1324,8 @@ def _user_subscription_response(
     words_transcribed_limit = subscription.limits.words_transcribed or 0
     insights_gained_limit = subscription.limits.insights_gained or 0
 
-    # Build available plans. Version-gated: new clients see Operator + Architect,
-    # old clients get legacy plan names. Legacy plans filtered from purchase catalog.
-    all_definitions = get_paid_plan_definitions()
-    if not new_plans_enabled:
-        all_definitions = adapt_plans_for_legacy_client(all_definitions)
+    # The fork sells no plans.
     available_plans: List[SubscriptionPlan] = []
-    definitions_for_user = filter_plans_for_user(all_definitions, subscription.plan, platform=x_app_platform)
-    for definition in definitions_for_user:
-        plan_prices: List[PricingOption] = []
-        monthly_price_id = definition["monthly_price_id"]
-        annual_price_id = definition["annual_price_id"]
-
-        if monthly_price_id:
-            try:
-                price_data = get_generic_cache(f'stripe_price:{monthly_price_id}')
-                if not price_data:
-                    price = stripe_utils.stripe.Price.retrieve(monthly_price_id)
-                    price_data = price.to_dict_recursive()
-                    set_generic_cache(f'stripe_price:{monthly_price_id}', price_data, ttl=3600 * 24)
-
-                plan_prices.append(
-                    PricingOption(
-                        id=price_data['id'],
-                        title="Monthly",
-                        price_string=f"${price_data['unit_amount'] / 100:.2f}/{price_data['recurring']['interval']}",
-                        description="Billed monthly. Cancel anytime.",
-                    )
-                )
-            except Exception as e:
-                logger.error(
-                    f"Error retrieving monthly price from Stripe for {definition['plan_id']} "
-                    f"(price_id={monthly_price_id}): {sanitize(str(e))}"
-                )
-
-        if annual_price_id:
-            try:
-                price_data = get_generic_cache(f'stripe_price:{annual_price_id}')
-                if not price_data:
-                    price = stripe_utils.stripe.Price.retrieve(annual_price_id)
-                    price_data = price.to_dict_recursive()
-                    set_generic_cache(f'stripe_price:{annual_price_id}', price_data, ttl=3600 * 24)
-
-                plan_prices.append(
-                    PricingOption(
-                        id=price_data['id'],
-                        title="Annual",
-                        price_string=f"${price_data['unit_amount'] / 100:.2f}/{price_data['recurring']['interval']}",
-                        description=definition["annual_description"],
-                    )
-                )
-            except Exception as e:
-                logger.error(
-                    f"Error retrieving annual price from Stripe for {definition['plan_id']} "
-                    f"(price_id={annual_price_id}): {sanitize(str(e))}"
-                )
-
-        if plan_prices:
-            features = (
-                get_plan_features(definition["plan_type"], simplified=is_mobile)
-                if new_plans_enabled
-                else legacy_plan_features(definition["plan_type"])
-            )
-            available_plans.append(
-                SubscriptionPlan(
-                    id=definition["plan_id"],
-                    title=definition["title"],
-                    subtitle=definition.get("subtitle"),
-                    description=definition.get("description"),
-                    eyebrow=definition.get("eyebrow"),
-                    features=features,
-                    prices=plan_prices,
-                    legacy=bool(definition.get("legacy")),
-                )
-            )
 
     show_subscription_ui = not should_hide_subscription_ui(uid, x_app_platform, x_app_version)
 

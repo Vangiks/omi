@@ -499,12 +499,8 @@ def test_subscription_endpoint_falls_back_to_basic_when_no_valid_subscription():
     # instead of the basic plan the branch exists to return.
     with patch.object(users_router.users_db, 'is_byok_active', MagicMock(return_value=False)), patch.object(
         users_router, 'get_user_subscription', MagicMock(return_value=None)
-    ), patch.object(users_router, 'reconcile_basic_plan_with_stripe', MagicMock()), patch.object(
-        users_router, 'get_user_valid_subscription', MagicMock(return_value=None)
-    ), patch.object(
+    ), patch.object(users_router, 'get_user_valid_subscription', MagicMock(return_value=None)), patch.object(
         users_router, 'get_monthly_usage_for_subscription', MagicMock(return_value={})
-    ), patch.object(
-        users_router, 'get_paid_plan_definitions', MagicMock(return_value=[])
     ), patch.object(
         users_router, 'should_hide_subscription_ui', MagicMock(return_value=False)
     ), patch.object(
@@ -526,13 +522,9 @@ def test_subscription_endpoint_reports_unlimited_phone_calls_for_basic_plan():
     with patch.object(users_router.users_db, 'is_byok_active', MagicMock(return_value=False)), patch.object(
         users_router.users_db, 'get_user_valid_subscription', MagicMock(return_value=None)
     ), patch.object(users_router, 'get_user_subscription', MagicMock(return_value=None)), patch.object(
-        users_router, 'reconcile_basic_plan_with_stripe', MagicMock()
-    ), patch.object(
         users_router, 'get_user_valid_subscription', MagicMock(return_value=None)
     ), patch.object(
         users_router, 'get_monthly_usage_for_subscription', MagicMock(return_value={})
-    ), patch.object(
-        users_router, 'get_paid_plan_definitions', MagicMock(return_value=[])
     ), patch.object(
         users_router, 'should_hide_subscription_ui', MagicMock(return_value=False)
     ), patch.object(
@@ -727,12 +719,8 @@ def test_subscription_snapshot_passes_plan_identity_to_the_wire_remap(identity_v
 
     with patch.object(users_router.users_db, 'is_byok_active', MagicMock(return_value=False)), patch.object(
         users_router, 'get_user_subscription', MagicMock(return_value=subscription)
-    ), patch.object(users_router, 'reconcile_basic_plan_with_stripe', MagicMock()), patch.object(
-        users_router, 'get_user_valid_subscription', MagicMock(return_value=subscription)
-    ), patch.object(
+    ), patch.object(users_router, 'get_user_valid_subscription', MagicMock(return_value=subscription)), patch.object(
         users_router, 'get_monthly_usage_for_subscription', MagicMock(return_value={'transcription_seconds': 9})
-    ), patch.object(
-        users_router, 'get_paid_plan_definitions', MagicMock(return_value=[])
     ), patch.object(
         users_router, 'should_hide_subscription_ui', MagicMock(return_value=False)
     ), patch.object(
@@ -865,9 +853,7 @@ def test_subscription_http_negotiates_catalog_ids_before_response_validation(
     monkeypatch.setattr(users_router.users_db, 'is_byok_active', lambda uid: False)
     monkeypatch.setattr(users_router, 'get_user_subscription', lambda uid: subscription.model_copy())
     monkeypatch.setattr(users_router, 'get_user_valid_subscription', lambda uid: subscription.model_copy())
-    monkeypatch.setattr(users_router, 'reconcile_basic_plan_with_stripe', lambda *args: None)
     monkeypatch.setattr(users_router, 'get_monthly_usage_for_subscription', lambda uid: {'transcription_seconds': 10})
-    monkeypatch.setattr(users_router, 'get_paid_plan_definitions', lambda *args, **kwargs: [])
     monkeypatch.setattr(users_router, 'should_hide_subscription_ui', lambda *args: False)
     monkeypatch.setattr(
         users_router,

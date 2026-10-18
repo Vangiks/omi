@@ -133,7 +133,6 @@ from routers.listen.registry import proactive_message_dispatcher
 
 from utils.other.timeout import TimeoutMiddleware
 from utils.observability import log_langsmith_status
-from utils.subscription import validate_stripe_price_ids
 from utils.http_client import close_all_clients
 from utils.jit_rollout import close_posthog_control_plane
 from utils.metrics import start_metrics_sidecar_server, stop_metrics_sidecar_server
@@ -161,9 +160,6 @@ from utils.other.local_storage import local_storage_root_from_env
 
 # Log LangSmith tracing status at startup
 log_langsmith_status()
-
-# Validate Stripe price IDs so misconfigured plans fail loud
-validate_stripe_price_ids()
 
 _auth_emulator_host = os.environ.get("FIREBASE_AUTH_EMULATOR_HOST", "").strip()
 _firebase_admin_options = firebase_admin_options()
