@@ -1294,7 +1294,6 @@ def _load_sync_router_for_fast_path():
     sys.modules['utils.fair_use'].get_enforcement_stage = MagicMock(return_value='off')
     sys.modules['utils.fair_use'].FAIR_USE_ENABLED = False
     sys.modules['utils.fair_use'].FAIR_USE_RESTRICT_DAILY_DG_MS = 0
-    sys.modules['utils.subscription'].has_transcription_credits = MagicMock(return_value=True)
     sys.modules['utils.request_validation'].parse_sync_filename_timestamp = MagicMock(return_value=time.time())
     saved_modules['utils.sync'] = prior_utils_sync
     sync_pkg = types.ModuleType('utils.sync')
@@ -2743,16 +2742,11 @@ async def test_sync_dispatch_carries_device_provenance_into_cloud_task(monkeypat
 
 
 @pytest.mark.asyncio
-async def test_sync_dispatch_never_locks_when_transcription_minutes_run_out():
+async def test_sync_dispatch_never_locks_conversations():
     from starlette.datastructures import UploadFile
 
     module, saved_modules, _, BytesIO, _, _ = _load_sync_router_for_fast_path()
     module.start_background_task = MagicMock()
-    has_credits = MagicMock(return_value=False)
-    resolve_allowance = MagicMock(return_value=types.SimpleNamespace(reason='minutes_exhausted'))
-    module.has_transcription_credits = has_credits
-    module.resolve_transcription_allowance = resolve_allowance
-    module.TRANSCRIPTION_ALLOWANCE_TRANSIENT_REASONS = frozenset()
 
     try:
         upload = UploadFile(filename='test.opus', file=BytesIO(b'\x00' * 10))
@@ -2760,8 +2754,6 @@ async def test_sync_dispatch_never_locks_when_transcription_minutes_run_out():
 
         assert response.status_code == 202
         assert 'should_lock' not in module.enqueue_sync_job.call_args.args[0]
-        has_credits.assert_not_called()
-        resolve_allowance.assert_not_called()
     finally:
         sys.modules.pop('routers.sync', None)
         for mod_name, orig in saved_modules.items():

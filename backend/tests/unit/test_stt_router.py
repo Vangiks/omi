@@ -48,10 +48,6 @@ def metering(monkeypatch):
 
     monkeypatch.setattr(stt_router, '_probe_audio_seconds', probe)
     monkeypatch.setattr(stt_router, 'record_usage', record)
-    # The fork has no plans (#3): the route must not look up a transcription allowance.
-    monkeypatch.setattr(
-        stt_router, 'resolve_transcription_allowance', Mock(side_effect=AssertionError('allowance read')), raising=False
-    )
     return record
 
 

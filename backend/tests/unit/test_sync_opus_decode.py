@@ -211,7 +211,6 @@ _ensure_attrs(
     'utils.stt.speaker_embedding',
     ['extract_embedding_from_bytes', 'compare_embeddings', 'speaker_embedding_configured', 'SPEAKER_MATCH_THRESHOLD'],
 )
-_ensure_attrs('utils.subscription', ['has_transcription_credits'])
 _ensure_attrs('pydub', ['AudioSegment'])
 _ensure_attrs('models.conversation_enums', ['CategoryEnum'])
 

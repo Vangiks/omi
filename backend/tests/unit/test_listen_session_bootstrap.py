@@ -30,7 +30,6 @@ def test_bootstrap_offloads_firestore_reads():
         "is_dg_budget_exhausted",
     ):
         assert required in awaited_targets
-    assert "has_transcription_credits" not in awaited_targets
 
 
 def test_runtime_uses_listen_connect_bootstrap():
@@ -41,7 +40,6 @@ def test_runtime_uses_listen_connect_bootstrap():
     assert "load_listen_connect_base" in bootstrap
     assert "finalize_listen_connect_context" in bootstrap
     assert "get_user_transcription_preferences(" not in bootstrap
-    assert "has_transcription_credits(" not in bootstrap
 
 
 def test_project_listen_connect_decisions_pins_vocabulary_and_translation():

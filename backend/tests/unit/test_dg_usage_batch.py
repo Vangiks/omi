@@ -45,7 +45,6 @@ def fair_use() -> Iterator[ModuleType]:
         'models.fair_use': _module('models.fair_use', SoftCapTrigger=_SoftCapTrigger),
         'utils.subscription': _module(
             'utils.subscription',
-            has_transcription_credits=MagicMock(return_value=True),
             is_paid_plan=MagicMock(return_value=False),
         ),
         'utils.executors': _module(

@@ -25,7 +25,6 @@ from models.users import PlanType, SubscriptionStatus, Subscription, PlanLimits,
 from utils.byok import get_byok_key, get_byok_uid, get_cached_byok_state, has_validated_byok_keys
 from utils.log_sanitizer import sanitize
 from utils.plan_wire_capabilities import understands_plan_identity
-from utils.transcription_allowance import TranscriptionAllowance
 from utils.observability.fallback import record_fallback
 import logging
 
@@ -558,8 +557,8 @@ def _basic_transcription_overlay() -> Tuple[int, Optional[int]]:
 
     ``seconds`` is ``None`` when the allowance is unlimited. Charts currently set
     300, so the legacy-zero branch is latent -- but reading a deployed ``0`` as a
-    finite zero would make ``has_transcription_credits`` return False for every Free
-    user, which is the same inversion as words/insights with worse consequences.
+    finite zero would show every Free user a zero allowance, the same inversion as
+    words/insights.
     """
     present, value = _legacy_overlay('BASIC_TIER_MINUTES_LIMIT_PER_MONTH')
     if not present:
@@ -1062,33 +1061,6 @@ def get_monthly_usage_for_subscription(uid: str) -> Dict[str, Any]:
     return user_usage_db.get_monthly_usage_stats_since(uid, now, launch_date)
 
 
-# --- transcription allowance: one answer -------------------------------------------------------
-
-TRANSCRIPTION_MODE_MANAGED = 'managed'
-TRANSCRIPTION_MODE_ON_DEVICE = 'on_device'
-TRANSCRIPTION_MODE_BLOCKED = 'blocked'
-# Sentinel for "the caller did not pass one; read it" — distinct from None,
-# which is a real answer (no valid subscription).
-_UNRESOLVED: Any = object()
-
-
-def _closed(reason: str, *, limit_seconds: Optional[int] = 0) -> TranscriptionAllowance:
-    """No managed minutes; preserve a known total without reopening enforcement.
-
-    A zero total here means unresolved, not unlimited. Snapshot serialization
-    retains its existing finite plan cap when this result has no known total.
-    """
-    return TranscriptionAllowance(TRANSCRIPTION_MODE_ON_DEVICE, 0, reason, limit_seconds=limit_seconds)
-
-
-# resolve_transcription_allowance() reasons meaning "this lookup could not be
-# trusted", as opposed to "the plan's minutes are actually exhausted". Failing
-# closed on these is right for a live listen socket (refusing one costs
-# nothing) but wrong for a decision written durably to storage, since nothing
-# routinely re-checks it later (#15232).
-TRANSCRIPTION_ALLOWANCE_TRANSIENT_REASONS = frozenset({'allowance_unavailable', 'usage_invalid'})
-
-
 def transcription_allowance_seconds(plan: PlanType) -> Optional[int]:
     """The plan's managed transcription allowance, from the catalog alone.
 
@@ -1100,107 +1072,6 @@ def transcription_allowance_seconds(plan: PlanType) -> Optional[int]:
     number there; only a divergent overlay (dev's) stops applying.
     """
     return allocation_limit(plan, 'transcription')
-
-
-def _usage_seconds(usage: Any) -> Optional[int]:
-    """Transcription seconds used this month, or ``None`` when the record is not trustworthy."""
-    if not isinstance(usage, dict):
-        return None
-    value = usage.get('transcription_seconds', 0)
-    if value is None:
-        return 0
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        return None
-    return value
-
-
-from utils.marketplace_reviewers import is_marketplace_reviewer
-
-
-def resolve_transcription_allowance(
-    uid: str,
-    source: Optional[str] = None,
-    *,
-    subscription: Any = _UNRESOLVED,
-    usage: Any = _UNRESOLVED,
-    byok_active: Any = _UNRESOLVED,
-) -> TranscriptionAllowance:
-    """Resolve the managed-transcription allowance for one uid, once. Never raises.
-
-    ``source`` is the listen-WS ``source`` query param (``desktop``, ``omi``,
-    ``phone_call``, ...) or the HTTP ``X-App-Platform`` header. No check reads
-    it now that the desktop trial is gone.
-
-    ``subscription`` / ``usage`` / ``byok_active`` let a caller that has
-    already read the valid subscription (``None`` when there is none), the
-    monthly usage and the BYOK enrolment pass them in, so the startup snapshot
-    and this answer come from the same reads.
-
-    Order: reviewer → BYOK → plan → unlimited → remaining. A
-    subscription the lookup calls invalid (an inactive basic account) has no
-    managed minutes; an expired paid subscription is downgraded to a fresh
-    basic one by that lookup and gets basic's minutes. Any dependency that
-    cannot be read and any usage record that cannot be trusted resolves to
-    the free local path rather than a billed socket.
-    """
-    known_limit_seconds: Optional[int] = 0
-    try:
-        # The reviewer identities the subscription snapshot already treats as
-        # unlimited; resolved first so nothing below can contradict that snapshot.
-        if is_marketplace_reviewer(uid):
-            return TranscriptionAllowance(TRANSCRIPTION_MODE_MANAGED, None, 'marketplace_reviewer', limit_seconds=None)
-        # Require the Deepgram header on this request so a user cannot activate
-        # BYOK with fake fingerprints and then omit x-byok-deepgram to ride Omi's key.
-        if byok_active is _UNRESOLVED:
-            byok_active = users_db.is_byok_active(uid)
-        if byok_active and get_byok_key('deepgram'):
-            return TranscriptionAllowance(TRANSCRIPTION_MODE_MANAGED, None, 'byok', limit_seconds=None)
-        if subscription is _UNRESOLVED:
-            subscription = users_db.get_user_valid_subscription(uid)
-        if not subscription:
-            return _closed('subscription_inactive')
-        allowance = transcription_allowance_seconds(subscription.plan)
-        known_limit_seconds = allowance
-        # The catalog's explicit unlimited marker projects to None. A finite
-        # zero is a real zero allowance and must therefore fail closed.
-        if allowance is None:
-            return TranscriptionAllowance(TRANSCRIPTION_MODE_MANAGED, None, 'plan_unlimited', limit_seconds=None)
-        if usage is _UNRESOLVED:
-            usage = get_monthly_usage_for_subscription(uid)
-        used = _usage_seconds(usage)
-        if used is None:
-            logger.warning('transcription allowance: untrusted usage record for uid=%s', uid)
-            return _closed('usage_invalid', limit_seconds=allowance)
-        remaining = max(0, allowance - used)
-        if remaining > 0:
-            return TranscriptionAllowance(
-                TRANSCRIPTION_MODE_MANAGED, remaining, 'plan_within_allowance', limit_seconds=allowance
-            )
-        return TranscriptionAllowance(
-            TRANSCRIPTION_MODE_ON_DEVICE, 0, 'plan_allowance_exhausted', limit_seconds=allowance
-        )
-    except Exception as exc:  # fail closed: a billed socket is never the default
-        logger.warning('transcription allowance unavailable for uid=%s: %s', uid, type(exc).__name__)
-        return _closed('allowance_unavailable', limit_seconds=known_limit_seconds)
-
-
-def has_transcription_credits(uid: str, source: Optional[str] = None) -> bool:
-    """Whether the user may open Omi's managed STT right now — a thin wrapper over the one resolver.
-
-    ``source`` is the listen-WS ``source`` query param (see
-    :func:`resolve_transcription_allowance`).
-    """
-    return resolve_transcription_allowance(uid, source).managed
-
-
-def get_remaining_transcription_seconds(uid: str, source: Optional[str] = None) -> int | None:
-    """Managed transcription seconds left this month — a thin wrapper over the one resolver.
-
-    ``None`` means unlimited (unlimited plans, BYOK, reviewers); ``0`` means
-    spent, inactive or unresolvable. Used for the freemium switch to
-    on-device transcription.
-    """
-    return resolve_transcription_allowance(uid, source).remaining_seconds
 
 
 def reconcile_basic_plan_with_stripe(uid: str, subscription: Subscription | None) -> Subscription | None:
