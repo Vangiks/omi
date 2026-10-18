@@ -89,7 +89,6 @@ from models.users import (
     LocationContextConsentResponse,
     LocationContextConsentUpdate,
 )
-from utils.phone_calls import get_quota_snapshot as get_phone_call_quota_snapshot
 from utils.apps import get_available_app_by_id
 from config.plan_catalog import plan_uses_overage
 from utils.subscription import (
@@ -1446,9 +1445,6 @@ def _user_subscription_response(
 
     show_subscription_ui = not should_hide_subscription_ui(uid, x_app_platform, x_app_version)
 
-    # Phone-call feature access + monthly free-tier usage snapshot.
-    phone_call_quota = PhoneCallQuota(**get_phone_call_quota_snapshot(uid).to_client_dict())
-
     # Chat quota — reuse the shared snapshot helper
     chat_snapshot = get_chat_quota_snapshot(uid, platform=x_app_platform)
     chat_percent = 0.0
@@ -1476,7 +1472,7 @@ def _user_subscription_response(
         chat_quota_percent=chat_percent,
         chat_quota_allowed=chat_allowed,
         chat_quota_reset_at=chat_snapshot['reset_at'],
-        phone_call_quota=phone_call_quota,
+        phone_call_quota=PhoneCallQuota(has_access=True, is_paid=True),
         desktop_grandfather_until=desktop_grandfather_until,
     )
 

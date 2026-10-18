@@ -162,7 +162,6 @@ AREA_TESTS = (
             'backend/scripts/support/find_stripe_entitlement_mismatches.py',
             'backend/routers/payment.py',
             'backend/routers/retired_desktop_proactivity.py',
-            'backend/database/phone_call_config.py',
         ),
         (),
         (
