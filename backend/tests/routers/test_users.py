@@ -718,6 +718,49 @@ def test_usage_quota_endpoint_reports_catalog_exhaustion_policy(plan, expected_o
     assert quota.allowed is False
 
 
+@pytest.mark.parametrize('identity_version', [None, '1'])
+def test_subscription_snapshot_passes_plan_identity_to_the_wire_remap(identity_version):
+    """The X-Omi-Plan-Identity header reaches the wire remap, and the remapped plan ships to the client."""
+    subscription = users_router.Subscription(
+        plan=users_router.PlanType.plus, status=users_router.SubscriptionStatus.active
+    )
+
+    with patch.object(users_router.users_db, 'is_byok_active', MagicMock(return_value=False)), patch.object(
+        users_router, 'get_user_subscription', MagicMock(return_value=subscription)
+    ), patch.object(users_router, 'reconcile_basic_plan_with_stripe', MagicMock()), patch.object(
+        users_router, 'get_user_valid_subscription', MagicMock(return_value=subscription)
+    ), patch.object(
+        users_router, 'get_monthly_usage_for_subscription', MagicMock(return_value={'transcription_seconds': 9})
+    ), patch.object(
+        users_router, 'get_paid_plan_definitions', MagicMock(return_value=[])
+    ), patch.object(
+        users_router, 'should_hide_subscription_ui', MagicMock(return_value=False)
+    ), patch.object(
+        users_router,
+        'get_chat_quota_snapshot',
+        MagicMock(return_value={'used': 0.0, 'limit': None, 'unit': 'questions', 'allowed': True, 'reset_at': None}),
+    ), patch.object(
+        users_router,
+        'wire_plan_for_client',
+        MagicMock(return_value=users_router.PlanType.unlimited),
+    ), patch.dict(
+        users_router.os.environ, {'MARKETPLACE_APP_REVIEWERS': ''}
+    ):
+        response = users_router.get_user_subscription_endpoint(
+            request=Request(
+                {'type': 'http', 'headers': [] if identity_version is None else [(b'x-omi-plan-identity', b'1')]}
+            ),
+            uid='uid1',
+            x_app_platform='ios',
+            x_app_version='1.0.0',
+        )
+        users_router.wire_plan_for_client.assert_called_once_with(
+            users_router.PlanType.plus, 'ios', '1.0.0', identity_version
+        )
+
+    assert response.subscription.plan is users_router.PlanType.unlimited
+
+
 def _route_dependency_names(path: str, method: str) -> list[str]:
     app = FastAPI()
     app.include_router(users_router.router)
