@@ -10,7 +10,6 @@ from config.plan_catalog import (
     plan_uses_overage,
     DESKTOP_PROFILE_DEFAULTS,
     FAIR_USE_PROFILE_LIMITS,
-    PHONE_CALL_PROFILE_DEFAULTS,
 )
 from models.users import Subscription
 
@@ -51,6 +50,5 @@ def legacy_snapshot():
                 ],
                 'desktop_profiles': DESKTOP_PROFILE_DEFAULTS,
                 'fair_use_profiles': FAIR_USE_PROFILE_LIMITS,
-                'phone_call_profiles': PHONE_CALL_PROFILE_DEFAULTS,
             }
         return result

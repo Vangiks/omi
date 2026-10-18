@@ -82,7 +82,6 @@ def validate_entitlement_compatibility(previous: Mapping[str, Any], current: Map
         'desktop_profile',
         'conditional_desktop_profiles',
         'fair_use_profile',
-        'phone_calls_profile',
     )
 
     def indexed_plans(catalog: Mapping[str, Any]) -> dict[str, Any]:

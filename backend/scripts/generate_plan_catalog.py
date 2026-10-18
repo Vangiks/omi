@@ -44,7 +44,6 @@ PLAN_KEYS = {
     'desktop_profile',
     'conditional_desktop_profiles',
     'fair_use_profile',
-    'phone_calls_profile',
     'allocations',
     'billing',
 }
@@ -232,19 +231,17 @@ def _validate_allocations(allocations: Any, path: str, decisions: set[str], erro
             _validate_exhaustion(allocation.get('exhaustion'), f'{allocation_path}.exhaustion', decisions, errors)
 
 
-def _validate_allocation_profiles(profiles: Any, errors: list[str]) -> tuple[set[str], set[str], set[str]]:
+def _validate_allocation_profiles(profiles: Any, errors: list[str]) -> tuple[set[str], set[str]]:
     desktop_profiles: set[str] = set()
     fair_use_profiles: set[str] = set()
-    phone_call_profiles: set[str] = set()
     if not isinstance(profiles, dict):
         errors.append('catalog.allocation_profiles: expected an object')
-        return desktop_profiles, fair_use_profiles, phone_call_profiles
+        return desktop_profiles, fair_use_profiles
 
-    _unexpected_keys(profiles, {'desktop', 'fair_use', 'phone_calls'}, 'catalog.allocation_profiles', errors)
+    _unexpected_keys(profiles, {'desktop', 'fair_use'}, 'catalog.allocation_profiles', errors)
     for profile_group, destination in (
         ('desktop', desktop_profiles),
         ('fair_use', fair_use_profiles),
-        ('phone_calls', phone_call_profiles),
     ):
         group = profiles.get(profile_group)
         if not isinstance(group, dict) or not group:
@@ -283,23 +280,7 @@ def _validate_allocation_profiles(profiles: Any, errors: list[str]) -> tuple[set
                 if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
                     errors.append(f'{path}.speech_milliseconds.{window}: expected a positive integer')
 
-    phone_calls = profiles.get('phone_calls')
-    if isinstance(phone_calls, dict):
-        for name, profile in phone_calls.items():
-            path = f'catalog.allocation_profiles.phone_calls.{name}'
-            if not isinstance(profile, dict):
-                errors.append(f'{path}: expected an object')
-                continue
-            _unexpected_keys(
-                profile, {'monthly_calls', 'max_duration_seconds', 'legacy_runtime_override'}, path, errors
-            )
-            _validate_limit(profile.get('monthly_calls'), f'{path}.monthly_calls', set(), errors)
-            _validate_limit(profile.get('max_duration_seconds'), f'{path}.max_duration_seconds', set(), errors)
-            override = profile.get('legacy_runtime_override')
-            if not isinstance(override, str) or not override:
-                errors.append(f'{path}.legacy_runtime_override: expected a non-empty source path')
-
-    return desktop_profiles, fair_use_profiles, phone_call_profiles
+    return desktop_profiles, fair_use_profiles
 
 
 def _validate_billing(billing: Any, path: str, is_paid: bool, errors: list[str]) -> None:
@@ -437,7 +418,7 @@ def validate_catalog(catalog: Mapping[str, Any]) -> list[str]:
                 errors.append(f'catalog.open_decisions.{decision_id}: expected an object with a question')
 
     profiles = catalog.get('allocation_profiles')
-    desktop_profiles, fair_use_profiles, phone_call_profiles = _validate_allocation_profiles(profiles, errors)
+    desktop_profiles, fair_use_profiles = _validate_allocation_profiles(profiles, errors)
 
     measurement_contracts = catalog.get('measurement_contracts')
     if not isinstance(measurement_contracts, dict):
@@ -528,8 +509,6 @@ def validate_catalog(catalog: Mapping[str, Any]) -> list[str]:
                     errors.append(f'{conditional_path}.profile: unknown desktop profile')
         if plan.get('fair_use_profile') not in fair_use_profiles:
             errors.append(f'{path}.fair_use_profile: unknown fair-use profile {plan.get("fair_use_profile")!r}')
-        if plan.get('phone_calls_profile') not in phone_call_profiles:
-            errors.append(f'{path}.phone_calls_profile: unknown phone-call profile {plan.get("phone_calls_profile")!r}')
         _validate_allocations(plan.get('allocations'), f'{path}.allocations', decisions, errors)
         _validate_billing(plan.get('billing'), f'{path}.billing', bool(plan.get('is_paid')), errors)
         billing = plan.get('billing')
@@ -880,7 +859,6 @@ PRIMARY_BILLING_ENV_VARS: Final[dict[PlanType, dict[str, str]]] = {{
 }}
 DESKTOP_PROFILE_DEFAULTS: Final[dict[str, dict[str, Any]]] = {_python_literal(profiles['desktop'])}
 FAIR_USE_PROFILE_LIMITS: Final[dict[str, dict[str, Any]]] = {_python_literal(profiles['fair_use'])}
-PHONE_CALL_PROFILE_DEFAULTS: Final[dict[str, dict[str, Any]]] = {_python_literal(profiles['phone_calls'])}
 
 
 __all__ = [
@@ -900,7 +878,6 @@ __all__ = [
     'OPEN_PLAN_DECISIONS',
     'PAID_PLAN_IDS',
     'PAID_PLAN_TYPES',
-    'PHONE_CALL_PROFILE_DEFAULTS',
     'PLAN_CATALOG_DATA',
     'PLAN_DISPLAY_NAMES',
     'PLAN_STOREFRONTS',

@@ -39,28 +39,6 @@
           "rolling_week": 72000000
         }
       }
-    },
-    "phone_calls": {
-      "free": {
-        "monthly_calls": {
-          "kind": "finite",
-          "value": 0
-        },
-        "max_duration_seconds": {
-          "kind": "finite",
-          "value": 300
-        },
-        "legacy_runtime_override": "phone_call_config/default.free_plan"
-      },
-      "paid": {
-        "monthly_calls": {
-          "kind": "unlimited"
-        },
-        "max_duration_seconds": {
-          "kind": "unlimited"
-        },
-        "legacy_runtime_override": "phone_call_config/default.paid_plan"
-      }
     }
   },
   "measurement_contracts": {
@@ -112,7 +90,6 @@
       "desktop_profile": "desktop_free",
       "conditional_desktop_profiles": [],
       "fair_use_profile": "metered_transcription",
-      "phone_calls_profile": "free",
       "allocations": {
         "transcription": {
           "period": "month",
@@ -173,7 +150,6 @@
         }
       ],
       "fair_use_profile": "unlimited_transcription",
-      "phone_calls_profile": "paid",
       "allocations": {
         "transcription": {
           "period": "month",
@@ -255,7 +231,6 @@
       "desktop_profile": "desktop_architect",
       "conditional_desktop_profiles": [],
       "fair_use_profile": "unlimited_transcription",
-      "phone_calls_profile": "paid",
       "allocations": {
         "transcription": {
           "period": "month",
@@ -335,7 +310,6 @@
       "desktop_profile": "desktop_full",
       "conditional_desktop_profiles": [],
       "fair_use_profile": "unlimited_transcription",
-      "phone_calls_profile": "paid",
       "allocations": {
         "transcription": {
           "period": "month",
@@ -413,7 +387,6 @@
       "desktop_profile": "desktop_free",
       "conditional_desktop_profiles": [],
       "fair_use_profile": "metered_transcription",
-      "phone_calls_profile": "paid",
       "allocations": {
         "transcription": {
           "period": "month",
@@ -492,7 +465,6 @@
       "desktop_profile": "desktop_free",
       "conditional_desktop_profiles": [],
       "fair_use_profile": "unlimited_transcription",
-      "phone_calls_profile": "paid",
       "allocations": {
         "transcription": {
           "period": "month",
