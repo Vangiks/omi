@@ -157,7 +157,6 @@ AREA_TESTS = (
             'backend/utils/subscription.py',
             'backend/utils/fair_use.py',
             'backend/utils/sync/rate_limit.py',
-            'backend/scripts/support/find_stripe_entitlement_mismatches.py',
             'backend/routers/retired_desktop_proactivity.py',
         ),
         (),

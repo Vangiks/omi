@@ -229,7 +229,6 @@ class Stack:
                 'BUCKET_APP_THUMBNAILS': 'app-thumbnails',
                 'BUCKET_CHAT_FILES': 'chat-files',
                 'BUCKET_DESKTOP_UPDATES': 'desktop-updates',
-                'STRIPE_SECRET_KEY': '',
                 'OMI_SYNC_STACK_STATE_DIR': str(self.state_dir),
                 'OMI_SYNC_STACK_STORAGE_DIR': str(self.storage_dir),
                 'OMI_SYNC_STACK_CONTROL_TOKEN': self.control_token,

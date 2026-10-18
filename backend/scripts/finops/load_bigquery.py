@@ -9,7 +9,6 @@ replaces it rather than doubling it.
 Tables (all partitioned by `date`, no partition expiry):
   unit_cost_daily          long format: date x segment_type x segment x component x method
   unit_cost_reconciliation what each pool cost vs what landed on user-days
-  plan_revenue_daily       Stripe snapshot, carrying snapshot_date so it stays honest
   unit_cost_user_day       per (date, uid_hash) allocation. HASHED uids only, never raw.
 """
 
@@ -67,17 +66,6 @@ SCHEMAS = {
         ("computed_at", "TIMESTAMP"),
         ("inputs_settled", "BOOL"),
     ],
-    "plan_revenue_daily": [
-        ("date", "DATE"),
-        ("plan", "STRING"),
-        ("paying_subs", "INT64"),
-        ("trialing_subs", "INT64"),
-        ("mrr_usd", "FLOAT64"),
-        ("arpu_usd", "FLOAT64"),
-        ("snapshot_date", "DATE"),
-        ("run_id", "STRING"),
-        ("computed_at", "TIMESTAMP"),
-    ],
     "unit_cost_user_day": [
         ("date", "DATE"),
         ("uid_hash", "STRING"),
@@ -97,7 +85,6 @@ SCHEMAS = {
 CLUSTER = {
     "unit_cost_daily": ["segment_type", "segment", "component"],
     "unit_cost_reconciliation": ["pool"],
-    "plan_revenue_daily": ["plan"],
     "unit_cost_user_day": ["cohort", "plan"],
 }
 
@@ -200,11 +187,9 @@ def load_replace(name: str, rows: list[dict], dates: list[str]) -> int:
 
 def build_rows(
     derived: pathlib.Path,
-    raw: pathlib.Path,
     run_id: str,
     computed_at: str,
     settled_through: str | None,
-    snapshot_date: str,
 ):
     longs = list(csv.DictReader(open(derived / "unit_cost_long.csv")))
     recon = list(csv.DictReader(open(derived / "unit_cost_reconciliation.csv")))
@@ -268,45 +253,19 @@ def build_rows(
         for r in userday
     ]
 
-    plan_rows = []
-    sp = raw / "stripe_plan_mrr.json"
-    if sp.exists():
-        book = json.load(open(sp))["by_plan"]
-        for d in dates:
-            for x in book:
-                if x["plan"].startswith("unmapped:"):
-                    continue
-                plan_rows.append(
-                    {
-                        "date": d,
-                        "plan": x["plan"],
-                        "paying_subs": x["paying_subs"],
-                        "trialing_subs": x["trialing_subs"],
-                        "mrr_usd": x["mrr_usd"],
-                        "arpu_usd": x["arpu_usd"],
-                        "snapshot_date": snapshot_date,
-                        "run_id": run_id,
-                        "computed_at": computed_at,
-                    }
-                )
-    out["plan_revenue_daily"] = plan_rows
     return out, dates
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--derived", required=True)
-    ap.add_argument("--raw", required=True)
     ap.add_argument("--run-id", required=True)
     ap.add_argument("--settled-through", default=None)
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
     acct = assert_writer_identity()
     computed_at = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-    snapshot_date = dt.datetime.now(dt.timezone.utc).date().isoformat()
-    tables, dates = build_rows(
-        pathlib.Path(a.derived), pathlib.Path(a.raw), a.run_id, computed_at, a.settled_through, snapshot_date
-    )
+    tables, dates = build_rows(pathlib.Path(a.derived), a.run_id, computed_at, a.settled_through)
     sys.stderr.write("writer identity: %s | dates: %s\n" % (acct, ", ".join(dates)))
     for t, rows in tables.items():
         sys.stderr.write("  %-26s %d rows\n" % (t, len(rows)))
@@ -315,7 +274,7 @@ def main() -> None:
         return
     ensure_dataset()
     loaded = {}
-    for name in ("unit_cost_daily", "unit_cost_reconciliation", "plan_revenue_daily", "unit_cost_user_day"):
+    for name in ("unit_cost_daily", "unit_cost_reconciliation", "unit_cost_user_day"):
         ensure_table(name)
         loaded[name] = load_replace(name, tables[name], dates)
     print(

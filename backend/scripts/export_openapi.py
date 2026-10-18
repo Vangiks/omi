@@ -96,7 +96,6 @@ APP_CLIENT_PREFIXES = (
     '/v1/screen-frame-egress',
     '/v1/search',
     '/v1/speaker-tag-prompts',
-    '/v1/stripe',
     '/v1/sync',
     '/v1/task-integrations',
     '/v1/task-intelligence',
@@ -463,8 +462,6 @@ def configure_hermetic_environment() -> None:
     os.environ['TYPESENSE_HOST'] = 'localhost'
     os.environ['TYPESENSE_HOST_PORT'] = '8108'
     os.environ['TYPESENSE_API_KEY'] = 'fake-typesense-key'
-    os.environ['STRIPE_SECRET_KEY'] = ''
-    os.environ['STRIPE_API_KEY'] = ''
     os.environ['ADMIN_KEY'] = ''
 
     for bucket_var in (

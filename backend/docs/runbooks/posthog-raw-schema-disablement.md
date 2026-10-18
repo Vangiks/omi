@@ -3,9 +3,7 @@
 Parent-owned. This runbook does not change PostHog, BigQuery, IAM, grants, or
 scheduled jobs. Do not add a PostHog billing aggregate or a scheduled query.
 `pull_gcp.py` and `web/admin/lib/services/gcp-billing.ts` already read the
-current billing export directly. `web/admin/lib/services/plan-economics.ts`
-reads `omi_finops.unit_cost_daily`, `plan_revenue_daily`, and
-`unit_cost_reconciliation`. None of those need a warehouse copy of PostHog.
+current billing export directly. Neither needs a warehouse copy of PostHog.
 
 ## Schemas to disable
 
@@ -48,7 +46,6 @@ Roll back by reading BigQuery directly (`pull_gcp.py`, `gcp-billing.ts`, `plan-e
 |---|---|---|
 | `unit_cost_daily` | date, segment_type, segment, component, method | segment_type, segment, component |
 | `unit_cost_reconciliation` | date, pool | pool |
-| `plan_revenue_daily` | date, plan, snapshot_date | plan |
 | `unit_cost_user_day` | date, uid_hash, cohort, plan | cohort, plan |
 
 Recompute today and the prior two UTC dates idempotently (`net = gross + credits`, credits signed). Older dates change only through an explicit date-range reconciliation. The predecessor export is never included. Logic and fixtures: `backend/scripts/finops/gcp_cost_reconciliation.py`.

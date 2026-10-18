@@ -95,15 +95,15 @@ def test_assert_runtime_identity_accepts_expected_sa(monkeypatch, cloudrun):
 def test_secret_reads_mounted_file_never_home_paths(cloudrun, tmp_path, monkeypatch):
     secdir = tmp_path / "secrets"
     secdir.mkdir()
-    (secdir / "STRIPE_API_KEY").write_text("  sk-test-value  \n")
+    (secdir / "OMI_PROMETHEUS_TOKEN").write_text("  sk-test-value  \n")
     monkeypatch.setenv("FINOPS_SECRETS_DIR", str(secdir))
-    assert cloudrun.secret("stripe") == "sk-test-value"
+    assert cloudrun.secret("prometheus") == "sk-test-value"
 
 
 def test_secret_missing_file_is_an_error_naming_the_mount(cloudrun, tmp_path, monkeypatch):
     monkeypatch.setenv("FINOPS_SECRETS_DIR", str(tmp_path / "absent"))
     with pytest.raises(SystemExit, match="FINOPS_SECRETS_DIR"):
-        cloudrun.secret("stripe")
+        cloudrun.secret("prometheus")
 
 
 def test_secret_rejects_unknown_name(cloudrun, tmp_path, monkeypatch):
@@ -232,12 +232,12 @@ def test_no_secret_values_checked_in():
 
 def test_secret_supports_per_secret_volume_layout(cloudrun, tmp_path, monkeypatch):
     """Cloud Run mounts each secret as <prefix>/<SECRET_NAME>/<file>; both layouts work."""
-    d = tmp_path / "secrets" / "STRIPE_API_KEY"  # dir = Secret Manager resource name
+    d = tmp_path / "secrets" / "OMI_PROMETHEUS_TOKEN"  # dir = Secret Manager resource name
     d.mkdir(parents=True)
     val = "sk-" + "test" + "-value"
-    (d / "STRIPE_API_KEY").write_text(val + "\n")
+    (d / "OMI_PROMETHEUS_TOKEN").write_text(val + "\n")
     monkeypatch.setenv("FINOPS_SECRETS_DIR", str(tmp_path / "secrets"))
-    assert cloudrun.secret("stripe") == val
+    assert cloudrun.secret("prometheus") == val
 
 
 def test_gap_fill_includes_the_known_hole_and_caps():

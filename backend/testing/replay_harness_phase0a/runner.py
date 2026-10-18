@@ -177,7 +177,6 @@ class Harness:
                 "BUCKET_APP_THUMBNAILS": "app-thumbnails",
                 "BUCKET_CHAT_FILES": "chat-files",
                 "BUCKET_DESKTOP_UPDATES": "desktop-updates",
-                "STRIPE_SECRET_KEY": "",
             }
         )
 

@@ -103,4 +103,4 @@ def test_partition_window_and_catalog_match_the_existing_loaders():
     ]
     assert AGGREGATE_CATALOG["unit_cost_user_day"]["cluster"] == ["cohort", "plan"]
     assert all(item["needs_posthog_copy"] is False for item in DIRECT_CONSUMERS)
-    assert len(DIRECT_CONSUMERS) == 3
+    assert len(DIRECT_CONSUMERS) == 2

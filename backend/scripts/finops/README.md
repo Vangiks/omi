@@ -37,7 +37,6 @@ actually present in the export at pull time, which is the empirical version of t
 | VAD-forwarded audio hours | Prometheus via the Grafana proxy on monitor.omi.me | Grafana token | modelled STT vendor volume |
 | OpenAI invoice | OpenAI admin costs API | org admin key | the LLM residual and the reconciliation |
 | Anthropic invoice | Anthropic admin cost API | org admin key | same |
-| Subscription book | Stripe (read-only key) | Stripe key | `plan_revenue_daily` |
 | DAU by platform | PostHog project 302298 | PostHog MCP | alternative denominators only |
 
 The billing export table is partitioned on `_PARTITIONTIME`; every query filters that **and**
@@ -123,10 +122,9 @@ BigQuery `based-hardware.omi_finops` (location US, same as the billing export, s
 |---|---|---|
 | `unit_cost_daily` | date × segment_type × segment × component × method | `segment_type ∈ {cohort, plan, cohort_plan, platform_union, total}` |
 | `unit_cost_reconciliation` | date × pool | `pool_usd` vs `allocated_usd` vs `delta_pct` |
-| `plan_revenue_daily` | date × plan | Stripe **snapshot**; carries `snapshot_date` because Stripe is not replayable per historical day |
 | `unit_cost_user_day` | date × `uid_hash` | hashed uids only (`sha256[:16]`) |
 
-All four are partitioned by `date` and clustered. Loads are **idempotent per date**: the run's
+All three are partitioned by `date` and clustered. Loads are **idempotent per date**: the run's
 dates are deleted and re-inserted inside one BigQuery transaction, so re-running a date replaces
 it rather than doubling it.
 
@@ -219,7 +217,6 @@ fresher and the billing export continuing to settle. No allocation logic changed
 | `pull_hourly_usage.py` | transcription seconds per uid-day |
 | `pull_prometheus.py` | VAD-forwarded audio hours |
 | `pull_providers.py` | OpenAI and Anthropic invoices |
-| `pull_stripe.py` | subscription book → MRR/ARPU by plan |
 | `posthog_dau.py` | DAU by platform (denominators only) |
 | `fs.py` | dependency-free Firestore REST client |
 
@@ -233,4 +230,3 @@ fresher and the billing export continuing to settle. No allocation logic changed
   Firestore-read counter exists. `shared_activity` is the alternative, not a better truth.
 * **The ledger's `app_platform` header is written only by `desktop_proactivity`**, so request-level
   platform is unavailable; platform comes from the users cohort join.
-* **Stripe is a snapshot**, not history. `plan_revenue_daily.snapshot_date` says so on every row.
