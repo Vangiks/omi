@@ -244,7 +244,6 @@ class TestExtractionSeamFanOut:
         structured = conversation.structured
 
         with (
-            patch.object(pc, "is_trial_paywalled", return_value=False),
             patch.object(pc, "should_skip_omi_paid_postprocessing", return_value=False),
             patch.object(pc.redis_db, "get_conversation_meeting_id", return_value=None),
             patch.object(pc, "_get_structured", return_value=(structured, False)),

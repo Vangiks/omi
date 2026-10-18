@@ -93,9 +93,9 @@ def env(monkeypatch):
     fakes['database.redis_db'].set_credits_invalidation_signal = signal
     fakes['database._client'].db = db
     fakes['utils.subscription'].resolve_transcription_allowance = allowance
-    fakes['utils.subscription'].clear_trial_paywall_cache = cache
     fakes['utils.observability.fallback'].record_fallback = MagicMock()
-    fakes['utils.fair_use'].invalidate_enforcement_cache = MagicMock()
+    # The access cache the recovery repairs is the fair-use enforcement cache.
+    fakes['utils.fair_use'].invalidate_enforcement_cache = cache
     monkeypatch.setenv('LOCKED_CONTENT_RESET_RECOVERY_ENABLED', 'true')
     with stub_modules(fakes):
         module = load_module_fresh(

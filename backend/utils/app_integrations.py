@@ -42,7 +42,6 @@ from database.chat import add_app_message, get_app_messages
 from database.goals import get_user_goals
 from database.notifications import get_mentor_notification_frequency
 from database.users import get_user_language_preference  # used via module attribute by proactivity_producers
-from utils.subscription import is_trial_paywalled
 from database.redis_db import (
     get_generic_cache,
     set_generic_cache,
@@ -940,12 +939,6 @@ async def _async_trigger_realtime_integrations(
     *,
     client_kind: ClientKind = 'unknown',
 ) -> dict:
-    # Paywall: skip mentor + third-party proactive notifications when this
-    # transcription session belongs to a paywalled desktop user.
-    # Reactivates automatically when the user upgrades or activates BYOK.
-    if await run_blocking(db_executor, is_trial_paywalled, uid, source):
-        return {}
-
     # The mentor lane is v2-only: the legacy mentor pipeline was deleted once
     # v2 reached 100%. Shared buffering/admission still gates it, and any
     # non-cohort env value (unset, stale legacy/v2, typo) invokes nothing.

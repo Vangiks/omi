@@ -146,16 +146,6 @@ def test_valid_subscription_without_provision_does_not_write_free() -> None:
     user_ref.set.assert_not_called()
 
 
-def test_desktop_trial_paywall_reads_customer_firestore_without_provisioning() -> None:
-    import inspect
-
-    from utils.subscription import is_desktop_trial_paywalled
-
-    paywall_source = inspect.getsource(is_desktop_trial_paywalled)
-    assert "get_customer_firestore_client()" in paywall_source
-    assert "provision=False" in paywall_source
-
-
 def test_screen_vector_entitlement_reads_customer_firestore_without_provisioning() -> None:
     import inspect
 

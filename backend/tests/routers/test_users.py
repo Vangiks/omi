@@ -592,7 +592,6 @@ def _mock_desktop_quota_storage(monkeypatch, *, enrolled, questions):
         return enrolled
 
     monkeypatch.setattr(users_router.users_db, 'is_byok_active', is_byok_active)
-    monkeypatch.setattr(subscription_utils, 'is_trial_paywalled', lambda *args, **kwargs: False)
     monkeypatch.setattr(
         subscription_utils.users_db,
         'get_user_valid_subscription',
@@ -827,7 +826,7 @@ def test_subscription_snapshot_survives_a_resolver_that_cannot_read_its_dependen
     ), patch.object(
         users_router, 'resolve_transcription_allowance', subscription_module.resolve_transcription_allowance
     ), patch.object(
-        subscription_module, 'is_trial_paywalled', MagicMock(side_effect=RuntimeError('firestore unavailable'))
+        subscription_module, 'is_marketplace_reviewer', MagicMock(side_effect=RuntimeError('firestore unavailable'))
     ):
         response = users_router.get_user_subscription_endpoint(
             request=Request({'type': 'http', 'headers': []}), uid='uid1', x_app_platform='desktop'
@@ -855,8 +854,6 @@ def test_llm_only_byok_snapshot_reads_monthly_usage_once_for_snapshot_and_allowa
         users_router, 'get_monthly_usage_for_subscription', usage_reads
     ), patch.object(
         users_router, 'resolve_transcription_allowance', subscription_module.resolve_transcription_allowance
-    ), patch.object(
-        subscription_module, 'is_trial_paywalled', MagicMock(return_value=False)
     ), patch.object(
         subscription_module, 'get_byok_key', MagicMock(return_value=None)
     ), patch.object(
@@ -1000,11 +997,11 @@ def test_closed_real_allowance_preserves_finite_snapshot_budget(monkeypatch, rea
     )
     monkeypatch.setattr(
         subscription_module,
-        'is_trial_paywalled',
+        'is_marketplace_reviewer',
         (
             MagicMock(side_effect=RuntimeError('dependency unavailable'))
             if reason == 'allowance_unavailable'
-            else lambda *args, **kwargs: False
+            else lambda uid: False
         ),
     )
     monkeypatch.setattr(subscription_module, 'get_byok_key', lambda provider: None)
@@ -1070,7 +1067,6 @@ def test_subscription_http_negotiates_catalog_ids_before_response_validation(
     monkeypatch.setattr(
         users_router, 'resolve_transcription_allowance', subscription_module.resolve_transcription_allowance
     )
-    monkeypatch.setattr(subscription_module, 'is_trial_paywalled', lambda *args, **kwargs: False)
     monkeypatch.setattr(subscription_module, 'get_byok_key', lambda provider: None)
     monkeypatch.setenv('MARKETPLACE_APP_REVIEWERS', '')
     app = FastAPI()

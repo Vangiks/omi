@@ -549,12 +549,10 @@ async def _run_relay(
     upstream = _FakeUpstream(upstream_frames, drained)
     validated = {provider: 'sk-user'} if byok else {}
     monkeypatch.setattr(omni_relay, 'raise_if_gateway_feature_mode_blocks_direct_model_surface', lambda _surface: None)
-    monkeypatch.setattr(omni_relay, 'run_blocking', _passthrough)
     monkeypatch.setattr(omni_relay, '_verify_ws_auth', lambda _authz: UID)
     monkeypatch.setattr(omni_relay, 'extract_byok_from_websocket', lambda _ws: dict(validated))
     monkeypatch.setattr(omni_relay, 'validate_byok_websocket_keys', lambda _uid, keys: (dict(keys), None))
     monkeypatch.setattr(omni_relay, 'set_validated_byok_keys', lambda _keys, _uid: None)
-    monkeypatch.setattr(omni_relay, 'is_trial_paywalled', lambda *_a, **_k: False)
     monkeypatch.setattr(omni_relay, '_upstream', lambda _provider, _model: (('wss://upstream.invalid', {}), None))
     monkeypatch.setattr(omni_relay.websockets, 'connect', lambda *_a, **_k: _FakeConnect(upstream))
     socket = _client_socket(

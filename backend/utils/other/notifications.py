@@ -817,13 +817,6 @@ def _send_summary_notification(user_data: Tuple[Any, ...]) -> None:
     uid = user_data[0]
     user_tz_name = user_data[2] if len(user_data) > 2 else None
 
-    # NOTE: The daily recap is a cross-platform feature delivered by a
-    # server-initiated cron that does not know the originating platform.
-    # It must NOT be gated on the desktop trial paywall: passing a hardcoded
-    # 'macos' to is_trial_paywalled() made the gate trip for any trial-expired
-    # user, suppressing their recap on mobile/web too (#9357). The desktop
-    # trial only gates desktop features, not the recap the mobile app renders.
-
     display_date = _display_date_for_now(user_tz_name, user_data[3] if len(user_data) > 3 else None)
     start_date_utc, end_date_utc = local_day_bounds_utc(display_date, user_tz_name)
     date_str = display_date.strftime('%Y-%m-%d')

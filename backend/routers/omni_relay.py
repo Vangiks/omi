@@ -16,7 +16,6 @@ from utils.byok import (
     validate_byok_websocket_keys,
 )
 from utils.async_tasks import drain_tasks
-from utils.executors import db_executor, run_blocking
 from utils.llm.gateway_client import raise_if_gateway_feature_mode_blocks_direct_model_surface
 from utils.llm.managed_spend_ledger import (
     DESKTOP_REALTIME_FEATURE,
@@ -33,7 +32,6 @@ from utils.llm.realtime_usage import (
     realtime_turn_metadata,
 )
 from utils.other.endpoints import _verify_ws_auth, run_critical_ws  # type: ignore[reportPrivateUsage]  # shared WS auth helper, intentionally reused cross-module
-from utils.subscription import is_trial_paywalled
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -155,13 +153,6 @@ async def omni_relay(websocket: WebSocket):
     provider = websocket.query_params.get("provider", "gemini")
     if provider not in {"gemini", "openai"}:
         await websocket.close(code=1011, reason=f"unsupported provider: {provider}"[:120])
-        return
-
-    # Same desktop gate as /v4/listen: Operator/Architect + BYOK pass; un-entitled
-    # desktop users past their trial are paywalled.
-    if await run_blocking(db_executor, is_trial_paywalled, uid, "desktop", required_byok_provider=provider):
-        logger.info(f"omni relay paywalled uid={uid}")
-        await websocket.close(code=1008, reason="trial_expired")
         return
 
     await _relay_session(websocket, uid, provider, validated_byok)

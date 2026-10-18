@@ -333,7 +333,6 @@ async def test_exclusive_dispatch(lane, pipeline, flag, expected):
 
     flag_lookup = MagicMock(side_effect=resolve)
     lane.monkeypatch.setattr(integration.proactivity_flags, 'enabled', flag_lookup)
-    lane.monkeypatch.setattr(integration, 'is_trial_paywalled', lambda *args: False)
     admission = MagicMock(return_value=[{'text': 'test'}])
     lane.monkeypatch.setattr(integration, 'process_mentor_notification', admission)
     new = AsyncMock(return_value=None)
@@ -353,7 +352,6 @@ async def test_exclusive_dispatch(lane, pipeline, flag, expected):
 @pytest.mark.parametrize('messages', [None, [], [{'text': 'test'}]])
 async def test_cohort_resolves_only_after_shared_admission(lane, messages):
     lane.monkeypatch.setenv('MENTOR_PIPELINE', 'cohort')
-    lane.monkeypatch.setattr(integration, 'is_trial_paywalled', lambda *args: False)
     calls = []
 
     def admit(uid, segments):
@@ -377,7 +375,6 @@ async def test_cohort_resolves_only_after_shared_admission(lane, messages):
 @pytest.mark.asyncio
 async def test_invalid_flip_during_shared_admission_invokes_neither_lane(lane):
     lane.monkeypatch.setenv('MENTOR_PIPELINE', 'cohort')
-    lane.monkeypatch.setattr(integration, 'is_trial_paywalled', lambda *args: False)
 
     def admit(uid, segments):
         lane.monkeypatch.setenv('MENTOR_PIPELINE', 'typo')
@@ -398,7 +395,6 @@ async def test_invalid_flip_during_shared_admission_invokes_neither_lane(lane):
 async def test_flag_denial_does_not_abort_app_integrations(lane):
     """A cohort flag error denies the mentor lane only; app lookup still runs."""
     lane.monkeypatch.setenv('MENTOR_PIPELINE', 'cohort')
-    lane.monkeypatch.setattr(integration, 'is_trial_paywalled', lambda *args: False)
     lane.monkeypatch.setattr(integration, 'process_mentor_notification', lambda *args: [{'text': 'test'}])
     lane.monkeypatch.setattr(
         integration.proactivity_flags,

@@ -357,12 +357,10 @@ def _stub_relay(monkeypatch, *, byok: bool, provider: str, connect: Any) -> tupl
     attempts: list[Any] = []
     validated = {provider: 'sk-user'} if byok else {}
     monkeypatch.setattr(omni_relay, 'raise_if_gateway_feature_mode_blocks_direct_model_surface', lambda _s: None)
-    monkeypatch.setattr(omni_relay, 'run_blocking', _passthrough)
     monkeypatch.setattr(omni_relay, '_verify_ws_auth', lambda _authz: UID)
     monkeypatch.setattr(omni_relay, 'extract_byok_from_websocket', lambda _ws: dict(validated))
     monkeypatch.setattr(omni_relay, 'validate_byok_websocket_keys', lambda _uid, keys: (dict(keys), None))
     monkeypatch.setattr(omni_relay, 'set_validated_byok_keys', lambda _keys, _uid: None)
-    monkeypatch.setattr(omni_relay, 'is_trial_paywalled', lambda *_a, **_k: False)
     monkeypatch.setattr(omni_relay, 'get_chat_quota_snapshot', _no_quota_read, raising=False)
     monkeypatch.setattr(omni_relay, 'get_customer_firestore_client', lambda: _NoFirestore(), raising=False)
     monkeypatch.setattr(llm_usage_db, 'record_chat_quota_question', lambda *a, **k: writes.append('question'))

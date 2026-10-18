@@ -320,24 +320,21 @@ def test_prerecorded_stt_and_storage_helpers_are_safe_on_managed_executors(scann
     assert results["async_helpers_with_blocking"] == []
 
 
-def test_sync_app_and_subscription_imports_are_db_blockers_with_aliases(scanner, tmp_path):
+def test_sync_app_imports_are_db_blockers_with_aliases(scanner, tmp_path):
     _source_path, results = _scan_source(
         scanner,
         tmp_path,
         """
         from utils.apps import get_available_apps as load_apps
-        from utils.subscription import is_trial_paywalled
 
         async def realtime_coordinator(uid, source):
             await checkpoint()
-            if is_trial_paywalled(uid, source):
-                return []
             return load_apps(uid)
         """,
     )
 
     finding = results["async_helpers_with_blocking"][0]
-    assert {call["call"] for call in finding["db_calls"]} == {"is_trial_paywalled", "load_apps"}
+    assert {call["call"] for call in finding["db_calls"]} == {"load_apps"}
 
 
 def test_sync_notification_import_is_detected_through_local_helper(scanner, tmp_path):
@@ -368,12 +365,9 @@ def test_app_boundaries_are_clean_on_owned_executor_and_async_notification_seam(
         tmp_path,
         """
         from utils.apps import get_available_apps
-        from utils.subscription import is_trial_paywalled
         from utils.notifications import send_notification_async
 
         async def realtime_coordinator(uid, source):
-            if await run_blocking(db_executor, is_trial_paywalled, uid, source):
-                return []
             apps = await run_blocking(db_executor, get_available_apps, uid)
             await send_notification_async(uid, "App says", "hello")
             return apps

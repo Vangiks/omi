@@ -186,7 +186,6 @@ def _build_fakes() -> dict[str, ModuleType | None]:
     )
 
     subscription = add('utils.subscription', AutoMockModule('utils.subscription'))
-    put(subscription, 'is_trial_paywalled', MagicMock(return_value=False))
     put(subscription, 'should_defer_desktop_processing', MagicMock(return_value=False))
     put(subscription, 'request_has_llm_byok_key', MagicMock(return_value=False))
     put(subscription, 'should_skip_omi_paid_postprocessing', MagicMock(return_value=False))
@@ -687,7 +686,6 @@ def _spy_managed_effects(monkeypatch: Any, pc: Any) -> dict[str, Any]:
     monkeypatch.setattr(pc.conversations_db, 'initialize_first_open_work', spies['init_first_open'])
     monkeypatch.setattr(pc, 'should_defer_desktop_processing', spies['should_defer'])
     monkeypatch.setattr(pc, '_enrich_meeting_context', lambda *args, **kwargs: None)
-    monkeypatch.setattr(pc, 'is_trial_paywalled', lambda *args, **kwargs: False)
     monkeypatch.setattr(pc, 'record_jit_first_open', MagicMock())
     monkeypatch.setattr(pc.folders_db, 'get_folders', MagicMock(return_value=[{'id': 'folder-1'}]))
     monkeypatch.setattr(pc.folders_db, 'resolve_category_folder_id', MagicMock(return_value=None))
