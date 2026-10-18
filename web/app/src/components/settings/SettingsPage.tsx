@@ -22,15 +22,11 @@ import {
   Brain,
   Mic,
   Lightbulb,
-  Crown,
   ChevronRight,
-  Zap,
-  CreditCard,
   Scale,
 } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { cn } from '@/lib/utils';
-import { DEFAULT_PLAN_FEATURES } from '@/lib/planFeatures';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { Toggle } from './SettingsToggle';
 import { Card } from '@/components/settings/SettingsCard';
@@ -52,30 +48,11 @@ import {
   setTrainingDataOptIn,
   deleteAccount,
   getAllUsageData,
-  getUserSubscription,
   getCustomVocabulary,
   updateCustomVocabulary,
-  getAvailablePlans,
-  createCheckoutSession,
-  upgradeSubscription,
-  cancelSubscription,
-  getCustomerPortal,
 } from '@/lib/api';
 import { SUPPORTED_LANGUAGES } from '@/types/user';
-import { decodePlan, planDisplayName, planGrantsPaidCapability } from '@/types/user';
-import type {
-  DailySummarySettings,
-  UserSubscription,
-  AllUsageData,
-  UsageHistoryPoint,
-  PricingOption,
-} from '@/types/user';
-import {
-  trackPaywallOpened,
-  trackUpgradePlanSelected,
-  trackUpgradeSucceeded,
-} from '@/lib/analytics/subscriptionFunnel';
-import { TranscriptionUsageMeter } from './TranscriptionUsageMeter';
+import type { DailySummarySettings, AllUsageData, UsageHistoryPoint } from '@/types/user';
 import { clearRetiredExperimentalFeaturesStorage } from './retiredExperimentalFeatures';
 
 // ============================================================================
@@ -604,7 +581,7 @@ function PrivacySection({
 }
 
 // ============================================================================
-// Plan & Usage Section
+// Usage Section
 // ============================================================================
 
 type UsagePeriod = 'today' | 'monthly' | 'yearly' | 'all_time';
@@ -819,61 +796,8 @@ function UsageChart({
   );
 }
 
-type PlanUsageTab = 'plan' | 'usage';
-
-function UnknownPlanCard() {
-  return (
-    <Card>
-      <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white/[0.08]">
-          <AlertTriangle className="h-5 w-5 text-text-secondary" />
-        </div>
-        <div>
-          <h3 className="text-lg font-semibold text-text-primary">Plan unavailable</h3>
-          <p className="mt-1 text-sm text-text-tertiary">
-            This account uses a plan that this version of Omi does not recognize yet. Plan
-            features are unavailable until the plan can be identified.
-          </p>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-export function UsageSectionContent({
-  allUsage,
-  subscription,
-  onSubscriptionUpdate,
-  cachedPlans,
-}: {
-  allUsage: AllUsageData | null;
-  subscription: UserSubscription | null;
-  onSubscriptionUpdate: () => void;
-  cachedPlans: PricingOption[] | null;
-}) {
-  const [activeTab, setActiveTab] = useState<PlanUsageTab>('plan');
+export function UsageSectionContent({ allUsage }: { allUsage: AllUsageData | null }) {
   const [selectedPeriod, setSelectedPeriod] = useState<UsagePeriod>('all_time');
-  const [selectedPriceId, setSelectedPriceId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [isCanceling, setIsCanceling] = useState(false);
-  const [showUpgradeOptions, setShowUpgradeOptions] = useState(false);
-
-  // Set initial selected price when plans load, and keep it in sync when the
-  // subscription's current price changes (e.g. after a plan change or
-  // cancellation) so a pending-cancellation user isn't left on a stale option.
-  const currentPriceId = subscription?.current_price_id;
-  useEffect(() => {
-    if (cachedPlans && cachedPlans.length > 0) {
-      const activePlan = cachedPlans.find((p) => p.is_active || p.id === currentPriceId);
-      if (activePlan) {
-        setSelectedPriceId(activePlan.id);
-      } else if (!selectedPriceId) {
-        setSelectedPriceId(cachedPlans[0].id);
-      }
-    }
-  }, [cachedPlans, currentPriceId]);
 
   const formatDuration = (seconds: number) => {
     const hours = Math.floor(seconds / 3600);
@@ -891,637 +815,74 @@ export function UsageSectionContent({
     return num.toString();
   };
 
-  const formatDate = (timestamp: number) => {
-    return new Date(timestamp * 1000).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
   // Get usage for selected period
   const usage = allUsage ? allUsage[selectedPeriod] : null;
-  const monthlyUsage = allUsage?.monthly;
   const periods: UsagePeriod[] = ['today', 'monthly', 'yearly', 'all_time'];
-
-  const planIdentity = subscription
-    ? subscription.plan_identity ?? decodePlan(subscription.plan)
-    : null;
-  // Paid status chooses billing actions, never the size of the listening allowance.
-  const isPaid = planIdentity ? planGrantsPaidCapability(planIdentity) : false;
-  const isUnknownPlan = planIdentity?.kind === 'unknown';
-  const currentPlanName = planIdentity
-    ? planDisplayName(planIdentity)
-    : 'Plan unavailable';
-  const isCancelingSubscription = subscription?.cancel_at_period_end;
-  // `Paywall Opened` is an impression of the plan choices actually being
-  // visible. Basic users reach them through "See plans", paid users see the
-  // grid on mount; unknown-plan users never see choices here.
-  const plansImpressionRecorded = useRef(false);
-  useEffect(() => {
-    if (activeTab !== 'plan' || !cachedPlans?.length) return;
-    if (!subscription || plansImpressionRecorded.current) return;
-    if (isUnknownPlan) return;
-    if (!isPaid && !showUpgradeOptions) return;
-    plansImpressionRecorded.current = true;
-    trackPaywallOpened('usage_page', subscription.plan);
-  }, [subscription, isPaid, isUnknownPlan, showUpgradeOptions, activeTab, cachedPlans]);
-
-  // Sort pricing options: monthly first, then annual
-  const sortedOptions = cachedPlans
-    ? [...cachedPlans].sort((a, b) => {
-        const aIsAnnual =
-          a.interval === 'year' || a.title?.toLowerCase().includes('annual');
-        const bIsAnnual =
-          b.interval === 'year' || b.title?.toLowerCase().includes('annual');
-        return (aIsAnnual ? 1 : 0) - (bIsAnnual ? 1 : 0);
-      })
-    : [];
-
-  const selectedOption = cachedPlans?.find((p) => p.id === selectedPriceId);
-
-  const handleSubscribe = async () => {
-    if (!selectedPriceId) return;
-
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const isCurrentPlan =
-        selectedOption?.is_active ||
-        selectedOption?.id === subscription?.current_price_id;
-
-      if (isCancelingSubscription && selectedPriceId !== subscription?.current_price_id) {
-        setError('Plan changes are available after your current subscription ends.');
-        return;
-      }
-
-      const tier = selectedOption?.plan_id ?? 'unknown';
-      const interval = selectedOption?.interval ?? selectedOption?.title ?? 'unknown';
-      trackUpgradePlanSelected(tier, interval, 'usage_page');
-      if (isPaid && !isCancelingSubscription && !isCurrentPlan) {
-        const result = await upgradeSubscription(selectedPriceId);
-        if (result?.status === 'success' || result?.scheduled_start) {
-          trackUpgradeSucceeded(tier, interval);
-          onSubscriptionUpdate();
-        } else {
-          setError(result?.message || 'Failed to upgrade plan');
-        }
-      } else {
-        const result = await createCheckoutSession(selectedPriceId);
-        if (result?.url) {
-          window.open(result.url, '_blank');
-          const handleFocus = () => {
-            onSubscriptionUpdate();
-            window.removeEventListener('focus', handleFocus);
-          };
-          window.addEventListener('focus', handleFocus);
-        } else if (result?.status === 'reactivated') {
-          trackUpgradeSucceeded(tier, interval);
-          onSubscriptionUpdate();
-        } else {
-          setError('Failed to create checkout session');
-        }
-      }
-    } catch (err) {
-      setError('An error occurred. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleManagePayment = async () => {
-    setIsLoading(true);
-    try {
-      const result = await getCustomerPortal();
-      if (result?.url) {
-        window.open(result.url, '_blank');
-        const handleFocus = () => {
-          onSubscriptionUpdate();
-          window.removeEventListener('focus', handleFocus);
-        };
-        window.addEventListener('focus', handleFocus);
-      } else {
-        setError('Failed to open payment portal');
-      }
-    } catch (err) {
-      setError('Failed to open payment portal');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCancelSubscription = async () => {
-    setIsCanceling(true);
-    try {
-      const result = await cancelSubscription();
-      if (result?.status === 'success' || result?.cancel_at_period_end) {
-        onSubscriptionUpdate();
-        setShowCancelConfirm(false);
-      } else {
-        setError(result?.message || 'Failed to cancel subscription');
-      }
-    } catch (err) {
-      setError('Failed to cancel subscription');
-    } finally {
-      setIsCanceling(false);
-    }
-  };
 
   return (
     <div className="space-y-6">
-      {/* Tab Switcher */}
-      <div className="flex w-fit gap-1 rounded-xl bg-bg-tertiary p-1">
-        <button
-          onClick={() => setActiveTab('plan')}
-          className={cn(
-            'rounded-lg px-4 py-2 text-sm font-medium transition-all',
-            activeTab === 'plan'
-              ? 'bg-text-primary text-bg-primary shadow-md'
-              : 'text-text-secondary hover:bg-bg-quaternary hover:text-text-primary',
-          )}
-        >
-          Plan
-        </button>
-        <button
-          onClick={() => setActiveTab('usage')}
-          className={cn(
-            'rounded-lg px-4 py-2 text-sm font-medium transition-all',
-            activeTab === 'usage'
-              ? 'bg-text-primary text-bg-primary shadow-md'
-              : 'text-text-secondary hover:bg-bg-quaternary hover:text-text-primary',
-          )}
-        >
-          Usage
-        </button>
+      {/* Period Tabs */}
+      <div className="flex gap-1 rounded-xl bg-bg-tertiary p-1">
+        {periods.map((period) => (
+          <button
+            key={period}
+            onClick={() => setSelectedPeriod(period)}
+            className={cn(
+              'flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all',
+              selectedPeriod === period
+                ? 'bg-text-primary text-bg-primary shadow-md'
+                : 'text-text-secondary hover:bg-bg-quaternary hover:text-text-primary',
+            )}
+          >
+            {PERIOD_LABELS[period]}
+          </button>
+        ))}
       </div>
 
-      {/* Tab Content */}
-      {activeTab === 'plan' ? (
-        /* PLAN TAB - Unknown plans remain neutral; known plans choose Basic vs paid. */
-        <div className="space-y-6">
-          {isUnknownPlan ? (
-            <UnknownPlanCard />
-          ) : !isPaid ? (
-            /* BASIC PLAN VIEW */
-            <>
-              {/* Current Plan Card */}
-              <Card className="relative overflow-hidden">
-                {/* Header */}
-                <div className="mb-6 flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.08]">
-                      <Zap className="h-6 w-6 text-text-secondary" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-semibold text-text-primary">
-                        {currentPlanName}
-                      </h3>
-                      <p className="text-sm text-text-tertiary">Free tier</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setShowUpgradeOptions(true)}
-                      className="rounded-xl bg-text-primary px-5 py-2.5 text-sm font-semibold text-bg-primary shadow-lg shadow-black/40 transition-all hover:bg-text-primary/90"
-                    >
-                      See plans
-                    </button>
-                    {subscription?.stripe_subscription_id && (
-                      <button
-                        onClick={handleManagePayment}
-                        disabled={isLoading}
-                        className="rounded-xl border border-bg-quaternary px-4 py-2.5 text-sm font-medium text-text-secondary transition-colors hover:text-text-primary disabled:opacity-50"
-                      >
-                        Billing &amp; Invoices
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <TranscriptionUsageMeter subscription={subscription} />
-
-                {/* What's Included - Checklist */}
-                <div>
-                  <h4 className="mb-3 text-sm font-semibold text-text-secondary">
-                    What&apos;s included
-                  </h4>
-                  <ul className="space-y-3">
-                    {DEFAULT_PLAN_FEATURES.map((feature) => (
-                      <li key={feature} className="flex items-center gap-3">
-                        <Check className="h-4 w-4 text-text-secondary" />
-                        <span className="text-sm text-text-secondary">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </Card>
-
-              {/* Billing error surfaced in the Basic view (not only the upgrade panel) */}
-              {error && !showUpgradeOptions && (
-                <div className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3">
-                  <AlertTriangle className="h-4 w-4 flex-shrink-0 text-red-400" />
-                  <p className="text-sm text-red-400">{error}</p>
-                </div>
-              )}
-
-              {/* Upgrade Options (shown when clicked) */}
-              {showUpgradeOptions && (
-                <Card className="border-white/25">
-                  <div className="mb-5 flex items-center justify-between">
-                    <div>
-                      <h4 className="text-lg font-semibold text-text-primary">
-                        Choose a Plan
-                      </h4>
-                      <p className="text-sm text-text-tertiary">Choose your plan</p>
-                    </div>
-                    <button
-                      onClick={() => setShowUpgradeOptions(false)}
-                      className="rounded-lg p-2 transition-colors hover:bg-bg-tertiary"
-                    >
-                      <X className="h-5 w-5 text-text-quaternary" />
-                    </button>
-                  </div>
-
-                  {/* Plan Selection */}
-                  {sortedOptions.length > 0 ? (
-                    <div className="mb-5 grid grid-cols-2 gap-4">
-                      {sortedOptions.map((option) => {
-                        const isSelected = selectedPriceId === option.id;
-                        const isAnnual =
-                          option.interval === 'year' ||
-                          option.title?.toLowerCase().includes('annual');
-
-                        return (
-                          <button
-                            key={option.id}
-                            onClick={() => setSelectedPriceId(option.id)}
-                            className={cn(
-                              'relative rounded-2xl border-2 p-5 text-left transition-all',
-                              isSelected
-                                ? 'border-white/25 bg-white/[0.08] shadow-lg shadow-black/40'
-                                : 'border-bg-tertiary bg-bg-tertiary/30 hover:border-white/25',
-                            )}
-                          >
-                            {isAnnual && (
-                              <span className="absolute -top-2.5 right-3 rounded-full bg-text-primary px-3 py-1 text-[10px] font-bold uppercase tracking-wide text-bg-primary">
-                                Best Value
-                              </span>
-                            )}
-                            <h4 className="mb-1 font-semibold text-text-primary">
-                              {option.title}
-                            </h4>
-                            <p className="text-2xl font-bold text-text-primary">
-                              {option.price_string}
-                            </p>
-                            {option.description && (
-                              <p className="mt-2 text-xs font-medium text-text-secondary">
-                                {option.description}
-                              </p>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin text-text-primary" />
-                    </div>
-                  )}
-
-                  {/* Error Message */}
-                  {error && (
-                    <div className="mb-4 flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3">
-                      <AlertTriangle className="h-4 w-4 flex-shrink-0 text-red-400" />
-                      <p className="text-sm text-red-400">{error}</p>
-                    </div>
-                  )}
-
-                  <button
-                    onClick={handleSubscribe}
-                    disabled={isLoading || !selectedPriceId}
-                    className={cn(
-                      'w-full rounded-xl py-3.5 font-semibold transition-all',
-                      'bg-text-primary text-bg-primary',
-                      'hover:bg-text-primary/90',
-                      'shadow-lg shadow-black/40',
-                      'disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none',
-                    )}
-                  >
-                    {isLoading ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Processing...
-                      </span>
-                    ) : (
-                      'Continue to Payment'
-                    )}
-                  </button>
-                </Card>
-              )}
-
-              {/* This Month Stats - Compact Single Row */}
-              <Card>
-                <h4 className="mb-4 text-sm font-semibold text-text-secondary">
-                  This month
-                </h4>
-                <div className="grid grid-cols-4 gap-3">
-                  <div className="text-center">
-                    <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10">
-                      <Mic className="h-5 w-5 text-blue-400" />
-                    </div>
-                    <p className="text-xl font-bold text-blue-400">
-                      {monthlyUsage
-                        ? formatDuration(monthlyUsage.transcription_seconds)
-                        : '0m'}
-                    </p>
-                    <p className="text-xs text-text-quaternary">Listening</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10">
-                      <MessageSquare className="h-5 w-5 text-green-400" />
-                    </div>
-                    <p className="text-xl font-bold text-green-400">
-                      {monthlyUsage ? formatNumber(monthlyUsage.words_transcribed) : '0'}
-                    </p>
-                    <p className="text-xs text-text-quaternary">Words</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10">
-                      <Lightbulb className="h-5 w-5 text-orange-400" />
-                    </div>
-                    <p className="text-xl font-bold text-orange-400">
-                      {monthlyUsage?.insights_gained || 0}
-                    </p>
-                    <p className="text-xs text-text-quaternary">Insights</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.08]">
-                      <Brain className="h-5 w-5 text-text-secondary" />
-                    </div>
-                    <p className="text-xl font-bold text-text-secondary">
-                      {monthlyUsage?.memories_created || 0}
-                    </p>
-                    <p className="text-xs text-text-quaternary">Memories</p>
-                  </div>
-                </div>
-              </Card>
-            </>
-          ) : (
-            /* PAID PLAN VIEW — the server allowance remains independent. */
-            <>
-              {/* Header */}
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/[0.14]">
-                  <Crown className="h-5 w-5 text-text-secondary" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-text-primary">
-                    {currentPlanName}
-                  </h3>
-                  {subscription?.current_period_end && (
-                    <p className="text-xs text-text-quaternary">
-                      {isCancelingSubscription
-                        ? `Cancels on ${formatDate(subscription.current_period_end)}`
-                        : `Renews ${formatDate(subscription.current_period_end)}`}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <TranscriptionUsageMeter subscription={subscription} />
-
-              {/* Plan Selection */}
-              {sortedOptions.length > 0 ? (
-                <div className="grid grid-cols-2 gap-3">
-                  {sortedOptions.map((option) => {
-                    const isSelected = selectedPriceId === option.id;
-                    const isCurrent =
-                      option.is_active || option.id === subscription?.current_price_id;
-                    const isAnnual =
-                      option.interval === 'year' ||
-                      option.title?.toLowerCase().includes('annual');
-
-                    return (
-                      <button
-                        key={option.id}
-                        onClick={() => setSelectedPriceId(option.id)}
-                        disabled={isCancelingSubscription && !isCurrent}
-                        className={cn(
-                          'relative rounded-xl border-2 p-4 text-left transition-all',
-                          isSelected
-                            ? 'border-white/25 bg-white/[0.08]'
-                            : 'border-bg-tertiary bg-bg-tertiary/50 hover:border-bg-quaternary',
-                          isCancelingSubscription &&
-                            !isCurrent &&
-                            'cursor-not-allowed opacity-50',
-                        )}
-                      >
-                        {isAnnual && (
-                          <span className="absolute -top-2 right-2 rounded-full bg-text-primary px-2 py-0.5 text-[10px] font-medium text-bg-primary">
-                            POPULAR
-                          </span>
-                        )}
-
-                        <h4 className="mb-1 font-medium text-text-primary">
-                          {option.title}
-                        </h4>
-                        <p className="text-lg font-bold text-text-primary">
-                          {option.price_string}
-                        </p>
-                        {option.description && (
-                          <p className="mt-1 text-xs text-text-secondary">
-                            {option.description}
-                          </p>
-                        )}
-
-                        {isCurrent && (
-                          <span className="mt-2 inline-flex items-center gap-1 rounded-full bg-green-500/10 px-2 py-0.5 text-xs text-green-400">
-                            <Check className="h-3 w-3" />
-                            Current
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-6 w-6 animate-spin text-text-primary" />
-                </div>
-              )}
-
-              {isCancelingSubscription && subscription?.current_period_end && (
-                <p className="text-sm text-text-tertiary">
-                  You can reactivate your current plan now. Plan changes are available
-                  after {formatDate(subscription.current_period_end)}.
-                </p>
-              )}
-
-              {/* Features List */}
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium text-text-secondary">Features:</h4>
-                <ul className="space-y-2">
-                  {DEFAULT_PLAN_FEATURES.map((feature, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-text-secondary" />
-                      <span className="text-sm text-text-tertiary">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Error Message */}
-              {error && (
-                <div className="flex items-center gap-2 rounded-lg bg-red-500/10 p-3">
-                  <AlertTriangle className="h-4 w-4 flex-shrink-0 text-red-400" />
-                  <p className="text-sm text-red-400">{error}</p>
-                </div>
-              )}
-
-              {/* Primary Action Button */}
-              <button
-                onClick={handleSubscribe}
-                disabled={
-                  isLoading ||
-                  !selectedPriceId ||
-                  (!isCancelingSubscription &&
-                    (selectedOption?.is_active ||
-                      selectedOption?.id === subscription?.current_price_id)) ||
-                  (isCancelingSubscription &&
-                    selectedPriceId !== subscription?.current_price_id)
-                }
-                className={cn(
-                  'w-full rounded-xl py-3 font-medium transition-colors',
-                  'bg-text-primary text-bg-primary',
-                  'hover:bg-text-primary/90',
-                  'disabled:cursor-not-allowed disabled:opacity-50',
-                )}
-              >
-                {isLoading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Processing...
-                  </span>
-                ) : isCancelingSubscription ? (
-                  'Reactivate Subscription'
-                ) : selectedOption?.is_active ||
-                  selectedOption?.id === subscription?.current_price_id ? (
-                  'Current Plan'
-                ) : (
-                  'Change Plan'
-                )}
-              </button>
-
-              {/* Secondary Actions */}
-              <div className="space-y-3 border-t border-bg-tertiary pt-4">
-                <button
-                  onClick={handleManagePayment}
-                  disabled={isLoading}
-                  className="flex w-full items-center justify-center gap-2 py-2.5 text-text-secondary transition-colors hover:text-text-primary"
-                >
-                  <CreditCard className="h-4 w-4" />
-                  <span className="text-sm">Manage Billing &amp; Invoices</span>
-                </button>
-
-                {!isCancelingSubscription && (
-                  <button
-                    onClick={() => setShowCancelConfirm(true)}
-                    disabled={isLoading}
-                    className="w-full py-2.5 text-sm text-red-400/70 transition-colors hover:text-red-400"
-                  >
-                    Cancel Subscription
-                  </button>
-                )}
-              </div>
-            </>
-          )}
-        </div>
-      ) : (
-        /* USAGE TAB */
-        <div className="space-y-6">
-          {/* Period Tabs */}
-          <div className="flex gap-1 rounded-xl bg-bg-tertiary p-1">
-            {periods.map((period) => (
-              <button
-                key={period}
-                onClick={() => setSelectedPeriod(period)}
-                className={cn(
-                  'flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-all',
-                  selectedPeriod === period
-                    ? 'bg-text-primary text-bg-primary shadow-md'
-                    : 'text-text-secondary hover:bg-bg-quaternary hover:text-text-primary',
-                )}
-              >
-                {PERIOD_LABELS[period]}
-              </button>
-            ))}
-          </div>
-
-          {/* Stats Summary - Compact Single Row */}
-          <Card>
-            <div className="grid grid-cols-4 gap-3">
-              <div className="text-center">
-                <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10">
-                  <Mic className="h-5 w-5 text-blue-400" />
-                </div>
-                <p className="text-xl font-bold text-blue-400">
-                  {usage ? formatDuration(usage.transcription_seconds) : '0m'}
-                </p>
-                <p className="text-xs text-text-quaternary">Listening</p>
-              </div>
-              <div className="text-center">
-                <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10">
-                  <MessageSquare className="h-5 w-5 text-green-400" />
-                </div>
-                <p className="text-xl font-bold text-green-400">
-                  {usage ? formatNumber(usage.words_transcribed) : '0'}
-                </p>
-                <p className="text-xs text-text-quaternary">Words</p>
-              </div>
-              <div className="text-center">
-                <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10">
-                  <Lightbulb className="h-5 w-5 text-orange-400" />
-                </div>
-                <p className="text-xl font-bold text-orange-400">
-                  {usage?.insights_gained || 0}
-                </p>
-                <p className="text-xs text-text-quaternary">Insights</p>
-              </div>
-              <div className="text-center">
-                <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.08]">
-                  <Brain className="h-5 w-5 text-text-secondary" />
-                </div>
-                <p className="text-xl font-bold text-text-secondary">
-                  {usage?.memories_created || 0}
-                </p>
-                <p className="text-xs text-text-quaternary">Memories</p>
-              </div>
+      {/* Stats Summary - Compact Single Row */}
+      <Card>
+        <div className="grid grid-cols-4 gap-3">
+          <div className="text-center">
+            <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10">
+              <Mic className="h-5 w-5 text-blue-400" />
             </div>
-          </Card>
-
-          {/* Usage Trends Chart */}
-          <UsageChart history={usage?.history} period={selectedPeriod} />
+            <p className="text-xl font-bold text-blue-400">
+              {usage ? formatDuration(usage.transcription_seconds) : '0m'}
+            </p>
+            <p className="text-xs text-text-quaternary">Listening</p>
+          </div>
+          <div className="text-center">
+            <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10">
+              <MessageSquare className="h-5 w-5 text-green-400" />
+            </div>
+            <p className="text-xl font-bold text-green-400">
+              {usage ? formatNumber(usage.words_transcribed) : '0'}
+            </p>
+            <p className="text-xs text-text-quaternary">Words</p>
+          </div>
+          <div className="text-center">
+            <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-orange-500/10">
+              <Lightbulb className="h-5 w-5 text-orange-400" />
+            </div>
+            <p className="text-xl font-bold text-orange-400">
+              {usage?.insights_gained || 0}
+            </p>
+            <p className="text-xs text-text-quaternary">Insights</p>
+          </div>
+          <div className="text-center">
+            <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-white/[0.08]">
+              <Brain className="h-5 w-5 text-text-secondary" />
+            </div>
+            <p className="text-xl font-bold text-text-secondary">
+              {usage?.memories_created || 0}
+            </p>
+            <p className="text-xs text-text-quaternary">Memories</p>
+          </div>
         </div>
-      )}
+      </Card>
 
-      {/* Cancel Subscription Confirmation Dialog */}
-      <ConfirmDialog
-        isOpen={showCancelConfirm}
-        title="Cancel Subscription?"
-        message={
-          subscription?.current_period_end
-            ? `Your subscription will remain active until ${formatDate(
-                subscription.current_period_end,
-              )}. After that, you'll be moved to the Free plan.`
-            : "Are you sure you want to cancel your subscription? You'll lose access to unlimited features."
-        }
-        confirmLabel="Cancel Subscription"
-        onConfirm={handleCancelSubscription}
-        onCancel={() => setShowCancelConfirm(false)}
-        isDestructive={true}
-        isLoading={isCanceling}
-      />
+      {/* Usage Trends Chart */}
+      <UsageChart history={usage?.history} period={selectedPeriod} />
     </div>
   );
 }
@@ -1532,29 +893,18 @@ export function UsageSectionContent({
 
 function AccountSection({
   allUsage,
-  subscription,
-  cachedPlans,
-  onSubscriptionUpdate,
   onSignOut,
   onDeleteAccount,
 }: {
   allUsage: AllUsageData | null;
-  subscription: UserSubscription | null;
-  cachedPlans: PricingOption[] | null;
-  onSubscriptionUpdate: () => void;
   onSignOut: () => void;
   onDeleteAccount: () => void;
 }) {
   return (
     <div className="space-y-8">
-      {/* Plan & Usage */}
-      <div id="plan-usage" className="scroll-mt-4">
-        <UsageSectionContent
-          allUsage={allUsage}
-          subscription={subscription}
-          onSubscriptionUpdate={onSubscriptionUpdate}
-          cachedPlans={cachedPlans}
-        />
+      {/* Usage */}
+      <div id="usage" className="scroll-mt-4">
+        <UsageSectionContent allUsage={allUsage} />
       </div>
 
       {/* Fair Use */}
@@ -1680,8 +1030,6 @@ export function SettingsPage() {
   const [recordingPermission, setRecordingPermissionState] = useState(false);
   const [trainingDataOptIn, setTrainingDataOptInState] = useState(false);
   const [allUsage, setAllUsage] = useState<AllUsageData | null>(null);
-  const [subscription, setSubscription] = useState<UserSubscription | null>(null);
-  const [cachedPlans, setCachedPlans] = useState<PricingOption[] | null>(null);
 
   // Dialog states
   const [showSignOutDialog, setShowSignOutDialog] = useState(false);
@@ -1714,22 +1062,16 @@ export function SettingsPage() {
           case 'account':
             // The merged Account section renders the former Profile and Account
             // groups together, so it loads both sets in one pass.
-            const [lang, vocab, summary, usageData, sub, plansData] = await Promise.all([
+            const [lang, vocab, summary, usageData] = await Promise.all([
               getUserLanguage().catch(() => 'en'),
               getCustomVocabulary().catch(() => null),
               getDailySummarySettings().catch(() => null),
               getAllUsageData().catch(() => null),
-              getUserSubscription().catch(() => null),
-              getAvailablePlans().catch(() => null),
             ]);
             setLanguage(lang);
             setVocabulary(vocab);
             setDailySummary(summary);
             setAllUsage(usageData);
-            setSubscription(sub);
-            if (plansData?.plans) {
-              setCachedPlans(plansData.plans);
-            }
             break;
           // sections not listed here don't need API calls
         }
@@ -1820,19 +1162,6 @@ export function SettingsPage() {
     }
   };
 
-  const refreshSubscription = async () => {
-    try {
-      const [usageData, sub] = await Promise.all([
-        getAllUsageData().catch(() => null),
-        getUserSubscription().catch(() => null),
-      ]);
-      setAllUsage(usageData);
-      setSubscription(sub);
-    } catch (error) {
-      console.error('Failed to refresh subscription:', error);
-    }
-  };
-
   const handleCopyUserId = () => {
     if (user?.uid) {
       navigator.clipboard.writeText(user.uid);
@@ -1892,9 +1221,6 @@ export function SettingsPage() {
             />
             <AccountSection
               allUsage={allUsage}
-              subscription={subscription}
-              cachedPlans={cachedPlans}
-              onSubscriptionUpdate={refreshSubscription}
               onSignOut={() => setShowSignOutDialog(true)}
               onDeleteAccount={() => setShowDeleteDialog(true)}
             />
@@ -1916,7 +1242,7 @@ export function SettingsPage() {
           { id: 'language', label: 'Language' },
           { id: 'vocabulary', label: 'Vocabulary' },
           { id: 'notifications', label: 'Notifications' },
-          { id: 'plan-usage', label: 'Plan & Usage' },
+          { id: 'usage', label: 'Usage' },
           { id: 'fair-use', label: 'Fair Use' },
           { id: 'actions', label: 'Actions' },
           { id: 'support', label: 'Support' },
