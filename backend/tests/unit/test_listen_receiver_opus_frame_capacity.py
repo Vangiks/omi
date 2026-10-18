@@ -141,9 +141,7 @@ async def test_multi_channel_receiver_decodes_frames_longer_than_twenty_millisec
     samples_per_frame = sample_rate // 1000 * 60
     host = SimpleNamespace(
         request=SimpleNamespace(uid='test-uid', codec='opus', sample_rate=sample_rate),
-        state=SimpleNamespace(
-            current_conversation_id=None, fair_use_dg_budget_exhausted=False, fair_use_track_dg_usage=False
-        ),
+        state=SimpleNamespace(current_conversation_id=None),
         is_multi_channel=True,
         use_custom_stt=True,
         audio_bytes_send=None,

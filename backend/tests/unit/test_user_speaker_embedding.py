@@ -329,13 +329,12 @@ def live_owner_profile(monkeypatch):
     monkeypatch.setattr(recovery_db, 'get_user_speaker_embedding_recovery_state', lambda uid: (None, None))
     monkeypatch.setattr(recovery_db, 'recover_user_speaker_embedding', world.store)
     monkeypatch.setattr(speakers_module.user_db, 'get_people', world.people)
-    monkeypatch.setattr(runtime_module, 'FAIR_USE_ENABLED', False)
     monkeypatch.setattr(runtime_module, 'get_stt_service_for_language', lambda *a, **kw: ('test-stt', 'en', 'test'))
 
     async def start(*, private_sync=False, **request_options):
         request = ListenRequest(websocket=SimpleNamespace(headers={}), uid='synthetic-owner', **request_options)
         runtime = runtime_module.ListenSessionRuntime(request)
-        base = ListenConnectBase(True, {'uses_custom_stt': runtime.use_custom_stt}, None, False, False)
+        base = ListenConnectBase(True, {'uses_custom_stt': runtime.use_custom_stt})
         monkeypatch.setattr(runtime_module, 'load_listen_connect_base', AsyncMock(return_value=base))
         monkeypatch.setattr(runtime_module.user_db, 'get_user_private_cloud_sync_enabled', lambda uid: private_sync)
 

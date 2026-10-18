@@ -110,79 +110,6 @@ async def test_teardown_rechecks_deletion_authority_before_owner_persistence():
     _assert_deletion_teardown_skipped_owner_writes(runtime)
 
 
-def _runtime_for_periodic_usage(*, tracking, exhausted):
-    runtime = object.__new__(ListenSessionRuntime)
-    runtime.request = SimpleNamespace(uid='fair-use-user')
-    runtime.session_id = 'fair-use-session'
-    runtime.use_custom_stt = False
-    runtime.persistence = _Persistence()
-    runtime.state = SimpleNamespace(
-        active=True,
-        fair_use_last_check_ts=0.0,
-        fair_use_track_dg_usage=tracking,
-        fair_use_dg_budget_exhausted=exhausted,
-        fair_use_plan=None,
-    )
-
-    async def wait(_seconds):
-        runtime.state.active = False
-        return False
-
-    async def flush_usage(*, final):
-        assert final is False
-        return 0
-
-    async def check_silent_user():
-        return None
-
-    runtime.wait = wait
-    runtime._flush_usage = flush_usage
-    runtime._check_silent_user = check_silent_user
-    return runtime
-
-
-@pytest.mark.anyio
-@pytest.mark.parametrize(
-    ('caps', 'initial_tracking', 'initial_exhausted', 'expected_tracking', 'expected_exhausted'),
-    [
-        (['daily'], False, False, True, False),
-        ([], True, True, False, False),
-    ],
-)
-async def test_periodic_fair_use_check_preserves_proactive_tracking_and_clears_stale_restriction(
-    monkeypatch, caps, initial_tracking, initial_exhausted, expected_tracking, expected_exhausted
-):
-    import routers.listen.runtime as runtime_module
-
-    runtime = _runtime_for_periodic_usage(tracking=initial_tracking, exhausted=initial_exhausted)
-    started_classifier_tasks = []
-
-    async def classifier(*_args):
-        return None
-
-    def start_background(coro, *, name):
-        started_classifier_tasks.append(name)
-        coro.close()
-
-    monkeypatch.setattr(runtime_module, 'FAIR_USE_ENABLED', True)
-    monkeypatch.setattr(runtime_module, 'FAIR_USE_RESTRICT_DAILY_DG_MS', 60_000)
-    monkeypatch.setattr(runtime_module, 'get_rolling_speech_ms', lambda _uid: {'daily_ms': 1})
-    monkeypatch.setattr(runtime_module, 'check_soft_caps', lambda _uid, *, speech_totals, plan: caps)
-    monkeypatch.setattr(runtime_module, 'is_daily_audio_ceiling_exceeded', lambda _uid, *, speech_totals: False)
-    monkeypatch.setattr(
-        runtime_module.user_db, 'get_user_valid_subscription', lambda _uid: SimpleNamespace(plan='basic')
-    )
-    monkeypatch.setattr(runtime_module, 'get_enforcement_stage', lambda _uid: 'observe')
-    monkeypatch.setattr(runtime_module, 'trigger_classifier_if_needed', classifier)
-    monkeypatch.setattr(runtime_module, 'start_background_task', start_background)
-
-    await runtime._record_usage_periodically()
-
-    assert runtime.state.fair_use_track_dg_usage is expected_tracking
-    assert runtime.state.fair_use_dg_budget_exhausted is expected_exhausted
-    assert started_classifier_tasks == (['fair_use_classifier:fair-use-user:fair-use-session'] if caps else [])
-
-
 @pytest.mark.anyio
 async def test_bootstrap_forces_single_language_before_selecting_stt_for_onboarding(monkeypatch):
     import routers.listen.runtime as runtime_module
@@ -211,9 +138,6 @@ async def test_bootstrap_forces_single_language_before_selecting_stt_for_onboard
     base = ListenConnectBase(
         user_exists=True,
         transcription_prefs={'single_language_mode': False, 'uses_custom_stt': False},
-        fair_use_init_stage=None,
-        fair_use_track_dg_usage=False,
-        fair_use_dg_budget_exhausted=False,
     )
     selected_multi_language_options = []
 
@@ -225,7 +149,6 @@ async def test_bootstrap_forces_single_language_before_selecting_stt_for_onboard
     monkeypatch.setattr(runtime_module.user_db, 'ensure_backend_onboarding_admission', lambda _uid: True, raising=False)
     monkeypatch.setattr(runtime_module.user_db, 'get_backend_onboarding_admission', lambda _uid: 'a' * 32)
     monkeypatch.setattr(runtime_module, 'get_stt_service_for_language', select_stt)
-    monkeypatch.setattr(runtime_module, 'FAIR_USE_ENABLED', False)
     monkeypatch.setattr(runtime_module, 'should_load_speech_profile', lambda **_kwargs: False)
     monkeypatch.setattr(runtime_module, 'should_enable_speaker_identification', lambda **_kwargs: False)
 
@@ -280,9 +203,6 @@ async def test_bootstrap_sends_first_onboarding_question_before_any_audio(monkey
     base = ListenConnectBase(
         user_exists=True,
         transcription_prefs={'single_language_mode': False, 'uses_custom_stt': False},
-        fair_use_init_stage=None,
-        fair_use_track_dg_usage=False,
-        fair_use_dg_budget_exhausted=False,
     )
     monkeypatch.setattr(runtime_module, 'load_listen_connect_base', lambda *_args, **_kwargs: _async_result(base))
     monkeypatch.setattr(runtime_module.user_db, 'ensure_backend_onboarding_admission', lambda _uid: True, raising=False)
@@ -290,7 +210,6 @@ async def test_bootstrap_sends_first_onboarding_question_before_any_audio(monkey
     monkeypatch.setattr(
         runtime_module, 'get_stt_service_for_language', lambda language, **_kwargs: ('test-stt', 'en', 'test-model')
     )
-    monkeypatch.setattr(runtime_module, 'FAIR_USE_ENABLED', False)
     monkeypatch.setattr(runtime_module, 'should_load_speech_profile', lambda **_kwargs: False)
     monkeypatch.setattr(runtime_module, 'should_enable_speaker_identification', lambda **_kwargs: False)
 
@@ -352,9 +271,6 @@ async def test_bootstrap_admits_speech_profile_redo_despite_completed_onboarding
     base = ListenConnectBase(
         user_exists=True,
         transcription_prefs={'single_language_mode': False, 'uses_custom_stt': False},
-        fair_use_init_stage=None,
-        fair_use_track_dg_usage=False,
-        fair_use_dg_budget_exhausted=False,
     )
     monkeypatch.setattr(runtime_module, 'load_listen_connect_base', lambda *_args, **_kwargs: _async_result(base))
 
@@ -370,7 +286,6 @@ async def test_bootstrap_admits_speech_profile_redo_despite_completed_onboarding
     monkeypatch.setattr(
         runtime_module, 'get_stt_service_for_language', lambda language, **_kwargs: ('test-stt', 'en', 'test-model')
     )
-    monkeypatch.setattr(runtime_module, 'FAIR_USE_ENABLED', False)
     monkeypatch.setattr(runtime_module, 'should_load_speech_profile', lambda **_kwargs: False)
     monkeypatch.setattr(runtime_module, 'should_enable_speaker_identification', lambda **_kwargs: False)
 
@@ -474,9 +389,6 @@ async def test_bootstrap_redo_without_persisted_profile_goes_through_provenance_
     base = ListenConnectBase(
         user_exists=True,
         transcription_prefs={'single_language_mode': False, 'uses_custom_stt': False},
-        fair_use_init_stage=None,
-        fair_use_track_dg_usage=False,
-        fair_use_dg_budget_exhausted=False,
     )
     monkeypatch.setattr(runtime_module, 'load_listen_connect_base', lambda *_args, **_kwargs: _async_result(base))
 
@@ -492,7 +404,6 @@ async def test_bootstrap_redo_without_persisted_profile_goes_through_provenance_
     monkeypatch.setattr(
         runtime_module, 'get_stt_service_for_language', lambda language, **_kwargs: ('test-stt', 'en', 'test-model')
     )
-    monkeypatch.setattr(runtime_module, 'FAIR_USE_ENABLED', False)
     monkeypatch.setattr(runtime_module, 'should_load_speech_profile', lambda **_kwargs: False)
     monkeypatch.setattr(runtime_module, 'should_enable_speaker_identification', lambda **_kwargs: False)
 
@@ -548,9 +459,6 @@ async def test_bootstrap_still_rejects_completed_account_without_speech_profile_
     base = ListenConnectBase(
         user_exists=True,
         transcription_prefs={'single_language_mode': False, 'uses_custom_stt': False},
-        fair_use_init_stage=None,
-        fair_use_track_dg_usage=False,
-        fair_use_dg_budget_exhausted=False,
     )
     monkeypatch.setattr(runtime_module, 'load_listen_connect_base', lambda *_args, **_kwargs: _async_result(base))
     # Simulates the real ensure_backend_onboarding_admission behavior for an
@@ -562,7 +470,6 @@ async def test_bootstrap_still_rejects_completed_account_without_speech_profile_
     monkeypatch.setattr(
         runtime_module, 'get_stt_service_for_language', lambda language, **_kwargs: ('test-stt', 'en', 'test-model')
     )
-    monkeypatch.setattr(runtime_module, 'FAIR_USE_ENABLED', False)
     monkeypatch.setattr(runtime_module, 'should_load_speech_profile', lambda **_kwargs: False)
     monkeypatch.setattr(runtime_module, 'should_enable_speaker_identification', lambda **_kwargs: False)
 
@@ -611,9 +518,6 @@ async def test_bootstrap_passes_explicit_parakeet_through_capability_aware_selec
     base = ListenConnectBase(
         user_exists=True,
         transcription_prefs={'single_language_mode': False, 'uses_custom_stt': False},
-        fair_use_init_stage=None,
-        fair_use_track_dg_usage=False,
-        fair_use_dg_budget_exhausted=False,
     )
 
     def select_stt(language, *, multi_lang_enabled, preferred_service=None, language_profile=None, window_uid=None):
@@ -623,7 +527,6 @@ async def test_bootstrap_passes_explicit_parakeet_through_capability_aware_selec
     monkeypatch.setenv('HOSTED_PARAKEET_API_URL', 'http://parakeet.test')
     monkeypatch.setattr(runtime_module, 'load_listen_connect_base', lambda *_args, **_kwargs: _async_result(base))
     monkeypatch.setattr(runtime_module, 'get_stt_service_for_language', select_stt)
-    monkeypatch.setattr(runtime_module, 'FAIR_USE_ENABLED', False)
     monkeypatch.setattr(runtime_module, 'should_load_speech_profile', lambda **_kwargs: False)
     monkeypatch.setattr(runtime_module, 'should_enable_speaker_identification', lambda **_kwargs: False)
 
@@ -1206,17 +1109,11 @@ async def _async_result(value):
 
 @pytest.mark.anyio
 async def test_custom_stt_flush_meters_speech_in_isolated_lane(monkeypatch):
-    """#7690: a custom-STT session's speech reaches the fair-use meter under
-    the custom_stt lane and speech_seconds accounting — never transcription
-    billing, and never a realtime-lane write that live enforcement would read."""
+    """#7690: a custom-STT session's speech reaches speech_seconds accounting
+    — never transcription billing."""
     import routers.listen.runtime as runtime_module
 
-    recorded = []
     usage_calls = []
-    monkeypatch.setattr(runtime_module, 'FAIR_USE_ENABLED', True)
-    monkeypatch.setattr(
-        runtime_module, 'record_speech_ms', lambda uid, ms, source='realtime': recorded.append((uid, ms, source))
-    )
 
     def _record_usage(uid, **kwargs):
         if kwargs.get('transcription_seconds', 0):
@@ -1230,8 +1127,6 @@ async def test_custom_stt_flush_meters_speech_in_isolated_lane(monkeypatch):
     runtime.use_custom_stt = True
     runtime.persistence = _Persistence()
     runtime.state = SimpleNamespace(
-        fair_use_track_dg_usage=False,
-        dg_usage_ms_pending=0,
         last_usage_record_timestamp=123.0,
         words_transcribed_since_last_record=7,
         last_audio_received_time=124.0,
@@ -1239,7 +1134,6 @@ async def test_custom_stt_flush_meters_speech_in_isolated_lane(monkeypatch):
     runtime.receiver = SimpleNamespace(vad_gate=SimpleNamespace(consume_speech_ms_delta=lambda: 4200))
 
     assert await runtime._flush_usage(final=False) == 0
-    assert recorded == [('custom-stt-user', 4200, 'custom_stt')]
     assert usage_calls == [
         (
             'custom-stt-user',
@@ -1250,10 +1144,9 @@ async def test_custom_stt_flush_meters_speech_in_isolated_lane(monkeypatch):
         )
     ]
 
-    # No speech delta → no meter write either.
+    # No speech delta → no usage write either.
     runtime.receiver = SimpleNamespace(vad_gate=SimpleNamespace(consume_speech_ms_delta=lambda: 0))
     assert await runtime._flush_usage(final=True) == 0
-    assert recorded == [('custom-stt-user', 4200, 'custom_stt')]
     assert usage_calls == [
         (
             'custom-stt-user',
@@ -1275,15 +1168,10 @@ async def test_flush_usage_meters_live_speech_seconds_exactly_once(monkeypatch):
     monkeypatch.setattr('utils.byok.get_byok_keys', lambda: {'deepgram': 'test-key'})
 
     metered = []
-    speech_recorded = []
     monkeypatch.setattr(
         runtime_module,
         'record_live_stt_audio_seconds',
         lambda **kwargs: metered.append(kwargs),
-    )
-    monkeypatch.setattr(runtime_module, 'FAIR_USE_ENABLED', True)
-    monkeypatch.setattr(
-        runtime_module, 'record_speech_ms', lambda uid, ms, source='realtime': speech_recorded.append((uid, ms))
     )
     monkeypatch.setattr(runtime_module, 'record_usage', lambda *a, **k: None)
 
@@ -1294,8 +1182,6 @@ async def test_flush_usage_meters_live_speech_seconds_exactly_once(monkeypatch):
     runtime.stt_service = STTService.soniox
     runtime.client_device_context = SimpleNamespace(platform='android')
     runtime.state = SimpleNamespace(
-        fair_use_track_dg_usage=False,
-        dg_usage_ms_pending=0,
         last_usage_record_timestamp=123.0,
         words_transcribed_since_last_record=0,
         last_audio_received_time=124.0,
@@ -1309,9 +1195,6 @@ async def test_flush_usage_meters_live_speech_seconds_exactly_once(monkeypatch):
     assert metered == [
         {'provider': 'soniox', 'platform': 'android', 'seconds': 4.2},
     ]
-    # Same single flush feeds the fair-use meter; the zero-delta final flush
-    # writes neither metric nor fair-use speech.
-    assert speech_recorded == [('listen-user', 4200)]
 
 
 def _heartbeat_runtime(send_text):

@@ -935,9 +935,6 @@ async def _receiver_with_racing_window(monkeypatch, client, *, speech_seconds=6,
     host.request.sample_rate = 16000
     host.request.websocket = SimpleNamespace(send_json=AsyncMock(), close=AsyncMock())
     host.state.stt_terminal_failure = False
-    host.state.fair_use_dg_budget_exhausted = False
-    host.state.fair_use_track_dg_usage = False
-    host.state.dg_usage_ms_pending = 0
     host.client_device_context = SimpleNamespace(platform='ios')
     host.transcripts = SimpleNamespace(enqueue=base.emitted.extend)
     host.spawn = lambda coro, **kw: (
@@ -1041,9 +1038,6 @@ async def _receiver_for_anchor_replay(monkeypatch, client):
     host.request.sample_rate = 16000
     host.request.websocket = SimpleNamespace(send_json=AsyncMock(), close=AsyncMock())
     host.state.stt_terminal_failure = False
-    host.state.fair_use_dg_budget_exhausted = False
-    host.state.fair_use_track_dg_usage = False
-    host.state.dg_usage_ms_pending = 0
     host.client_device_context = SimpleNamespace(platform='ios')
     host.transcripts = SimpleNamespace(enqueue=base.emitted.extend)
     host.spawn = lambda coro, **kw: (
@@ -2676,9 +2670,6 @@ async def test_long_vad_silence_does_not_replace_healthy_window_leg(monkeypatch)
     host.request.sample_rate = 16000
     host.request.websocket = SimpleNamespace(send_json=AsyncMock(), close=AsyncMock())
     host.state.stt_terminal_failure = False
-    host.state.fair_use_dg_budget_exhausted = False
-    host.state.fair_use_track_dg_usage = False
-    host.state.dg_usage_ms_pending = 0
     host.client_device_context = SimpleNamespace(platform='ios')
     host.transcripts = SimpleNamespace(enqueue=base.emitted.extend)
     host.spawn = lambda coro, **kw: (

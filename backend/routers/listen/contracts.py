@@ -137,11 +137,6 @@ class ListenSessionState:
     words_transcribed_since_last_record: int = 0
     last_transcript_time: Optional[float] = None
     current_conversation_id: Optional[str] = None
-    fair_use_last_check_ts: float = 0.0
-    fair_use_dg_budget_exhausted: bool = False
-    fair_use_track_dg_usage: bool = False
-    fair_use_plan: Optional[Any] = None
-    dg_usage_ms_pending: int = 0
     last_audio_received_time: Optional[float] = None
     last_audio_resume_time: Optional[float] = None
     last_activity_time: Optional[float] = None

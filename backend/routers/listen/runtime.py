@@ -31,20 +31,7 @@ from utils.async_tasks import WebSocketTaskSupervisor, drain_tasks, wait_for_eve
 from utils.byok import get_byok_keys
 from utils.client_device import resolve_client_device_from_headers
 from utils.journey_metrics_contract import resolve_client_kind_from_headers
-from utils.executors import db_executor, run_blocking, start_background_task, storage_executor
-from utils.fair_use import (
-    FAIR_USE_CHECK_INTERVAL_SECONDS,
-    FAIR_USE_ENABLED,
-    FAIR_USE_RESTRICT_DAILY_DG_MS,
-    check_soft_caps,
-    get_enforcement_stage,
-    get_rolling_speech_ms,
-    is_daily_audio_ceiling_exceeded,
-    is_dg_budget_exhausted,
-    record_dg_usage_ms,
-    record_speech_ms,
-    trigger_classifier_if_needed,
-)
+from utils.executors import db_executor, run_blocking, storage_executor
 from utils.listen_pusher_session import ListenPusherSession, ListenPusherSessionConfig, ListenPusherSessionDeps
 from utils.listen_session_bootstrap import finalize_listen_connect_context, load_listen_connect_base
 from utils.listen_reconnect_budget import listen_reconnect_budget
@@ -629,9 +616,6 @@ class ListenSessionRuntime:
         self.request = replace(request, codec=decision.codec)
         self.lc3_frame_duration_us = decision.lc3_frame_duration_us
         self._build_components()
-        if FAIR_USE_ENABLED:
-            self.state.fair_use_track_dg_usage = context.fair_use_track_dg_usage
-            self.state.fair_use_dg_budget_exhausted = context.fair_use_dg_budget_exhausted
         if request.onboarding_mode and self.onboarding_admitted:
 
             async def send_onboarding(event: Dict[str, Any]) -> None:
@@ -694,48 +678,6 @@ class ListenSessionRuntime:
             await self._flush_usage(final=False)
             if self.use_custom_stt:
                 continue
-            now = time.time()
-            if FAIR_USE_ENABLED and now - self.state.fair_use_last_check_ts >= FAIR_USE_CHECK_INTERVAL_SECONDS:
-                self.state.fair_use_last_check_ts = now
-                try:
-                    if self.state.fair_use_plan is None:
-                        sub = await self.persistence.call(user_db.get_user_valid_subscription, self.request.uid)
-                        self.state.fair_use_plan = sub.plan if sub else None
-                    totals = await self.persistence.call(get_rolling_speech_ms, self.request.uid)
-                    caps = await self.persistence.call(
-                        check_soft_caps, self.request.uid, speech_totals=totals, plan=self.state.fair_use_plan
-                    )
-                    if caps:
-                        start_background_task(
-                            trigger_classifier_if_needed(self.request.uid, caps, self.session_id),
-                            name=f'fair_use_classifier:{self.request.uid}:{self.session_id}',
-                        )
-                        if FAIR_USE_RESTRICT_DAILY_DG_MS > 0:
-                            self.state.fair_use_track_dg_usage = True
-                    stage = await self.persistence.call(get_enforcement_stage, self.request.uid)
-                    if stage == 'restrict' and FAIR_USE_RESTRICT_DAILY_DG_MS > 0:
-                        self.state.fair_use_track_dg_usage = True
-                        was_exhausted = self.state.fair_use_dg_budget_exhausted
-                        self.state.fair_use_dg_budget_exhausted = await self.persistence.call(
-                            is_dg_budget_exhausted, self.request.uid
-                        )
-                        if self.state.fair_use_dg_budget_exhausted and not was_exhausted:
-                            logger.info('Fair-use DG budget exhausted')
-                    elif caps and FAIR_USE_RESTRICT_DAILY_DG_MS > 0:
-                        # Meter while the classifier decides whether this cap hit should escalate.
-                        self.state.fair_use_dg_budget_exhausted = False
-                    else:
-                        self.state.fair_use_track_dg_usage = False
-                        self.state.fair_use_dg_budget_exhausted = False
-                    # Hard anti-abuse daily audio ceiling (all plans): once over the ceiling,
-                    # stop forwarding audio to STT for the rest of the day. Reuses the same
-                    # gate the restrict stage uses, so no socket close / reconnect loop.
-                    if is_daily_audio_ceiling_exceeded(self.request.uid, speech_totals=totals):
-                        if not self.state.fair_use_dg_budget_exhausted:
-                            logger.info('Fair-use daily audio ceiling reached uid=%s', self.request.uid)
-                        self.state.fair_use_dg_budget_exhausted = True
-                except Exception as error:
-                    logger.error('Fair-use listen check failed type=%s', type(error).__name__)
             await self._check_silent_user()
 
     async def _check_silent_user(self) -> None:
@@ -753,19 +695,14 @@ class ListenSessionRuntime:
                     logger.error('Silent-user notification refresh failed type=%s', type(error).__name__)
 
     async def _flush_usage(self, *, final: bool) -> int:
-        if self.state.fair_use_track_dg_usage and self.state.dg_usage_ms_pending:
-            await self.persistence.call(record_dg_usage_ms, self.request.uid, self.state.dg_usage_ms_pending)
-            self.state.dg_usage_ms_pending = 0
         if self.use_custom_stt:
             # Exempt from transcription billing and live STT caps. Speech still
-            # drives Omi-paid LLM post-processing: meter the isolated fair-use
-            # lane and record speech_seconds (never transcription_seconds) so
-            # the processing budget can cap enrichment (#7690).
+            # drives Omi-paid LLM post-processing: record speech_seconds
+            # (never transcription_seconds) so the processing budget can cap
+            # enrichment (#7690).
             custom_speech_ms = 0
             if self.receiver.vad_gate is not None:
                 custom_speech_ms = self.receiver.vad_gate.consume_speech_ms_delta()
-                if FAIR_USE_ENABLED and custom_speech_ms:
-                    await self.persistence.call(record_speech_ms, self.request.uid, custom_speech_ms, 'custom_stt')
             if custom_speech_ms:
                 await self.persistence.call(
                     record_usage,
@@ -782,7 +719,7 @@ class ListenSessionRuntime:
             speech_seconds = speech_ms // 1000
             if speech_ms and not managed_chain_enabled(self):
                 # Live provider minutes: VAD speech seconds actually sent for
-                # STT (not wall-clock, not fair-use transcription_seconds),
+                # STT (not wall-clock, not transcription_seconds),
                 # attributed to the provider serving at flush time — failover
                 # can switch it mid-session, same read-at-use rule as
                 # _serving_provider(). The consumed delta makes each
@@ -795,8 +732,6 @@ class ListenSessionRuntime:
                     platform=getattr(getattr(self, 'client_device_context', None), 'platform', None),
                     seconds=speech_ms / 1000,
                 )
-            if FAIR_USE_ENABLED and speech_ms:
-                await self.persistence.call(record_speech_ms, self.request.uid, speech_ms)
         now = time.time()
         seconds = billable_transcription_seconds(
             self.state.last_usage_record_timestamp,

@@ -23,12 +23,7 @@ def test_bootstrap_offloads_firestore_reads():
                 awaited_targets.append(call.args[1].attr)
             elif len(call.args) >= 2 and isinstance(call.args[1], ast.Name):
                 awaited_targets.append(call.args[1].id)
-    for required in (
-        "is_exists_user",
-        "get_user_transcription_preferences",
-        "get_enforcement_stage",
-        "is_dg_budget_exhausted",
-    ):
+    for required in ("is_exists_user", "get_user_transcription_preferences"):
         assert required in awaited_targets
 
 
@@ -109,7 +104,6 @@ async def test_connect_never_asks_for_transcription_credits(monkeypatch):
             return {"single_language_mode": True, "vocabulary": [], "language": "en", "uses_custom_stt": False}
         raise AssertionError(f"unexpected offload {name}")
 
-    monkeypatch.setattr(bootstrap, "FAIR_USE_ENABLED", False)
     monkeypatch.setattr(bootstrap, "run_blocking", fake_run_blocking)
 
     ctx = await bootstrap.load_listen_connect_context(

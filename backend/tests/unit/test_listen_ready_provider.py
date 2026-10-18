@@ -254,9 +254,6 @@ async def test_bootstrap_records_the_selected_provider_for_fallback_comparison(m
     base = ListenConnectBase(
         user_exists=True,
         transcription_prefs={'single_language_mode': False, 'uses_custom_stt': False},
-        fair_use_init_stage=None,
-        fair_use_track_dg_usage=False,
-        fair_use_dg_budget_exhausted=False,
     )
 
     async def close(**_kwargs):
