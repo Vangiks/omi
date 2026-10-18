@@ -2354,38 +2354,6 @@ export interface FactSource {
   label: string;
 }
 
-export interface FairUseDailyGenerationsBudgetResponse {
-  daily_limit_ms: number;
-  exhausted: boolean;
-  remaining_ms: number;
-  resets_at?: string | null;
-  used_ms: number;
-}
-
-export interface FairUseLimitsResponse {
-  daily_hours: number;
-  three_day_hours: number;
-  weekly_hours: number;
-}
-
-export interface FairUseStatusResponse {
-  case_ref: string;
-  dg_budget: FairUseDailyGenerationsBudgetResponse;
-  limits: FairUseLimitsResponse;
-  message: string;
-  speech_hours_3day: number;
-  speech_hours_today: number;
-  speech_hours_weekly: number;
-  stage: string;
-  usage_pct: FairUseUsagePctResponse;
-}
-
-export interface FairUseUsagePctResponse {
-  daily: number;
-  three_day: number;
-  weekly: number;
-}
-
 export interface FcmTokenResponse {
   status: string;
 }
@@ -3982,15 +3950,6 @@ export interface ProjectionProvenance {
   generated_at: string;
   model_id: string;
   runtime: string;
-}
-
-export interface PublicFairUseCaseStatusResponse {
-  case_ref: string;
-  created_at?: string | null;
-  message: string;
-  stage: string;
-  support_email: string;
-  updated_at?: string | null;
 }
 
 export interface QuestionCardSpec {
@@ -6120,10 +6079,6 @@ export interface OmiApiSchemas {
   "ExtractMemoryLogResponse": ExtractMemoryLogResponse;
   "Fact": Fact;
   "FactSource": FactSource;
-  "FairUseDailyGenerationsBudgetResponse": FairUseDailyGenerationsBudgetResponse;
-  "FairUseLimitsResponse": FairUseLimitsResponse;
-  "FairUseStatusResponse": FairUseStatusResponse;
-  "FairUseUsagePctResponse": FairUseUsagePctResponse;
   "FcmTokenResponse": FcmTokenResponse;
   "FeedbackCreate": FeedbackCreate;
   "FeedbackReason": FeedbackReason;
@@ -6338,7 +6293,6 @@ export interface OmiApiSchemas {
   "ProjectedSection": ProjectedSection;
   "ProjectedStructure": ProjectedStructure;
   "ProjectionProvenance": ProjectionProvenance;
-  "PublicFairUseCaseStatusResponse": PublicFairUseCaseStatusResponse;
   "QuestionCardSpec": QuestionCardSpec;
   "QuestionOption": QuestionOption;
   "RateMessageRequest": RateMessageRequest;
@@ -8423,27 +8377,6 @@ export interface OmiApiPaths {
         "200": EntityPage;
         "401": void;
         "404": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/fair-use/case/{case_ref}/status": {
-    get: {
-      operationId: "get_public_case_status_v1_fair_use_case__case_ref__status_get";
-      responses: {
-        "200": PublicFairUseCaseStatusResponse;
-        "401": void;
-        "404": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/fair-use/status": {
-    get: {
-      operationId: "get_my_fair_use_status_v1_fair_use_status_get";
-      responses: {
-        "200": FairUseStatusResponse;
-        "401": void;
         "422": HTTPValidationError;
       };
     };
@@ -15034,40 +14967,6 @@ export async function get_entity_page_v1_entities__entity_id__page_get(path: { e
   return _res.status === 204 ? (undefined as any) : await _res.json();
 }
 
-export async function get_public_case_status_v1_fair_use_case__case_ref__status_get(path: { case_ref: string }, init?: OmiApiClientInit): Promise<PublicFairUseCaseStatusResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/fair-use/case/${path.case_ref}/status`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "GET",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function get_my_fair_use_status_v1_fair_use_status_get(header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, init?: OmiApiClientInit): Promise<FairUseStatusResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/fair-use/status`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "GET",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
 export async function get_folders_v1_folders_get(header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, init?: OmiApiClientInit): Promise<Array<Folder>> {
   const _base = init?.baseURL ?? "";
   const _path = `/v1/folders`;
@@ -21125,4 +21024,4 @@ export async function get_speech_profile_v4_speech_profile_get(header: { authori
   return _res.status === 204 ? (undefined as any) : await _res.json();
 }
 
-// Total: 482 client methods generated.
+// Total: 480 client methods generated.

@@ -30,7 +30,6 @@ import type {
   MergeConversationsResponse,
   CreateConversationResponse,
   ActionItemsResponse,
-  FairUseStatusResponse,
   StoreRecordingPermissionResponse,
 } from './omiApi.generated';
 import {
@@ -2604,27 +2603,5 @@ export async function unregisterFCMToken(fcmToken: string): Promise<void> {
   } catch (error) {
     // Silently fail on logout - token cleanup is best-effort
     console.warn('Failed to unregister FCM token:', error);
-  }
-}
-
-// ============================================================================
-// Fair Use Status
-// ============================================================================
-
-/**
- * Client-narrowed view of the generated `FairUseStatusResponse` (backend
- * OpenAPI authority for `/v1/fair-use/status`). The backend types `stage` as a
- * plain string; this adapter narrows it to the union the UI renders.
- */
-export type FairUseStatus = Omit<FairUseStatusResponse, 'stage'> & {
-  stage: 'none' | 'warning' | 'throttle' | 'restrict';
-};
-
-export async function getFairUseStatus(): Promise<FairUseStatus | null> {
-  try {
-    return await fetchWithAuth<FairUseStatus>('/v1/fair-use/status');
-  } catch (error) {
-    console.error('getFairUseStatus error:', error);
-    return null;
   }
 }

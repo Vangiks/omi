@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from '@tschk/moonshine-next/navigation';
 import Image from '@tschk/moonshine-next/image';
-import Link from '@tschk/moonshine-next/link';
 import {
   Shield,
   LogOut,
@@ -22,8 +21,6 @@ import {
   Brain,
   Mic,
   Lightbulb,
-  ChevronRight,
-  Scale,
 } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { cn } from '@/lib/utils';
@@ -907,27 +904,6 @@ function AccountSection({
         <UsageSectionContent allUsage={allUsage} />
       </div>
 
-      {/* Fair Use */}
-      <div id="fair-use" className="scroll-mt-4">
-        <Card>
-          <Link
-            href="/fair-use"
-            className="flex items-center justify-between py-2 text-text-primary transition-colors hover:text-text-secondary"
-          >
-            <div className="flex items-center gap-3">
-              <Scale className="h-5 w-5 text-text-tertiary" />
-              <div>
-                <span className="font-medium">Fair Use</span>
-                <p className="text-sm text-text-quaternary">
-                  View speech usage and policy status
-                </p>
-              </div>
-            </div>
-            <ChevronRight className="h-4 w-4 text-text-quaternary" />
-          </Link>
-        </Card>
-      </div>
-
       {/* Account Actions */}
       <div id="actions" className="scroll-mt-4 space-y-3">
         <h3 className="text-sm font-medium uppercase tracking-wider text-text-tertiary">
@@ -1243,7 +1219,6 @@ export function SettingsPage() {
           { id: 'vocabulary', label: 'Vocabulary' },
           { id: 'notifications', label: 'Notifications' },
           { id: 'usage', label: 'Usage' },
-          { id: 'fair-use', label: 'Fair Use' },
           { id: 'actions', label: 'Actions' },
           { id: 'support', label: 'Support' },
         ];

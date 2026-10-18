@@ -47,6 +47,10 @@ DELIBERATELY_REMOVED_ENDPOINTS: frozenset[str] = frozenset(
         # (#32): dark behind HELD_CONTENT_ENABLED plus a capability header, so
         # no released client ever called it.
         '/v1/users/budget-choice',
+        # Fair use removed (#19): disabled by default (FAIR_USE_ENABLED=false),
+        # so both returned an inert state; this fork serves a single local user.
+        '/v1/fair-use/status',
+        '/v1/fair-use/case/{case_ref}/status',
     }
 )
 
