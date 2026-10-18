@@ -20,7 +20,6 @@ os.environ.setdefault(
 _STUB_MODULES = [
     "pinecone",
     "typesense",
-    "stripe",
     "pycountry",
     "firebase_admin",
     "firebase_admin.auth",

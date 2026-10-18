@@ -557,7 +557,7 @@ def test_get_pending_deletion_wipes_includes_stale_running():
 
 
 def test_reconciler_and_claims_ignore_retired_billing_failed_marker():
-    data = {'uid': 'uid1', 'wipe_status': 'billing_failed', 'billing_error': 'stripe cancel returned no subscription'}
+    data = {'uid': 'uid1', 'wipe_status': 'billing_failed', 'billing_error': 'subscription already gone'}
     with patch.object(
         users_db, 'account_deletion_collection', lambda **_kwargs: _FakeCollection({'billing_failed': [data]})
     ):

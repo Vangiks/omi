@@ -142,9 +142,6 @@ def _build_fakes() -> dict:
     pydub = ModuleType('pydub')
     pydub.AudioSegment = MagicMock
     fakes['pydub'] = pydub
-
-    fakes['stripe'] = ModuleType('stripe')
-
     python_multipart = ModuleType('python_multipart')
     python_multipart.__version__ = '0.0.99'
     fakes['python_multipart'] = python_multipart

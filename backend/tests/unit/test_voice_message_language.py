@@ -65,7 +65,6 @@ def chat():
 
     fakes: dict[str, object] = {
         "database._client": MagicMock(),
-        "stripe": MagicMock(),
         "database.chat": MagicMock(),
         "database.notifications": MagicMock(),
         "database.apps": MagicMock(),

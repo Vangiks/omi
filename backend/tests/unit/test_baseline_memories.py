@@ -9,7 +9,7 @@ Tests exercise:
   - get_prompt_data() bucket routing through the universal memory service
   - get_prompt_memories() prompt-string formatting through the same authority
 
-No Firebase, Redis, stripe, anthropic, or network connections are required.
+No Firebase, Redis, anthropic, or network connections are required.
 The heavy memory-service import is isolated with the project's sanctioned stub_modules
 and load_module_fresh primitives from testing/import_isolation.py.
 """
@@ -57,7 +57,7 @@ def _raw_memory(
 def mem_module():
     """Load utils.llms.memory fresh with the heavy database chain stubbed out.
 
-    Import chain that pulls in heavy packages (stripe, anthropic, …):
+    Import chain that pulls in heavy packages (anthropic, …):
       utils.memory.memory_service → database.vector_db → utils.llm.clients → anthropic
 
     We stub the service module. All other imports

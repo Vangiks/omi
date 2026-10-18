@@ -35,7 +35,6 @@ def _make_fakes() -> dict:
         "database.apps",
         "utils.other.storage",
         "utils.apps",
-        "utils.stripe",
         "utils.twilio_service",
         "utils.notifications",
         "utils.llm.external_integrations",

@@ -62,7 +62,6 @@ def users_db():
         "google.cloud.firestore": firestore_stub,
         "google.cloud.exceptions": google_exceptions_stub,
         "google.cloud.firestore_v1": fv1_stub,
-        "stripe": MagicMock(),
         "firebase_admin": MagicMock(),
         "firebase_admin.auth": MagicMock(),
     }

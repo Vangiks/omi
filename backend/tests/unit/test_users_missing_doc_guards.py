@@ -2,8 +2,8 @@
 
 Several simple getters did `user_ref.get().to_dict().get(field)`. When the user document does not
 exist, `.to_dict()` returns None, so `.get(field)` raised AttributeError, surfacing as a 500 on
-authenticated endpoints (store-recording permission, private-cloud-sync, the Stripe/PayPal/default
-payment-method getters, training-data opt-in) and in conversation post-processing. A UID can be
+authenticated endpoints (store-recording permission, private-cloud-sync,
+training-data opt-in) and in conversation post-processing. A UID can be
 valid in auth but missing from Firestore (new user before doc creation, mid-deletion, or a data
 race). These getters now use the file's existing `.to_dict() or {}` guard so a missing doc yields
 the same default as a missing field instead of crashing. These cover the pure getter behavior.

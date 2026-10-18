@@ -44,7 +44,6 @@ class _AutoFinder:
             'google.',
             'redis',
             'pycountry',
-            'stripe',
             'anthropic',
             'openai',
         )

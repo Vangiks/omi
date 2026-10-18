@@ -45,7 +45,6 @@ _STUB = (
     "ulid",
     "langchain",
     "langchain_core",
-    "stripe",
     "openai",
     "anthropic",
     "redis",

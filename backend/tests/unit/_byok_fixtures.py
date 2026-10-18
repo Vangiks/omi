@@ -50,10 +50,6 @@ def _make_db_fakes() -> dict:
     apps.get_available_app_by_id = MagicMock(return_value=None)
     fakes["utils.apps"] = apps
 
-    stripe_utils = ModuleType("utils.stripe")
-    stripe_utils.cancel_subscription = MagicMock(return_value=True)
-    fakes["utils.stripe"] = stripe_utils
-
     twilio_service = ModuleType("utils.twilio_service")
     twilio_service.delete_user_caller_ids = MagicMock()
     twilio_service.delete_user_caller_ids_strict = MagicMock()

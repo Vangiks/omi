@@ -75,7 +75,6 @@ _STUB = (
     'langchain',
     'langchain_core',
     'av',
-    'stripe',
     'openai',
     'anthropic',
     'redis',

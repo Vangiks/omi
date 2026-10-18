@@ -160,7 +160,7 @@ def _build_fakes() -> dict[str, ModuleType]:
     workstream_association.associate_canonical_evidence = MagicMock()
     add("utils.task_intelligence.workstream_association", workstream_association)
 
-    # --- firebase / pinecone / typesense / anthropic / stripe --------------
+    # --- firebase / pinecone / typesense / anthropic -----------------------
     firebase_admin = ModuleType("firebase_admin")
     firebase_admin.auth = MagicMock()
     add("firebase_admin", firebase_admin)
@@ -174,9 +174,6 @@ def _build_fakes() -> dict[str, ModuleType]:
     add("typesense", typesense)
 
     add("anthropic", ModuleType("anthropic"))
-
-    stripe = ModuleType("stripe")
-    add("stripe", stripe)
 
     # --- langchain_core (minimal: only what usage_tracker imports) ---------
     langchain_core = ModuleType("langchain_core")

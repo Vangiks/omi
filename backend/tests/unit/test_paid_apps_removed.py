@@ -1,6 +1,6 @@
 """The fork has no paid marketplace apps (#22).
 
-Purchases, app payment links, app subscriptions and developer payouts (Stripe Connect,
+Purchases, app payment links, app subscriptions and developer payouts (Connect accounts,
 PayPal) are gone from the backend. Source-level checks: routers/apps.py has a heavy
 import graph.
 """
@@ -74,6 +74,6 @@ def test_app_document_with_legacy_paid_fields_still_loads():
         is_paid=True,
         price=4.99,
         payment_plan='monthly_recurring',
-        payment_link='https://buy.stripe.com/x',
+        payment_link='https://pay.example.com/x',
     )
     assert 'is_paid' not in app.model_dump()

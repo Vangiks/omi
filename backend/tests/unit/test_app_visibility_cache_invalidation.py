@@ -7,7 +7,7 @@ Every sibling mutation (approve, reject, delete, update) already invalidates tha
 verifies change_app_visibility now does too, and that it skips it for an unapproved app (which is not
 in the public list).
 
-routers/apps.py has a heavy import graph (langchain, utils.llm, stripe, ...), so it is imported under
+routers/apps.py has a heavy import graph (langchain, utils.llm, ...), so it is imported under
 a stub finder that auto-mocks those namespaces (keeping models/fastapi/pydantic real), then the
 handler is called directly with its collaborators patched.
 """
@@ -37,7 +37,6 @@ _STUB = (
     'ulid',
     'langchain',
     'langchain_core',
-    'stripe',
     'openai',
     'anthropic',
     'redis',
