@@ -90,7 +90,7 @@ def test_v2_apps_search_response_uses_same_desktop_safe_app_items():
     assert 'reviews' not in app
 
 
-def test_v2_apps_catalog_response_tolerates_legacy_null_is_paid():
+def test_v2_apps_catalog_response_drops_legacy_paid_fields():
     payload = _app_payload()
     payload['is_paid'] = None
     response = AppCatalogResponse.model_validate(
@@ -100,7 +100,9 @@ def test_v2_apps_catalog_response_tolerates_legacy_null_is_paid():
         }
     )
 
-    assert response.model_dump()['data'][0]['is_paid'] is None
+    app = response.model_dump()['data'][0]
+    assert 'is_paid' not in app
+    assert 'price' not in app
 
 
 def test_v1_app_detail_response_preserves_shared_client_fields():
@@ -123,4 +125,5 @@ def test_v1_app_detail_response_preserves_shared_client_fields():
     assert app['external_integration']['auth_steps'][0]['name'] == 'Connect'
     assert app['reviews'][0]['uid'] == 'u1'
     assert app['chat_tools'][0]['name'] == 'tool'
-    assert app['payment_product_id'] == 'prod_123'
+    assert 'payment_product_id' not in app
+    assert 'payment_plan' not in app

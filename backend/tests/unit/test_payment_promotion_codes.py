@@ -302,9 +302,6 @@ def _setup_payment_module(include_client: bool = True) -> Any:
     stripe_utils_mod.base_url = "http://test/"
     stripe_utils_mod.create_subscription_checkout_session = MagicMock()
 
-    apps_mod = sys.modules["utils.apps"]
-    apps_mod.get_is_user_paid_app = MagicMock()
-
     endpoints_mod = sys.modules["utils.other.endpoints"]
     endpoints_mod.get_current_user_uid = lambda: "test-uid"
     endpoints_mod.get_current_user_uid_no_byok_validation = lambda: "test-uid"

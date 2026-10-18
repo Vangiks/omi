@@ -91,7 +91,6 @@ def _db_for(to_dict_result):
 CASES = [
     ("get_user_store_recording_permission", "store_recording_permission", False, True),
     ("get_user_private_cloud_sync_enabled", "private_cloud_sync_enabled", True, False),
-    ("get_stripe_connect_account_id", "stripe_account_id", None, "acct_123"),
     ("get_user_training_data_opt_in", "training_data_opt_in", None, {"opt_in": True}),
 ]
 

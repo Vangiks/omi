@@ -538,7 +538,6 @@ PINNED_CONVERSATION_DUMPS: FrozenSet[DumpSite] = frozenset(
         DumpSite('database/task_recommendations.py', 'create_outcome', 'model_dump'),
         DumpSite('database/task_recommendations.py', 'replace_context_snapshot', 'model_dump'),
         DumpSite('database/task_recommendations.py', 'replace_open_loop_snapshot', 'model_dump'),
-        DumpSite('utils/apps.py', 'upsert_app_payment_link', 'model_dump'),
         DumpSite('utils/apps.py', 'update_persona_prompt', 'dict'),
         # generate_persona_prompt / generate_persona_desc dump MemoryDB records
         # (not Conversation) after switching the legacy memories read to the

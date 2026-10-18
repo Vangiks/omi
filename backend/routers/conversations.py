@@ -2153,7 +2153,7 @@ async def search_conversations_endpoint(
     tags=['conversations'],
 )
 def get_conversation_suggested_apps(conversation_id: str, uid: str = Depends(auth.get_current_user_uid)):
-    from utils.apps import get_available_app_by_id_with_reviews, get_is_user_paid_app
+    from utils.apps import get_available_app_by_id_with_reviews
 
     conversation_data = _get_valid_conversation_by_id(uid, conversation_id)
     conversation = deserialize_conversation(conversation_data)
@@ -2164,12 +2164,6 @@ def get_conversation_suggested_apps(conversation_id: str, uid: str = Depends(aut
         app_data = get_available_app_by_id_with_reviews(app_id, uid)
         if app_data:
             app = App(**app_data)
-            # Add user-specific data
-            app.is_user_paid = get_is_user_paid_app(app.id, uid)
-
-            # Add payment link with user reference
-            if app.payment_link:
-                app.payment_link = f'{app.payment_link}?client_reference_id=uid_{uid}'
 
             # Generate thumbnail URLs if thumbnails exist
             if app.thumbnails:

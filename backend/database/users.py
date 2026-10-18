@@ -1509,12 +1509,6 @@ def set_chat_message_rating_score(
 # **************************************
 
 
-def get_stripe_connect_account_id(uid: str):
-    user_ref = db.collection('users').document(uid)
-    user_data = user_ref.get().to_dict() or {}
-    return user_data.get('stripe_account_id', None)
-
-
 def get_stripe_customer_id(uid: str) -> Optional[str]:
     """Get the Stripe customer ID for a user."""
     user_ref = db.collection('users').document(uid)

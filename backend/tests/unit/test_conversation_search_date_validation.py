@@ -253,7 +253,6 @@ _register_module('utils.memory.canonical_memory_adapter', _canonical_adapter_stu
 
 _apps_stub = ModuleType('utils.apps')
 setattr(_apps_stub, 'get_available_app_by_id_with_reviews', MagicMock())
-setattr(_apps_stub, 'get_is_user_paid_app', MagicMock(return_value=False))
 _register_module('utils.apps', _apps_stub)
 
 from fastapi import FastAPI, HTTPException  # noqa: E402

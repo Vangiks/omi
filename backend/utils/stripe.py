@@ -15,25 +15,6 @@ if base_url and not base_url.startswith(('http://', 'https://')):
     base_url = 'https://' + base_url
 
 
-def create_product(name: str, description: str, image: str):
-    """Create a new product in Stripe."""
-    product = stripe.Product.create(
-        name=name,
-        description=description,
-        images=[image] if image and len(image) > 0 else [],
-        tax_code="txcd_10103000",  # saas
-    )
-    return product
-
-
-def create_app_monthly_recurring_price(product_id: str, amount_in_cents: int, currency: str = 'usd'):
-    """Create a price for the given product."""
-    price = stripe.Price.create(
-        unit_amount=amount_in_cents, currency=currency, product=product_id, recurring={'interval': 'month'}
-    )
-    return price
-
-
 def create_subscription_checkout_session(
     uid: str,
     price_id: str,
@@ -174,24 +155,6 @@ def find_billable_app_subscription_ids(uid: str) -> list[str]:
         if subscription.get('metadata', {}).get('app_id')
         and subscription.get('status') not in TERMINAL_SUBSCRIPTION_STATUSES
     ]
-
-
-def create_app_payment_link(price_id: str, app_id: str, stripe_acc_id: str):
-    """Create a payment link for the specified price."""
-    payment_link = stripe.PaymentLink.create(
-        line_items=[
-            {
-                'price': price_id,
-                'quantity': 1,
-            }
-        ],
-        transfer_data={
-            'destination': stripe_acc_id,
-        },
-        subscription_data={'metadata': {'app_id': app_id}},
-        metadata={'app_id': app_id},
-    )
-    return payment_link
 
 
 def parse_event(payload: Any, sig_header: Any) -> Any:

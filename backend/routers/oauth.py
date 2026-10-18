@@ -15,7 +15,7 @@ from utils.executors import critical_executor, db_executor, run_blocking
 from utils.other.endpoints import enforce_account_deletion_http_access
 from utils.http_client import safe_request_target, get_auth_client, UnsafeWebhookURLError
 from database.redis_db import enable_app, increase_app_installs_count
-from utils.apps import is_user_app_enabled, get_is_user_paid_app, is_tester
+from utils.apps import is_user_app_enabled, is_tester
 from utils.jit_qa_admission import JITQAAdmissionError, enforce_jit_qa_uid
 from models.app import App as AppModel, ActionType
 
@@ -250,12 +250,6 @@ async def oauth_token(
                     status_code=503,
                     detail='Could not verify app setup due to an invalid response from the app. Please contact app developer or support.',
                 )
-
-        # Check payment status
-        if app.is_paid and not await run_blocking(db_executor, get_is_user_paid_app, app.id, uid):
-            raise HTTPException(
-                status_code=403, detail='This is a paid app. Please purchase the app before authorizing.'
-            )
 
         try:
             newly_enabled = await run_blocking(db_executor, enable_app, uid, app_id)
