@@ -1443,12 +1443,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/be/66/d887ee80ea85f035b
 wheels = [{ url = "https://files.pythonhosted.org/packages/48/1d/40de1819374b4f0507411a60f4d2de0d620a9b10c817de5925799132b6c9/streamlit-1.54.0-py3-none-any.whl", upload-time = 2026-02-04T16:37:52Z, size = 9119730, hashes = { sha256 = "a7b67d6293a9f5f6b4d4c7acdbc4980d7d9f049e78e404125022ecb1712f79fc" } }]
 
 [[packages]]
-name = "stripe"
-version = "11.3.0"
-sdist = { url = "https://files.pythonhosted.org/packages/0d/96/358f9f62960826ee77de447d70e7ed09741dd5d53d684be1371913e51d7f/stripe-11.3.0.tar.gz", upload-time = 2024-11-20T23:40:16Z, size = 1367031, hashes = { sha256 = "98e625d9ddbabcecf02666867169696e113d9eaba27979fb310a7a8dfd44097c" } }
-wheels = [{ url = "https://files.pythonhosted.org/packages/a4/85/2f4365a0112e49ff646bc701b93e8c4eb314812d84149a43898ea88d377d/stripe-11.3.0-py2.py3-none-any.whl", upload-time = 2024-11-20T23:40:14Z, size = 1617363, hashes = { sha256 = "9d2e86943e1e4f325835d3860c4f58aa98d49229c9caf67588f9f9b2451e8e56" } }]
-
-[[packages]]
 name = "sympy"
 version = "1.14.0"
 sdist = { url = "https://files.pythonhosted.org/packages/83/d3/803453b36afefb7c2bb238361cd4ae6125a569b4db67cd9e79846ba2d68c/sympy-1.14.0.tar.gz", upload-time = 2025-04-27T18:05:01Z, size = 7793921, hashes = { sha256 = "d3d3fe8df1e5a0b42f0e7bdf50541697dbe7d23746e894990c030e2b05e72517" } }
