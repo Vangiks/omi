@@ -430,29 +430,7 @@ def test_update_person_name_existing_returns_ok():
     update_person.assert_called_once_with('uid1', 'p1', 'Alice')
 
 
-def _managed_allowance():
-    from utils.subscription import TranscriptionAllowance
-
-    return TranscriptionAllowance('managed', None, 'byok', limit_seconds=None)
-
-
-@pytest.fixture(autouse=True)
-def _stub_transcription_allowance():
-    """The subscription endpoint decorates every snapshot with the one allowance answer (S16).
-
-    The resolver reads Firestore through its own bindings, which the per-test patches
-    on `users_router.*` do not reach; these tests are about the snapshot itself, so the
-    resolver is stubbed at the router seam. The one test that is about the decoration
-    patches its own resolver inside the stub.
-    """
-    with patch.object(users_router, 'resolve_transcription_allowance', MagicMock(return_value=_managed_allowance())):
-        yield
-
-
-def test_byok_llm_only_subscription_meters_the_resolved_transcription_budget():
-    # The LLM identity does not determine the resolved transcription budget.
-    from utils.subscription import TranscriptionAllowance
-
+def test_byok_llm_only_subscription_meters_the_basic_transcription_budget():
     basic_limits = users_router.PlanLimits(transcription_seconds=600, words_transcribed=8000)
     with patch.object(users_router.users_db, 'is_byok_active', MagicMock(return_value=True)), patch.object(
         users_router, 'request_has_llm_byok_key', MagicMock(return_value=True)
@@ -462,10 +440,6 @@ def test_byok_llm_only_subscription_meters_the_resolved_transcription_budget():
         users_router,
         'get_monthly_usage_for_subscription',
         MagicMock(return_value={'transcription_seconds': 120, 'words_transcribed': 500}),
-    ), patch.object(
-        users_router,
-        'resolve_transcription_allowance',
-        MagicMock(return_value=TranscriptionAllowance('managed', 480, 'plan_within_allowance', limit_seconds=600)),
     ):
         response = users_router.get_user_subscription_endpoint(
             request=Request({'type': 'http', 'headers': []}), uid='uid1'
@@ -477,7 +451,7 @@ def test_byok_llm_only_subscription_meters_the_resolved_transcription_budget():
     assert response.subscription.limits.insights_gained is None
     assert response.insights_gained_used == 0
     assert response.insights_gained_limit == 0
-    # Transcription comes from the resolver; the existing words budget is preserved.
+    # Transcription and words keep the basic budget.
     assert response.subscription.limits.transcription_seconds == 600
     assert response.transcription_seconds_used == 120
     assert response.transcription_seconds_limit == 600
@@ -744,164 +718,6 @@ def test_usage_quota_endpoint_reports_catalog_exhaustion_policy(plan, expected_o
     assert quota.allowed is False
 
 
-def test_subscription_snapshot_carries_the_one_transcription_allowance_answer():
-    """The startup snapshot exposes exactly what the listen socket will enforce (free tier S16),
-    resolved with the app platform standing in for the listen `source`."""
-    from utils.subscription import TranscriptionAllowance
-
-    seen: list[tuple[str, object]] = []
-
-    def resolver(uid: str, source=None, **already_read) -> TranscriptionAllowance:
-        seen.append((uid, source))
-        return TranscriptionAllowance('on_device', 0, 'plan_allowance_exhausted')
-
-    with patch.object(users_router.users_db, 'is_byok_active', MagicMock(return_value=True)), patch.object(
-        users_router, 'request_has_llm_byok_key', MagicMock(return_value=True)
-    ), patch.object(
-        users_router, 'get_byok_key', MagicMock(side_effect=lambda p: 'dg-key' if p == 'deepgram' else None)
-    ), patch.object(
-        users_router, 'resolve_transcription_allowance', resolver
-    ):
-        response = users_router.get_user_subscription_endpoint(
-            request=Request({'type': 'http', 'headers': []}), uid='uid1', x_app_platform='desktop'
-        )
-
-    assert seen == [('uid1', 'desktop')]
-    assert response.transcription_allowance is not None
-    assert response.transcription_allowance.model_dump() == {
-        'mode': 'on_device',
-        'remaining_seconds': 0,
-        'reason': 'plan_allowance_exhausted',
-    }
-
-
-@pytest.mark.parametrize('identity_version', [None, '1'])
-def test_subscription_snapshot_reuses_its_own_reads_for_the_allowance(identity_version):
-    """The ordinary branch reads the valid subscription and the monthly usage once; the resolver
-    gets exactly those, so the snapshot and the allowance cannot come from different reads."""
-    from utils.subscription import TranscriptionAllowance
-
-    seen: list[dict] = []
-    subscription = users_router.Subscription(
-        plan=users_router.PlanType.plus, status=users_router.SubscriptionStatus.active
-    )
-
-    def resolver(uid: str, source=None, **already_read) -> TranscriptionAllowance:
-        seen.append(already_read)
-        return TranscriptionAllowance('managed', 5, 'plan_within_allowance')
-
-    with patch.object(users_router.users_db, 'is_byok_active', MagicMock(return_value=False)), patch.object(
-        users_router, 'get_user_subscription', MagicMock(return_value=subscription)
-    ), patch.object(users_router, 'reconcile_basic_plan_with_stripe', MagicMock()), patch.object(
-        users_router, 'get_user_valid_subscription', MagicMock(return_value=subscription)
-    ), patch.object(
-        users_router, 'get_monthly_usage_for_subscription', MagicMock(return_value={'transcription_seconds': 9})
-    ), patch.object(
-        users_router, 'get_paid_plan_definitions', MagicMock(return_value=[])
-    ), patch.object(
-        users_router, 'should_hide_subscription_ui', MagicMock(return_value=False)
-    ), patch.object(
-        users_router,
-        'get_chat_quota_snapshot',
-        MagicMock(return_value={'used': 0.0, 'limit': None, 'unit': 'questions', 'allowed': True, 'reset_at': None}),
-    ), patch.object(
-        users_router, 'resolve_transcription_allowance', resolver
-    ), patch.object(
-        # A legacy client is shown a remapped plan; the allowance must not see the remap.
-        users_router,
-        'wire_plan_for_client',
-        MagicMock(return_value=users_router.PlanType.unlimited),
-    ), patch.dict(
-        users_router.os.environ, {'MARKETPLACE_APP_REVIEWERS': ''}
-    ):
-        response = users_router.get_user_subscription_endpoint(
-            request=Request(
-                {'type': 'http', 'headers': [] if identity_version is None else [(b'x-omi-plan-identity', b'1')]}
-            ),
-            uid='uid1',
-            x_app_platform='ios',
-            x_app_version='1.0.0',
-        )
-        users_router.wire_plan_for_client.assert_called_once_with(
-            users_router.PlanType.plus, 'ios', '1.0.0', identity_version
-        )
-
-    assert [sorted(read) for read in seen] == [['byok_active', 'subscription', 'usage']]
-    assert seen[0]['byok_active'] is False
-    assert seen[0]['usage'] == {'transcription_seconds': 9}
-    assert seen[0]['subscription'].plan is users_router.PlanType.plus  # not the client-facing remap
-    assert response.subscription.plan is users_router.PlanType.unlimited  # the remap still ships to the client
-    assert response.transcription_allowance.remaining_seconds == 5
-
-
-def test_subscription_snapshot_survives_a_resolver_that_cannot_read_its_dependencies():
-    """The real resolver never raises: a Firestore failure inside it becomes the free-path answer,
-    and the snapshot the endpoint already built is still returned."""
-    import utils.subscription as subscription_module
-
-    with patch.object(users_router.users_db, 'is_byok_active', MagicMock(return_value=True)), patch.object(
-        users_router, 'request_has_llm_byok_key', MagicMock(return_value=True)
-    ), patch.object(
-        users_router, 'get_byok_key', MagicMock(side_effect=lambda p: 'dg-key' if p == 'deepgram' else None)
-    ), patch.object(
-        users_router, 'resolve_transcription_allowance', subscription_module.resolve_transcription_allowance
-    ), patch.object(
-        subscription_module, 'is_marketplace_reviewer', MagicMock(side_effect=RuntimeError('firestore unavailable'))
-    ):
-        response = users_router.get_user_subscription_endpoint(
-            request=Request({'type': 'http', 'headers': []}), uid='uid1', x_app_platform='desktop'
-        )
-
-    assert response.subscription.features == ['byok']  # the snapshot itself is intact
-    assert response.transcription_allowance.model_dump() == {
-        'mode': 'on_device',
-        'remaining_seconds': 0,
-        'reason': 'allowance_unavailable',
-    }
-
-
-def test_llm_only_byok_snapshot_reads_monthly_usage_once_for_snapshot_and_allowance():
-    """An enrolled BYOK request with an LLM key but no Deepgram key takes the early metered branch,
-    which reads usage; the allowance must come from that same read, not a second one (S16)."""
-    import utils.subscription as subscription_module
-
-    usage_reads = MagicMock(return_value={'transcription_seconds': 17_000})
-    with patch.object(users_router.users_db, 'is_byok_active', MagicMock(return_value=True)), patch.object(
-        users_router, 'request_has_llm_byok_key', MagicMock(return_value=True)
-    ), patch.object(
-        users_router, 'get_byok_key', MagicMock(side_effect=lambda p: 'llm-key' if p == 'openai' else None)
-    ), patch.object(
-        users_router, 'get_monthly_usage_for_subscription', usage_reads
-    ), patch.object(
-        users_router, 'resolve_transcription_allowance', subscription_module.resolve_transcription_allowance
-    ), patch.object(
-        subscription_module, 'get_byok_key', MagicMock(return_value=None)
-    ), patch.object(
-        subscription_module.users_db,
-        'get_user_valid_subscription',
-        MagicMock(
-            return_value=users_router.Subscription(
-                plan=users_router.PlanType.basic, status=users_router.SubscriptionStatus.active
-            )
-        ),
-    ), patch.object(
-        subscription_module, 'get_monthly_usage_for_subscription', usage_reads
-    ), patch.dict(
-        users_router.os.environ, {'MARKETPLACE_APP_REVIEWERS': ''}
-    ):
-        response = users_router.get_user_subscription_endpoint(
-            request=Request({'type': 'http', 'headers': []}), uid='uid1', x_app_platform='ios'
-        )
-
-    assert usage_reads.call_count == 1
-    assert response.transcription_seconds_used == 17_000
-    assert response.transcription_allowance.model_dump() == {
-        'mode': 'managed',
-        'remaining_seconds': 1_000,
-        'reason': 'plan_within_allowance',
-    }
-
-
 def _route_dependency_names(path: str, method: str) -> list[str]:
     app = FastAPI()
     app.include_router(users_router.router)
@@ -980,63 +796,6 @@ def test_onboarding_patch_http_preserves_previous_completion(monkeypatch):
     }
 
 
-@pytest.mark.parametrize('reason', ['subscription_inactive', 'usage_invalid', 'allowance_unavailable'])
-def test_closed_real_allowance_preserves_finite_snapshot_budget(monkeypatch, reason):
-    import utils.subscription as subscription_module
-
-    plan = users_router.PlanType.basic if reason == 'subscription_inactive' else users_router.PlanType.plus
-    cap = 18_000 if plan is users_router.PlanType.basic else 90_000
-    subscription = users_router.Subscription(plan=plan, status=users_router.SubscriptionStatus.active)
-    monkeypatch.setattr(users_router.users_db, 'is_byok_active', lambda uid: False)
-    monkeypatch.setattr(users_router, 'get_user_subscription', lambda uid: subscription)
-    monkeypatch.setattr(users_router, 'reconcile_basic_plan_with_stripe', lambda *args, **kwargs: None)
-    monkeypatch.setattr(
-        users_router,
-        'get_user_valid_subscription',
-        lambda uid: None if reason == 'subscription_inactive' else subscription,
-    )
-    monkeypatch.setattr(
-        users_router,
-        'get_monthly_usage_for_subscription',
-        lambda uid: {'transcription_seconds': -1 if reason == 'usage_invalid' else 10},
-    )
-    monkeypatch.setattr(users_router, 'get_paid_plan_definitions', lambda *args, **kwargs: [])
-    monkeypatch.setattr(users_router, 'should_hide_subscription_ui', lambda *args: False)
-    monkeypatch.setattr(
-        users_router,
-        'get_chat_quota_snapshot',
-        lambda *args, **kwargs: {'used': 0.0, 'limit': None, 'unit': 'questions', 'allowed': True, 'reset_at': None},
-    )
-    monkeypatch.setattr(
-        users_router, 'resolve_transcription_allowance', subscription_module.resolve_transcription_allowance
-    )
-    monkeypatch.setattr(
-        subscription_module,
-        'is_marketplace_reviewer',
-        (
-            MagicMock(side_effect=RuntimeError('dependency unavailable'))
-            if reason == 'allowance_unavailable'
-            else lambda uid: False
-        ),
-    )
-    monkeypatch.setattr(subscription_module, 'get_byok_key', lambda provider: None)
-    monkeypatch.setenv('MARKETPLACE_APP_REVIEWERS', '')
-    response = users_router.get_user_subscription_endpoint(
-        # Shipped clients do not declare the new six-plan capability.
-        request=Request({'type': 'http', 'headers': []}),
-        uid='fixture-user',
-        x_app_platform='ios',
-        x_app_version='1.0.600',
-    )
-    assert response.transcription_allowance.model_dump() == {
-        'mode': 'on_device',
-        'remaining_seconds': 0,
-        'reason': reason,
-    }
-    assert response.transcription_seconds_limit == cap
-    assert response.subscription.limits.transcription_seconds == cap
-
-
 @pytest.mark.parametrize('plan', [users_router.PlanType.plus, users_router.PlanType.unlimited_v2])
 @pytest.mark.parametrize(
     'platform,version,identity,capable',
@@ -1058,9 +817,7 @@ def test_closed_real_allowance_preserves_finite_snapshot_budget(monkeypatch, rea
 def test_subscription_http_negotiates_catalog_ids_before_response_validation(
     monkeypatch, plan, platform, version, identity, capable
 ):
-    """Real HTTP/response model, wire gate and allowance; only storage is fake."""
-    from utils import subscription as subscription_module
-
+    """Real HTTP/response model and wire gate; only storage is fake."""
     subscription = users_router.Subscription(plan=plan, status=users_router.SubscriptionStatus.active)
     monkeypatch.setattr(users_router.users_db, 'is_byok_active', lambda uid: False)
     monkeypatch.setattr(users_router, 'get_user_subscription', lambda uid: subscription.model_copy())
@@ -1074,10 +831,6 @@ def test_subscription_http_negotiates_catalog_ids_before_response_validation(
         'get_chat_quota_snapshot',
         lambda *args, **kwargs: {'used': 0.0, 'limit': None, 'unit': 'questions', 'allowed': True, 'reset_at': None},
     )
-    monkeypatch.setattr(
-        users_router, 'resolve_transcription_allowance', subscription_module.resolve_transcription_allowance
-    )
-    monkeypatch.setattr(subscription_module, 'get_byok_key', lambda provider: None)
     monkeypatch.setenv('MARKETPLACE_APP_REVIEWERS', '')
     app = FastAPI()
     app.add_api_route(
@@ -1100,8 +853,6 @@ def test_subscription_http_negotiates_catalog_ids_before_response_validation(
     assert response.status_code == 200
     body = response.json()
     assert body['subscription']['plan'] == (plan.value if capable else 'unlimited')
-    # Remapping cannot change the real plan's budget or its enforcement answer.
+    # Remapping cannot change the real plan's budget.
     assert body['transcription_seconds_limit'] == (90_000 if plan is users_router.PlanType.plus else 0)
-    assert body['transcription_allowance']['remaining_seconds'] == (
-        89_990 if plan is users_router.PlanType.plus else None
-    )
+    assert 'transcription_allowance' not in body

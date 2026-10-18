@@ -72,7 +72,6 @@ from models.user_usage import UserUsageResponse, UsagePeriod
 from datetime import datetime, time, timedelta
 
 from models.users import (
-    TranscriptionAllowanceSnapshot,
     ChatUsageQuota,
     ChatQuotaUnit,
     WebhookType,
@@ -93,7 +92,6 @@ from utils.apps import get_available_app_by_id
 from config.plan_catalog import plan_uses_overage
 from utils.subscription import (
     DESKTOP_CHAT_BYOK_PROVIDER,
-    resolve_transcription_allowance,
     request_has_llm_byok_key,
     request_has_byok_provider,
     get_chat_quota_snapshot,
@@ -1212,30 +1210,19 @@ def get_user_subscription_endpoint(
     x_app_platform: Optional[str] = Header(None, alias='X-App-Platform'),
     x_app_version: Optional[str] = Header(None, alias='X-App-Version'),
 ):
-    """Gets the user's subscription plan and usage, plus the one transcription-allowance answer."""
-    already_read: dict[str, Any] = {}
-    response = _user_subscription_response(
-        uid, x_app_platform, x_app_version, already_read, request.headers.get('X-Omi-Plan-Identity')
+    """Gets the user's subscription plan and usage."""
+    return _user_subscription_response(
+        uid, x_app_platform, x_app_version, request.headers.get('X-Omi-Plan-Identity')
     )
-    allowance = resolve_transcription_allowance(uid, source=x_app_platform, **already_read)
-    response.transcription_allowance = TranscriptionAllowanceSnapshot(**allowance.as_dict())
-    # A closed result with no resolved total is not an unlimited allowance.
-    # Keep the already-built finite snapshot instead of emitting the wire's
-    # 0 == unlimited sentinel. Known totals (including exhaustion) still win.
-    if allowance.remaining_seconds is None or (allowance.limit_seconds is not None and allowance.limit_seconds > 0):
-        response.transcription_seconds_limit = allowance.limit_seconds or 0
-        response.subscription.limits.transcription_seconds = allowance.limit_seconds
-    return response
 
 
 def _user_subscription_response(
     uid: str,
     x_app_platform: Optional[str],
     x_app_version: Optional[str],
-    already_read: dict[str, Any],
     plan_identity_version: Optional[str],
 ) -> UserSubscriptionResponse:
-    """Read subscription/usage once, reusing those reads for the allowance."""
+    """Read subscription and usage for the response."""
     # BYOK free plan: unlimited chat/insights only for a validated LLM-capability
     # key. Deepgram-only does not unlock this.
     # Synthetic paid-tier quota for BYOK / marketplace-reviewer overrides so
@@ -1243,9 +1230,8 @@ def _user_subscription_response(
     unlimited_phone_quota = PhoneCallQuota(has_access=True, is_paid=True)
 
     byok_active = users_db.is_byok_active(uid)
-    already_read['byok_active'] = byok_active
     if byok_active and request_has_llm_byok_key():
-        # Preserve synthetic Neo feature access; the outer resolver supplies the STT budget.
+        # Preserve synthetic Neo feature access.
         if get_byok_key('deepgram'):
             return UserSubscriptionResponse(
                 subscription=_byok_unlimited_subscription(),
@@ -1260,7 +1246,6 @@ def _user_subscription_response(
                 phone_call_quota=unlimited_phone_quota,
             )
         usage = get_monthly_usage_for_subscription(uid)
-        already_read['usage'] = dict(usage) if isinstance(usage, dict) else usage
         basic_limits = get_basic_plan_limits()
         return UserSubscriptionResponse(
             subscription=_byok_unlimited_subscription(
@@ -1308,10 +1293,6 @@ def _user_subscription_response(
 
     # Then re-evaluate using our normal "valid subscription" semantics.
     subscription = get_user_valid_subscription(uid)
-    # A copy: this object is remapped below for legacy clients (operator -> unlimited,
-    # wire_plan_for_client), and the allowance must be resolved for the plan that is
-    # actually subscribed, not the one the client is shown.
-    already_read['subscription'] = subscription.model_copy() if subscription else None
     if not subscription:
         # Return default basic plan if no valid subscription
         subscription = get_default_basic_subscription()
@@ -1340,7 +1321,6 @@ def _user_subscription_response(
 
     # Get current usage
     usage = get_monthly_usage_for_subscription(uid)
-    already_read['usage'] = dict(usage) if isinstance(usage, dict) else usage
 
     # Calculate usage metrics
     transcription_seconds_used = usage.get('transcription_seconds', 0)
