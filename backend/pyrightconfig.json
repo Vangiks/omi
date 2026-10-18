@@ -136,7 +136,6 @@
         "routers/memory_product.py",
         "routers/notifications.py",
         "routers/oauth.py",
-        "routers/payment.py",
         "routers/speech_profile.py",
         "routers/sync.py",
         "routers/task_integrations.py",

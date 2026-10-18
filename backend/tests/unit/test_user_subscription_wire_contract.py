@@ -3,7 +3,6 @@ from pydantic import ValidationError
 
 from config.plan_catalog import PLAN_TYPE_VALUES
 from models.users import PlanType, Subscription, UserSubscriptionResponse
-from routers.payment import PaymentSubscriptionResponse
 
 
 def _response(plan: PlanType) -> UserSubscriptionResponse:
@@ -37,11 +36,6 @@ def test_subscription_schema_uses_the_catalog_enum():
     assert schema['properties']['plan']['$ref'] == '#/$defs/PlanType'
     assert 'enum' not in schema['properties']['plan']
     assert set(schema['$defs']['PlanType']['enum']) == set(PLAN_TYPE_VALUES)
-
-
-@pytest.mark.parametrize('plan', ['plus', 'unlimited_v2'])
-def test_payment_response_already_accepts_catalog_ids(plan):
-    assert PaymentSubscriptionResponse(plan=plan).model_dump()['plan'] == plan
 
 
 def test_export_publishes_capable_catalog_schema_and_preserves_checked_legacy_response():

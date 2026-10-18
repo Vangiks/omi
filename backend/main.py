@@ -56,7 +56,6 @@ from routers import (
     trends,
     sync,
     apps,
-    payment,
     storefront,
     integration,
     conversations,
@@ -292,7 +291,6 @@ app.include_router(oauth.router)  # Added oauth router (for Omi Apps)
 app.include_router(auth.router)  # Added auth router (for the main Omi App, this is the core auth router)
 
 
-app.include_router(payment.router)
 app.include_router(storefront.router)
 app.include_router(api_key_management.mcp_router)
 app.include_router(mcp.router)

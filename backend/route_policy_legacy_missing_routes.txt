@@ -32,7 +32,6 @@ backend-main:http:DELETE:/v1/mcp/memories/{memory_id}
 backend-main:http:DELETE:/v1/mcp/oauth/grants/{grant_id}
 backend-main:http:DELETE:/v1/mcp/sse
 backend-main:http:DELETE:/v1/messages
-backend-main:http:DELETE:/v1/payments/subscription
 backend-main:http:DELETE:/v1/personas/{persona_id}
 backend-main:http:DELETE:/v1/phone/numbers/{phone_number_id}
 backend-main:http:DELETE:/v1/staged-tasks
@@ -156,11 +155,6 @@ backend-main:http:GET:/v1/mcp/screen-activity
 backend-main:http:GET:/v1/mcp/sse
 backend-main:http:GET:/v1/mcp/sse/info
 backend-main:http:GET:/v1/oauth/authorize
-backend-main:http:GET:/v1/payments/available-plans
-backend-main:http:GET:/v1/payments/cancel
-backend-main:http:GET:/v1/payments/overage-info
-backend-main:http:GET:/v1/payments/portal-return
-backend-main:http:GET:/v1/payments/success
 backend-main:http:GET:/v1/personas
 backend-main:http:GET:/v1/personas/twitter/initial-message
 backend-main:http:GET:/v1/personas/twitter/profile
@@ -382,9 +376,6 @@ backend-main:http:POST:/v1/mcp/sse
 backend-main:http:POST:/v1/messages/{message_id}/report
 backend-main:http:POST:/v1/notification
 backend-main:http:POST:/v1/oauth/token
-backend-main:http:POST:/v1/payments/checkout-session
-backend-main:http:POST:/v1/payments/customer-portal
-backend-main:http:POST:/v1/payments/upgrade-subscription
 backend-main:http:POST:/v1/personas
 backend-main:http:POST:/v1/phone/numbers/verify
 backend-main:http:POST:/v1/phone/numbers/verify/check
@@ -395,7 +386,6 @@ backend-main:http:POST:/v1/staged-tasks/migrate
 backend-main:http:POST:/v1/staged-tasks/migrate-conversation-items
 backend-main:http:POST:/v1/staged-tasks/promote
 backend-main:http:POST:/v1/staged-tasks/{task_id}/promote
-backend-main:http:POST:/v1/stripe/webhook
 backend-main:http:POST:/v1/summary-app-ids/{app_id}
 backend-main:http:POST:/v1/sync-local-files
 backend-main:http:POST:/v1/sync/audio/{conversation_id}/precache

@@ -47,10 +47,6 @@ LEGIT_NON_JSON: dict[tuple[str, str], str] = {
     ("task_integrations.py", "asana_oauth_callback"): "OAuth callback redirect",
     ("task_integrations.py", "google_tasks_oauth_callback"): "OAuth callback redirect",
     ("task_integrations.py", "clickup_oauth_callback"): "OAuth callback redirect",
-    ("payment.py", "stripe_return"): "Stripe redirect callback",
-    ("payment.py", "stripe_success"): "Stripe redirect callback",
-    ("payment.py", "stripe_cancel"): "Stripe redirect callback",
-    ("payment.py", "portal_return"): "Stripe redirect callback",
     # --- Binary / non-JSON content ---
     ("metrics.py", "metrics"): "Prometheus text/plain exposition",
     ("phone_calls.py", "twiml_voice_webhook"): "TwiML XML (voice webhook)",
