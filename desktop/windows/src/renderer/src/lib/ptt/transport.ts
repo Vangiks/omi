@@ -205,7 +205,7 @@ export async function batchTranscribe(pcm: Int16Array, signal: AbortSignal): Pro
 export function batchErrorMessage(err: unknown): string {
   if (axios.isAxiosError(err)) {
     const status = err.response?.status
-    if (status === 402) return 'Voice transcription needs an active Omi plan'
+    if (status === 402) return 'The server refused voice transcription for this account'
     if (status === 413) return RECORDING_TOO_LONG_MESSAGE
     if (status === 429) return 'Voice limit reached — try again in a minute'
     if (status === 401 || status === 403) return 'Sign-in expired — sign in again to use voice'

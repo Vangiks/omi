@@ -27,11 +27,12 @@ describe('classifyMintFailure', () => {
     expect(f.message).toMatch(/sign in/i)
   })
 
-  it('402 trial_expired → paywall message, no fallback', () => {
-    const f = classifyMintFailure(402, { error: 'trial_expired' })
+  it('402 → neutral refusal message without plan wording, no fallback', () => {
+    const f = classifyMintFailure(402, { error: 'payment required' })
     expect(f.retryable).toBe(false)
     expect(f.tryOtherProvider).toBe(false)
-    expect(f.message).toMatch(/trial/i)
+    expect(f.message).toMatch(/server refused realtime voice/i)
+    expect(f.message).not.toMatch(/trial|upgrade|plan/i)
   })
 
   it('provider_not_configured (503) → try the other provider', () => {
