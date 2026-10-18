@@ -64,26 +64,17 @@ it("keeps real healthy counts bright, all fixtures dim, and puts the complete me
           ],
           { sourceRefreshedAt: now.toISOString() }
         ),
-      shopify: fail,
       billing: fail,
-      stripe: async () => ({
-        usd: 39.98,
-        partial: false,
-        unmappedProducts: 0,
-        unsupportedItems: 0,
-        fixture: true,
-        dataThrough: "2026-10-14",
-        sourceRefreshedAt: now.toISOString(),
-      }),
     },
     now
   );
+  data.metrics.find((m) => m.id === "engagement.dau")!.fixture = true;
   const view = wallPresentation(data, now);
   const count = view.tiles.growth_wau as Record<string, unknown>,
-    money = view.tiles.revenue_mrr as Record<string, unknown>;
+    sample = view.tiles.engagement_dau as Record<string, unknown>;
   expect(count.valueColor).toBe("#f4f7fc");
-  expect(money.valueColor).toBe("#8190a6");
-  expect(money.state).toBe("FIXTURE");
+  expect(sample.valueColor).toBe("#8190a6");
+  expect(sample.state).toBe("FIXTURE");
   const svg = String(count.cardSvg);
   expect(svg).toContain("<rect");
   expect(svg).toContain("Weekly active people");
@@ -95,23 +86,7 @@ it("keeps real healthy counts bright, all fixtures dim, and puts the complete me
   expect(svg).not.toMatch(
     /script|foreignObject|iframe|NO WATERMARK|\[Active\]/
   );
-  expect(String(money.cardSvg)).toContain("FIXTURE");
-  const cash = data.metrics.find(
-    (m) => m.id === "revenue.plan_prepay_usd_week"
-  )!;
-  Object.assign(cash, {
-    value: 41812.82,
-    status: "proxy",
-    partial: true,
-    sourceRefreshedAt: now.toISOString(),
-    dataThrough: "2026-10-11",
-  });
-  expect(
-    wallPresentation(data, now).tiles.revenue_plan_prepay_usd_week
-  ).toMatchObject({
-    valueColor: "#8190a6",
-    footnote: "Coverage incomplete · as of Oct 11",
-  });
+  expect(String(sample.cardSvg)).toContain("FIXTURE");
 });
 it("dims proxies with a material gap without dimming all proxy metrics", async () => {
   const now = new Date("2026-10-15T12:00Z");
@@ -121,9 +96,7 @@ it("dims proxies with a material gap without dimming all proxy metrics", async (
         Object.assign([[0, "macos", 3]], {
           sourceRefreshedAt: now.toISOString(),
         }),
-      shopify: fail,
       billing: fail,
-      stripe: fail,
     },
     now
   );

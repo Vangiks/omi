@@ -6,8 +6,7 @@ import {
   establishedQuery,
   queryPosthog,
 } from "../wall-posthog";
-import { fetchShopifyWeek } from "../wall-shopify";
-import { completeWeek, isoDay } from "../qualified-activity";
+import { completeWeek } from "../qualified-activity";
 it.skipIf(process.env.OMI_TV_LIVE_CHECK !== "1")(
   "live sources compile qualified aggregate queries",
   async () => {
@@ -24,13 +23,4 @@ it.skipIf(process.env.OMI_TV_LIVE_CHECK !== "1")(
     }
   },
   360_000
-);
-it.skipIf(process.env.OMI_TV_LIVE_CHECK !== "1")(
-  "live Shopify orders are complete",
-  async () => {
-    const w = completeWeek(new Date("2026-10-15"));
-    const sales = await fetchShopifyWeek(isoDay(w.start), isoDay(w.end));
-    expect(sales.units).toBeGreaterThan(0);
-  },
-  180_000
 );

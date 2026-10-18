@@ -1,17 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { computeWall, WALL_DEFINITIONS, WallSources } from "../wall-metrics";
 import { resetWallCache, wallPayload } from "../wall-cache";
-import { aggregateOrders, ShopOrder } from "../wall-shopify";
-import { wallSubscriptionBook } from "../stripe-subscriptions";
-import type Stripe from "stripe";
 const now = new Date("2026-10-15T12:00Z");
 const fail = async () => {
   throw new Error("unavailable");
 };
 const sources = (): WallSources => ({
   query: fail,
-  shopify: fail,
-  stripe: fail,
   billing: fail,
 });
 
@@ -83,150 +78,4 @@ describe("wall source and payload contracts", () => {
     await wallPayload(new Date("2026-10-16T00:00Z"), compute);
     expect(compute).toHaveBeenCalledTimes(2);
   });
-  it("never presents current Stripe as a same-cutoff ARPMAU close", async () => {
-    const s = sources();
-    s.stripe = async () => ({
-      usd: 1400,
-      partial: false,
-      unmappedProducts: 0,
-      unsupportedItems: 1,
-    });
-    const wall = await computeWall(s, now);
-    expect(wall.metrics.find((m) => m.id === "revenue.mrr")?.value).toBe(1400);
-    expect(wall.metrics.find((m) => m.id === "revenue.mrr")?.partial).toBe(
-      true
-    );
-    expect(
-      wall.metrics.find((m) => m.id === "revenue.arpmau")?.value
-    ).toBeNull();
-  });
-});
-
-describe("Shopify net weekly sales", () => {
-  const money = (amount: string) => ({
-    shopMoney: { amount, currencyCode: "USD" },
-  });
-  const order: ShopOrder = {
-    test: false,
-    cancelledAt: null,
-    displayFinancialStatus: "PAID",
-    lineItems: {
-      pageInfo: { hasNextPage: false },
-      nodes: [
-        {
-          id: "device",
-          title: "Omi",
-          sku: null,
-          quantity: 2,
-          discountedTotalSet: money("300"),
-        },
-        {
-          id: "plan",
-          title: "Omi Unlimited: 1st Year",
-          sku: null,
-          quantity: 1,
-          discountedTotalSet: money("200"),
-        },
-      ],
-    },
-    refunds: [
-      {
-        refundLineItems: {
-          pageInfo: { hasNextPage: false },
-          nodes: [
-            {
-              lineItem: { id: "device" },
-              quantity: 1,
-              subtotalSet: money("150"),
-            },
-          ],
-        },
-      },
-    ],
-  };
-  it("restates sale week for refunds and separates plan cash", () => {
-    expect(aggregateOrders([order])).toEqual({
-      units: 1,
-      hardwareUsd: 150,
-      prepayUsd: 200,
-      unmappedLines: 0,
-    });
-    expect(aggregateOrders([{ ...order, test: true }]).units).toBe(0);
-    expect(
-      aggregateOrders([{ ...order, displayFinancialStatus: "PARTIALLY_PAID" }])
-        .units
-    ).toBe(0);
-  });
-  it("rejects truncated line/refund data and missing currency conversion", () => {
-    expect(() =>
-      aggregateOrders([
-        {
-          ...order,
-          lineItems: { ...order.lineItems, pageInfo: { hasNextPage: true } },
-        },
-      ])
-    ).toThrow("pagination");
-    const copy = structuredClone(order);
-    copy.lineItems.nodes[0].discountedTotalSet.shopMoney.currencyCode = "JPY";
-    expect(() => aggregateOrders([copy])).toThrow("FX");
-  });
-});
-
-describe("Stripe wall book", () => {
-  const sub = (
-    currency: string,
-    amount: number,
-    product = "prod_Uu6nrHIKWnnTWL"
-  ) =>
-    ({
-      status: "active",
-      metadata: {},
-      items: {
-        data: [
-          {
-            quantity: 1,
-            price: {
-              unit_amount: amount,
-              currency,
-              product,
-              recurring: { interval: "month", interval_count: 1 },
-            },
-          },
-        ],
-      },
-    } as Stripe.Subscription);
-  it("includes unmapped prices within allowed products and keeps JPY in major yen", () => {
-    const book = wallSubscriptionBook([
-      sub("usd", 140000),
-      sub("jpy", 4800),
-      sub("usd", 100, "test"),
-    ]);
-    expect(book.usd).toBe(1400);
-    expect(book.monthlyByCurrency.jpy).toBe(4800);
-    expect(book.unsupportedItems).toBe(1);
-    expect(book.unmappedProducts).toBe(1);
-    expect(
-      wallSubscriptionBook([sub("jpy", 4800)], { jpy: 0.0067 }).usd
-    ).toBeCloseTo(32.16);
-  });
-  it("counts additional approved enterprise products and excludes marketplace", () => {
-    vi.stubEnv("OMI_TV_PLAN_PRODUCT_IDS", "enterprise");
-    const app = { ...sub("usd", 1000), metadata: { app_id: "app" } };
-    expect(
-      wallSubscriptionBook([sub("usd", 140000, "enterprise"), app]).usd
-    ).toBe(1400);
-    vi.unstubAllEnvs();
-  });
-});
-
-it("does not turn unsupported or failed Stripe coverage into a zero MRR", async () => {
-  const s = sources();
-  s.stripe = async () => ({
-    usd: 0,
-    partial: false,
-    unmappedProducts: 0,
-    unsupportedItems: 2,
-  });
-  const wall = await computeWall(s, now);
-  expect(wall.metrics.find((m) => m.id === "revenue.mrr")?.value).toBeNull();
 });

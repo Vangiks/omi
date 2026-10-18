@@ -16,7 +16,6 @@ import {
   Query,
   queryPosthog,
 } from "./wall-posthog";
-import { fetchShopifyWeek } from "./wall-shopify";
 
 export const WALL_DEFINITIONS = [
   ["growth.wau", "WAU", "people", "Growth"],
@@ -35,18 +34,10 @@ export const WALL_DEFINITIONS = [
   ["engagement.mau", "MAU", "people", "Growth"],
   ["engagement.saved_creators", "Saved creators", "people", "Activation"],
   ["engagement.assistant_success", "Assistant success", "people", "Activation"],
-  ["revenue.arpmau", "ARPMAU", "USD/person/month", "Revenue"],
-  ["revenue.mrr", "Omi-plan MRR", "USD/month", "Revenue"],
-  ["revenue.activated_paid_30d", "Activated → paid", "percent", "Activation"],
-  ["revenue.payer_churn", "Payer churn", "percent", "Revenue"],
-  ["revenue.hardware_units_week", "Hardware units", "devices", "Revenue"],
-  ["revenue.hardware_usd_week", "Hardware sales", "USD", "Revenue"],
   ["cost.net_day", "Settled net cost", "USD/day", "Health"],
   ["cost.per_mau_month", "Cost / MAU", "USD/person/30d", "Health"],
-  ["cost.gross_margin_pct", "Gross margin · goal 60%", "percent", "Revenue"],
   ["health.crash_free", "Crash-free · macOS", "percent", "Health"],
   ["health.thumbs_positive", "Positive answers", "percent", "Health"],
-  ["revenue.plan_prepay_usd_week", "Plan prepay sold · cash", "USD", "Revenue"],
   [
     "activation.capture_week1_share",
     "Capture in week 1",
@@ -92,16 +83,6 @@ const bucket = (p: unknown): keyof Split =>
   p === "macos" ? "macos" : p === "ios" || p === "android" ? "mobile" : "other";
 export interface WallSources {
   query: Query;
-  shopify: typeof fetchShopifyWeek;
-  stripe: () => Promise<{
-    usd: number;
-    partial: boolean;
-    unmappedProducts: number;
-    unsupportedItems: number;
-    fixture?: boolean;
-    dataThrough?: string;
-    sourceRefreshedAt?: string;
-  }>;
   billing: () => Promise<{
     daily: { date: string; total: number }[];
     generatedAt: number;
@@ -110,34 +91,6 @@ export interface WallSources {
 }
 export const defaultWallSources: WallSources = {
   query: queryPosthog,
-  shopify: fetchShopifyWeek,
-  stripe: async () => {
-    const { getOptionalStripe } = await import("./stripe");
-    const { fetchWallSubscriptionBook, wallSubscriptionBook } = await import(
-      "./stripe-subscriptions"
-    );
-    if (process.env.OMI_TV_LOCAL_STRIPE_FIXTURE_PATH) {
-      if (
-        process.env.NODE_ENV === "production" ||
-        process.env.DEV_BYPASS_AUTH !== "1"
-      )
-        throw new Error("Stripe fixture requires development bypass");
-      const { readFile } = await import("node:fs/promises");
-      const fixture = JSON.parse(
-        await readFile(process.env.OMI_TV_LOCAL_STRIPE_FIXTURE_PATH, "utf8")
-      );
-      return {
-        ...wallSubscriptionBook(fixture.subscriptions),
-        partial: false,
-        fixture: true,
-        dataThrough: fixture.dataThrough,
-        sourceRefreshedAt: fixture.sourceRefreshedAt,
-      };
-    }
-    const stripe = getOptionalStripe();
-    if (!stripe) throw new Error("Stripe restricted read key unavailable");
-    return fetchWallSubscriptionBook(stripe);
-  },
   billing: async () => {
     const { computeBillingInfraCosts } = await import(
       "@/app/api/omi/stats/infra-costs/route"
@@ -146,15 +99,6 @@ export const defaultWallSources: WallSources = {
   },
 };
 const NULL_REASONS: Partial<Record<MetricId, string>> = {
-  "revenue.mrr":
-    "Stripe plan book unavailable; restricted read credentials required",
-  "revenue.arpmau": "Corrected same-cutoff MRR snapshot unavailable",
-  "revenue.activated_paid_30d":
-    "Signup/person/billing identity join unavailable",
-  "revenue.payer_churn":
-    "Complete-month distinct-payer snapshots and effective lapse history unavailable",
-  "cost.gross_margin_pct":
-    "Recognized subscription revenue, variable cost, STT and fee coverage unavailable; 60% is a goal",
   "health.crash_free":
     "Crash reporting coverage unverified; zero crash events cannot prove 100% crash-free",
   "health.thumbs_positive":
@@ -342,101 +286,7 @@ export async function computeWall(
       )} to ${m.windowEnd?.slice(0, 10)} (exclusive end); ${m.reason}`;
     }
   }
-  const week = completeWeek(now);
   await Promise.allSettled([
-    (async () => {
-      const snapshots = await Promise.allSettled(
-        [0, 1].map(async (i) =>
-          sources.shopify(
-            isoDay(shiftDay(week.start, -7 * i)),
-            isoDay(shiftDay(week.end, -7 * i))
-          )
-        )
-      );
-      for (const [id, key] of [
-        ["revenue.hardware_units_week", "units"],
-        ["revenue.hardware_usd_week", "hardwareUsd"],
-        ["revenue.plan_prepay_usd_week", "prepayUsd"],
-      ] as const) {
-        const current = snapshots[0],
-          previous = snapshots[1];
-        const m = metrics[id];
-        if (current.status !== "fulfilled") {
-          m.reason =
-            "Shopify orders unavailable; read_orders and complete pagination required";
-          continue;
-        }
-        m.value = current.value[key];
-        m.prev = previous.status === "fulfilled" ? previous.value[key] : null;
-        stamp(
-          m,
-          week.start,
-          week.end,
-          `Shopify net of refunds; USD shop currency; title/SKU mapping proxy (${current.value.unmappedLines} other lines). Platform attribution unavailable. Prepay is cash, never MRR.`
-        );
-        m.partial = true;
-        m.trend = [
-          ...(previous.status === "fulfilled"
-            ? [{ date: isoDay(shiftDay(week.start, -1)), value: m.prev }]
-            : []),
-          { date: isoDay(shiftDay(week.end, -1)), value: m.value },
-        ];
-      }
-    })(),
-    (async () => {
-      const book = await sources.stripe();
-      const m = metrics["revenue.mrr"];
-      m.fixture = book.fixture === true;
-      m.value =
-        book.usd === 0 &&
-        (book.partial || book.unmappedProducts > 0 || book.unsupportedItems > 0)
-          ? null
-          : book.usd;
-      m.partial =
-        book.partial || book.unmappedProducts > 0 || book.unsupportedItems > 0;
-      // Live Stripe is today's book. Never pretend it is a historical complete-day close.
-      m.status = m.value == null ? "null" : "proxy";
-      m.sourceRefreshedAt = new Date().toISOString();
-      m.dataThrough = now.toISOString();
-      m.stale = false;
-      m.reason = `Live renewal run-rate, not a complete-period snapshot; prior/trend unavailable. ${book.unmappedProducts} unmapped product items, ${book.unsupportedItems} tiered/non-USD items excluded; JPY stays yen, no implicit FX. Shopify cash excluded.`;
-      const a = metrics["revenue.arpmau"];
-      a.reason =
-        "MRR snapshot at the qualified-MAU cutoff unavailable; live Stripe book is not a same-cutoff numerator";
-      if (
-        book.dataThrough === isoDay(shiftDay(end, -1)) &&
-        book.sourceRefreshedAt
-      ) {
-        stamp(
-          m,
-          shiftDay(end, -1),
-          end,
-          `${
-            book.fixture ? "LOCAL STRIPE FIXTURE · " : ""
-          }Omi-plan renewal run-rate snapshot; Shopify cash excluded; USD/approved FX only`,
-          book.sourceRefreshedAt
-        );
-        const mau = metrics["engagement.mau"];
-        if (mau.value && m.value != null && !m.partial) {
-          a.fixture = book.fixture === true;
-          a.value = book.usd / mau.value;
-          a.denominator = mau.value;
-          stamp(
-            a,
-            shiftDay(end, -30),
-            end,
-            `${
-              book.fixture ? "LOCAL STRIPE FIXTURE numerator · " : ""
-            }Same-cutoff Omi-plan MRR / qualified MAU. ${COVERAGE_REASON}`,
-            book.sourceRefreshedAt
-          );
-          a.sourceRefreshedAt = mau.sourceRefreshedAt
-            ? [book.sourceRefreshedAt, mau.sourceRefreshedAt].sort()[0]
-            : null;
-          a.stale = m.stale || mau.stale;
-        }
-      }
-    })(),
     (async () => {
       const bill = await sources.billing();
       if (!bill || bill.summary.costSource !== "billing") return;

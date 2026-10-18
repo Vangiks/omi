@@ -24,7 +24,6 @@ import {
 } from "@/lib/telemetry/fixtures";
 import { reliabilityReaderConfig } from "@/lib/telemetry/flags";
 import { assembleResponseReliability } from "@/lib/telemetry/replacement-reliability";
-import { PLAN_ECONOMICS_QUERY } from "@/lib/services/plan-economics";
 import { billingTable } from "@/lib/services/gcp-billing";
 
 const channels = new Map([
@@ -133,9 +132,6 @@ export function buildFixtureParityReceipt() {
     warehouse: {
       posthog_gcp_aggregate: false,
       billing_table: billingTable(),
-      plan_economics_reads_unit_cost_daily: PLAN_ECONOMICS_QUERY.includes(
-        "omi_finops.unit_cost_daily"
-      ),
     },
   };
 }

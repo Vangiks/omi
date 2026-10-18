@@ -36,7 +36,6 @@ import { reliabilityReaderConfig } from "@/lib/telemetry/flags";
 import { buildFixtureParityReceipt } from "@/lib/telemetry/parity-receipt";
 import { assembleResponseReliability } from "@/lib/telemetry/replacement-reliability";
 import { billingTable } from "@/lib/services/gcp-billing";
-import { PLAN_ECONOMICS_QUERY } from "@/lib/services/plan-economics";
 
 const channels = new Map([
   ["prod-user", "production" as const],
@@ -505,12 +504,6 @@ describe("fixture parity receipt", () => {
     expect(receipt.fallback_triage.equal).toBe(true);
     expect(receipt.connection_balance.mobile_reconnect_volume).toBe(3);
     expect(receipt.warehouse.posthog_gcp_aggregate).toBe(false);
-    expect(receipt.warehouse.plan_economics_reads_unit_cost_daily).toBe(true);
-    expect(PLAN_ECONOMICS_QUERY).toContain("omi_finops.plan_revenue_daily");
-    expect(PLAN_ECONOMICS_QUERY).toContain(
-      "omi_finops.unit_cost_reconciliation"
-    );
-    expect(PLAN_ECONOMICS_QUERY).not.toContain("posthog");
     expect(billingTable()).toContain("gcp_billing_export");
     expect(billingTable()).not.toContain("posthog");
   });

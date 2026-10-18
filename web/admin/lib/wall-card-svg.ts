@@ -4,22 +4,10 @@ export const HERO_METRICS = new Set([
   "growth.wau",
   "activation.rate",
   "retention.if_activated",
-  "revenue.arpmau",
   "health.crash_free",
 ]);
-export const SMALL_METRICS = new Set([
-  "revenue.plan_prepay_usd_week",
-  "revenue.payer_churn",
-  "cost.gross_margin_pct",
-]);
 export function cardHeight(id: string): number {
-  return SMALL_METRICS.has(id)
-    ? 102
-    : id === "revenue.arpmau"
-    ? 174
-    : HERO_METRICS.has(id)
-    ? 210
-    : 144;
+  return HERO_METRICS.has(id) ? 210 : 144;
 }
 export function formatWallValue(value: number | null, unit: string): string {
   if (value == null) return "—";
@@ -72,14 +60,12 @@ export interface CardView {
   missingReason: string;
   fixture: boolean;
   dimmed: boolean;
-  hardwareUnits: number | null;
 }
 /** A data-only SVG for Grafana's built-in Canvas SVG icon; Grafana sanitizes it.
  * No scripts, stylesheets, links, foreignObject, external images, or user content.
  */
 export function wallCardSvg(metric: Metric, view: CardView): string {
   const h = cardHeight(metric.id),
-    small = SMALL_METRICS.has(metric.id),
     hero = HERO_METRICS.has(metric.id);
   const accent = view.dimmed ? "#516176" : "#60a5fa",
     muted = "#92a3ba";
@@ -117,87 +103,59 @@ export function wallCardSvg(metric: Metric, view: CardView): string {
   }" y="13" font-size="9.5" fill="#b7c7dc" font-weight="500" text-anchor="middle">${escape(
     view.scope
   )}</text></svg>`;
-  const valueY = small ? 52 : h >= 200 ? 80 : h >= 170 ? 68 : 58;
-  const valueSize = small
-    ? 25
-    : h >= 200
-    ? 49
-    : hero
-    ? 41
-    : ["revenue.mrr", "revenue.hardware_usd_week"].includes(metric.id)
-    ? 33
-    : 29;
+  const valueY = h >= 200 ? 80 : 58;
+  const valueSize = h >= 200 ? 49 : hero ? 41 : 29;
   svg += text(view.display, 14, valueY, valueSize, view.valueColor, 700);
-  if (view.hardwareUnits != null)
+  const deltaY = h >= 200 ? 105 : 77;
+  svg += text(
+    metric.value == null ? view.missingReason : view.deltaText,
+    14,
+    deltaY,
+    10,
+    metric.value == null ? muted : view.deltaColor,
+    500
+  );
+  const labelY = h >= 200 ? 126 : 94;
+  ["macOS", "Mobile", "Other"].forEach((p, i) => {
+    svg += text(p, 14 + i * 80, labelY, 8.8);
     svg += text(
-      `${view.hardwareUnits.toLocaleString("en-US")} devices`,
-      246,
-      valueY - 1,
-      10.5,
-      view.valueColor,
-      500,
-      "end"
-    );
-  if (small) {
-    svg += text("macOS — · Mobile — · Other —", 14, 70, 9);
-    svg += text(
-      metric.value == null ? view.missingReason : view.footnote,
-      14,
-      89,
-      9.2
-    );
-  } else {
-    const deltaY = h >= 200 ? 105 : h >= 170 ? 89 : 77;
-    svg += text(
-      metric.value == null ? view.missingReason : view.deltaText,
-      14,
-      deltaY,
-      10,
-      metric.value == null ? muted : view.deltaColor,
+      view.splitValues[i],
+      14 + i * 80,
+      labelY + 14,
+      11.2,
+      "#c2cedd",
       500
     );
-    const labelY = h >= 200 ? 126 : h >= 170 ? 107 : 94;
-    ["macOS", "Mobile", "Other"].forEach((p, i) => {
-      svg += text(p, 14 + i * 80, labelY, 8.8);
-      svg += text(
-        view.splitValues[i],
-        14 + i * 80,
-        labelY + 14,
-        11.2,
-        "#c2cedd",
-        500
-      );
-    });
-    const top = h >= 200 ? 154 : h >= 170 ? 131 : 114,
-      height = h >= 200 ? 28 : h >= 170 ? 18 : 12;
-    const points = metric.trend.map((p, i) => ({ index: i, value: p.value }));
-    const finite = points.filter(
-      (p): p is { index: number; value: number } =>
-        p.value != null && Number.isFinite(p.value)
-    );
-    if (finite.length >= 2) {
-      const min = Math.min(...finite.map((p) => p.value)),
-        max = Math.max(...finite.map((p) => p.value)),
-        span = max - min || 1;
-      // A missing bucket breaks the line; it never joins across unavailable periods.
-      let path = "",
-        last = -2;
-      for (const p of finite) {
-        const x = (232 * p.index) / Math.max(1, points.length - 1),
-          y = height - ((p.value - min) / span) * height;
-        path += `${p.index === last + 1 ? "L" : "M"}${x.toFixed(2)} ${y.toFixed(
-          2
-        )} `;
-        last = p.index;
-      }
-      svg += `<svg x="${(14 / 260) * 100}%" y="${(top / h) * 100}%" width="${
-        (232 / 260) * 100
-      }%" height="${
-        (height / h) * 100
-      }%" viewBox="0 0 232 ${height}" preserveAspectRatio="none"><path vector-effect="non-scaling-stroke" d="${path.trim()}" fill="none" stroke="${accent}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-    } else svg += text("Trend not available yet", 14, top + height - 1, 8.8);
-    svg += text(view.footnote, 14, h - 11, 8.6);
-  }
+  });
+  const top = h >= 200 ? 154 : 114,
+    height = h >= 200 ? 28 : 12;
+  const points = metric.trend.map((p, i) => ({ index: i, value: p.value }));
+  const finite = points.filter(
+    (p): p is { index: number; value: number } =>
+      p.value != null && Number.isFinite(p.value)
+  );
+  if (finite.length >= 2) {
+    const min = Math.min(...finite.map((p) => p.value)),
+      max = Math.max(...finite.map((p) => p.value)),
+      span = max - min || 1;
+    // A missing bucket breaks the line; it never joins across unavailable periods.
+    let path = "",
+      last = -2;
+    for (const p of finite) {
+      const x = (232 * p.index) / Math.max(1, points.length - 1),
+        y = height - ((p.value - min) / span) * height;
+      path += `${p.index === last + 1 ? "L" : "M"}${x.toFixed(2)} ${y.toFixed(
+        2
+      )} `;
+      last = p.index;
+    }
+    svg += `<svg x="${(14 / 260) * 100}%" y="${(top / h) * 100}%" width="${
+      (232 / 260) * 100
+    }%" height="${
+      (height / h) * 100
+    }%" viewBox="0 0 232 ${height}" preserveAspectRatio="none"><path vector-effect="non-scaling-stroke" d="${path.trim()}" fill="none" stroke="${accent}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  } else svg += text("Trend not available yet", 14, top + height - 1, 8.8);
+  svg += text(view.footnote, 14, h - 11, 8.6);
   if (view.fixture)
     svg += text("FIXTURE", 246, valueY + 18, 8.8, "#9eabc0", 600, "end");
   return svg + "</svg>";

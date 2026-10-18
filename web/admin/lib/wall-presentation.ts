@@ -10,19 +10,13 @@ export const WALL_LABELS: Partial<Record<Metric["id"], string>> = {
   "engagement.dau": "Daily active people",
   "engagement.mau": "Monthly active people",
   "engagement.assistant_success": "Answered questions",
-  "revenue.arpmau": "ARPMAU",
-  "revenue.mrr": "Monthly recurring revenue",
-  "revenue.hardware_usd_week": "Hardware sales",
-  "revenue.plan_prepay_usd_week": "Plan prepay · Shopify",
   "cost.net_day": "Daily net cost",
   "cost.per_mau_month": "Monthly cost / MAU",
-  "cost.gross_margin_pct": "Gross margin · goal 60%",
   "health.crash_free": "Crash-free",
   "health.thumbs_positive": "Positive answers",
   "activation.capture_week1_share": "Saved capture · week one",
   "retention.established_week": "Established retention",
   "retention.day1_return": "Day-one return",
-  "revenue.activated_paid_30d": "Activated to paid",
 };
 export function wallPresentation(payload: WallPayload, now = new Date()) {
   const tiles: Record<string, object> = {},
@@ -33,7 +27,6 @@ export function wallPresentation(payload: WallPayload, now = new Date()) {
     const cadence = m.id.startsWith("cost.")
       ? "settled"
       : m.id.startsWith("activation.") ||
-        m.id.startsWith("revenue.") ||
         m.id === "health.thumbs_positive" ||
         [
           "retention.if_activated",
@@ -92,13 +85,7 @@ export function wallPresentation(payload: WallPayload, now = new Date()) {
       change == null
         ? 0
         : change *
-          ([
-            "cost.net_day",
-            "cost.per_mau_month",
-            "revenue.payer_churn",
-          ].includes(m.id)
-            ? -1
-            : 1);
+          (["cost.net_day", "cost.per_mau_month"].includes(m.id) ? -1 : 1);
     const deltaColor = dimmed
       ? "#8190a6"
       : signal > 0
@@ -116,11 +103,6 @@ export function wallPresentation(payload: WallPayload, now = new Date()) {
     const missingReasons: Partial<Record<Metric["id"], string>> = {
       "health.crash_free": "Crash coverage not verified",
       "health.thumbs_positive": "Answer ratings source needed",
-      "revenue.payer_churn": "Payer history needed",
-      "revenue.activated_paid_30d": "Paid-account linkage needed",
-      "revenue.arpmau": "Same-date revenue source needed",
-      "revenue.mrr": "Plan revenue source needed",
-      "cost.gross_margin_pct": "Revenue and cost coverage needed",
     };
     const missingReason = missingReasons[m.id] || "Source data not available";
     let footnote = through ? `as of ${through}` : "Refresh time unavailable";
@@ -131,7 +113,7 @@ export function wallPresentation(payload: WallPayload, now = new Date()) {
           : ""
       }`;
     if (m.status === "null") footnote = missingReason;
-    else if (fixture) footnote = "FIXTURE · sample Stripe data";
+    else if (fixture) footnote = "FIXTURE · sample data";
     else if (m.stale)
       footnote = `Refresh overdue · ${
         through ? `as of ${through}` : "time unavailable"
@@ -144,22 +126,6 @@ export function wallPresentation(payload: WallPayload, now = new Date()) {
       footnote = `180-day lookback · ${
         through ? `as of ${through}` : "refresh pending"
       }`;
-    if (
-      m.id === "revenue.plan_prepay_usd_week" &&
-      !fixture &&
-      !m.stale &&
-      !m.partial &&
-      !m.materialGap &&
-      m.value != null
-    )
-      footnote = `Shopify cash · ${
-        through ? `as of ${through}` : "refresh pending"
-      }`;
-    const hardwareUnits =
-      m.id === "revenue.hardware_usd_week"
-        ? payload.metrics.find((p) => p.id === "revenue.hardware_units_week")
-            ?.value ?? null
-        : null;
     const scope = [
       "health.crash_free",
       "health.thumbs_positive",
@@ -181,7 +147,6 @@ export function wallPresentation(payload: WallPayload, now = new Date()) {
       missingReason,
       fixture,
       dimmed,
-      hardwareUnits,
     };
     tiles[key] = {
       value: m.value,
