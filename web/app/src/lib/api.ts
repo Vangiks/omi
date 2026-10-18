@@ -57,7 +57,6 @@ import type {
   ThumbnailUploadResponse,
   GenerateDescriptionResponse,
   NotificationScope,
-  PaymentPlan,
 } from '@/types/apps';
 
 // Always use proxy to avoid CORS (browser → proxy → api.omi.me)
@@ -1415,7 +1414,6 @@ export async function getChatApps(): Promise<App[]> {
 export async function createApp(
   data: CreateAppRequest & {
     deleted?: boolean;
-    price?: number;
     thumbnails?: string[];
     uid?: string;
   },
@@ -1640,30 +1638,6 @@ export async function getNotificationScopes(): Promise<NotificationScope[]> {
     if (!token) return [];
 
     const response = await fetch(`${API_BASE_URL}/v1/app/proactive-notification-scopes`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'X-App-Platform': 'web',
-      },
-    });
-
-    if (!response.ok) return [];
-    return response.json();
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Get available payment plans
- * Note: This endpoint may not exist in all API versions, returns empty array on 404
- */
-export async function getPaymentPlans(): Promise<PaymentPlan[]> {
-  try {
-    const token = await getIdToken();
-    if (!token) return [];
-
-    const response = await fetch(`${API_BASE_URL}/v1/app/plans`, {
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',

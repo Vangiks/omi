@@ -64,11 +64,6 @@ export interface App {
   chat_tools?: ChatTool[];
   thumbnails?: string[];
   thumbnail_urls?: string[];
-  is_paid?: boolean;
-  price?: number;
-  payment_plan?: string;
-  payment_link?: string;
-  is_user_paid?: boolean;
   is_popular?: boolean;
   created_at?: string;
   source_code_url?: string;
@@ -174,11 +169,6 @@ export interface NotificationScope {
   title: string;
 }
 
-export interface PaymentPlan {
-  id: string;
-  title: string;
-}
-
 export interface AppFormData {
   // Metadata
   name: string;
@@ -220,9 +210,6 @@ export interface CreateAppRequest {
   category: string;
   capabilities: string[];
   private: boolean;
-  is_paid?: boolean;
-  price?: number;
-  payment_plan?: string;
   chat_prompt?: string;
   memory_prompt?: string;
   persona_prompt?: string;

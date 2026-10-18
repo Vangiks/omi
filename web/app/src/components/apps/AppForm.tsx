@@ -8,7 +8,6 @@ import {
   getAppCategories,
   getAppCapabilities,
   getNotificationScopes,
-  getPaymentPlans,
   createApp,
   updateApp,
   uploadAppThumbnail,
@@ -20,7 +19,6 @@ import type {
   AppCategory,
   AppCapability,
   NotificationScope,
-  PaymentPlan,
   CreateAppRequest,
   ThumbnailUploadResponse,
 } from '@/types/apps';
@@ -165,7 +163,6 @@ export function AppForm({ mode, app }: AppFormProps) {
   const [categories, setCategories] = useState<AppCategory[]>([]);
   const [capabilities, setCapabilities] = useState<AppCapability[]>([]);
   const [notificationScopes, setNotificationScopes] = useState<NotificationScope[]>([]);
-  const [paymentPlans, setPaymentPlans] = useState<PaymentPlan[]>([]);
 
   // Form data
   const [name, setName] = useState('');
@@ -199,9 +196,6 @@ export function AppForm({ mode, app }: AppFormProps) {
 
   // Privacy & Payment
   const [isPrivate, setIsPrivate] = useState(true);
-  const [isPaid, setIsPaid] = useState(false);
-  const [price, setPrice] = useState('');
-  const [paymentPlan, setPaymentPlan] = useState('');
 
   // Source code URL
   const [sourceCodeUrl, setSourceCodeUrl] = useState('');
@@ -213,16 +207,14 @@ export function AppForm({ mode, app }: AppFormProps) {
   useEffect(() => {
     async function loadMetadata() {
       try {
-        const [cats, caps, scopes, plans] = await Promise.all([
+        const [cats, caps, scopes] = await Promise.all([
           getAppCategories(),
           getAppCapabilities(),
           getNotificationScopes(),
-          getPaymentPlans(),
         ]);
         setCategories(cats);
         setCapabilities(caps);
         setNotificationScopes(scopes);
-        setPaymentPlans(plans);
       } catch (err) {
         console.error('Failed to load metadata:', err);
         setError('Failed to load form data');
@@ -245,9 +237,6 @@ export function AppForm({ mode, app }: AppFormProps) {
       setMemoryPrompt(app.memory_prompt || '');
       setPersonaPrompt(app.persona_prompt || '');
       setIsPrivate(app.private || false);
-      setIsPaid(app.is_paid || false);
-      setPrice(app.price?.toString() || '');
-      setPaymentPlan(app.payment_plan || '');
 
       setSourceCodeUrl(app.source_code_url || '');
 
@@ -399,17 +388,6 @@ export function AppForm({ mode, app }: AppFormProps) {
       );
       return false;
     }
-    if (isPaid) {
-      if (!price || parseFloat(price) < 1) {
-        setError('Price must be at least $1.00');
-        return false;
-      }
-      if (!paymentPlan) {
-        setError('Please select a payment plan');
-        return false;
-      }
-    }
-
     setError(null);
     return true;
   };
@@ -454,11 +432,6 @@ export function AppForm({ mode, app }: AppFormProps) {
       }
       if ((hasExternalIntegration || hasProactiveNotification) && sourceCodeUrl.trim()) {
         data.source_code_url = sourceCodeUrl.trim();
-      }
-      if (isPaid) {
-        data.is_paid = true;
-        data.price = parseFloat(price);
-        data.payment_plan = paymentPlan;
       }
       const thumbnailIds = thumbnails.map((thumb) => thumb.id);
       if (!thumbnailIds.includes(null)) {
@@ -1080,99 +1053,6 @@ export function AppForm({ mode, app }: AppFormProps) {
                 />
               </button>
             </div>
-
-            {/* Paid App Toggle */}
-            {paymentPlans.length > 0 && (
-              <>
-                <div
-                  className={cn(
-                    'flex items-center justify-between p-4 rounded-xl transition-all',
-                    isPaid ? 'bg-white/10' : 'bg-bg-tertiary',
-                  )}
-                >
-                  <div>
-                    <p className="text-text-primary font-medium">Paid App</p>
-                    <p className="text-sm text-text-tertiary">
-                      Charge users for your app
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsPaid(!isPaid)}
-                    className={cn(
-                      'relative w-14 h-8 rounded-full transition-all',
-                      isPaid ? 'bg-white' : 'bg-bg-quaternary',
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        'absolute top-1 w-6 h-6 rounded-full transition-all shadow-md',
-                        isPaid ? 'bg-black' : 'bg-white',
-                        isPaid ? 'left-7' : 'left-1',
-                      )}
-                    />
-                  </button>
-                </div>
-
-                {isPaid && (
-                  <div className="space-y-4 p-4 bg-bg-tertiary rounded-xl">
-                    {/* Price */}
-                    <div>
-                      <label className="block text-sm text-text-secondary mb-2">
-                        Price (USD) *
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-text-tertiary">
-                          $
-                        </span>
-                        <input
-                          type="number"
-                          value={price}
-                          onChange={(e) => setPrice(e.target.value)}
-                          min="1"
-                          step="0.01"
-                          placeholder="0.00"
-                          className={cn(
-                            'w-full pl-8 pr-4 py-3 rounded-xl',
-                            'bg-bg-secondary border border-bg-quaternary',
-                            'text-text-primary placeholder:text-text-tertiary',
-                            'focus:outline-none focus:ring-2 focus:ring-white/50',
-                          )}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Payment Plan */}
-                    <div>
-                      <label className="block text-sm text-text-secondary mb-2">
-                        Payment Plan *
-                      </label>
-                      <div className="flex gap-2">
-                        {paymentPlans.map((plan) => {
-                          const isSelected = paymentPlan === plan.id;
-                          return (
-                            <button
-                              key={plan.id}
-                              type="button"
-                              onClick={() => setPaymentPlan(plan.id)}
-                              className={cn(
-                                'flex-1 px-4 py-3 rounded-xl text-sm font-medium transition-all',
-                                'border',
-                                isSelected
-                                  ? 'bg-white/10 text-white border-white/50'
-                                  : 'bg-bg-secondary border-bg-quaternary text-text-secondary hover:bg-bg-quaternary',
-                              )}
-                            >
-                              {plan.title}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
           </section>
 
           {/* Bottom padding to ensure content isn't cut off */}

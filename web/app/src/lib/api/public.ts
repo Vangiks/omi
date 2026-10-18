@@ -36,9 +36,6 @@ export async function getApprovedApps(): Promise<{
     rating_count: number;
     capabilities: string[];
     created_at: string;
-    is_paid?: boolean;
-    price?: number;
-    payment_plan?: 'one_time' | 'monthly_recurring' | null;
     is_popular?: boolean;
   }>;
   stats: Array<{
@@ -87,9 +84,6 @@ export async function getAppById(appId: string): Promise<{
   rating_count: number;
   capabilities: string[];
   created_at: string;
-  is_paid?: boolean;
-  price?: number;
-  payment_plan?: 'one_time' | 'monthly_recurring' | null;
   is_popular?: boolean;
   reviews?: Array<{
     id: string;
@@ -125,9 +119,6 @@ export function transformToPlugin(raw: {
   rating_count: number;
   capabilities: string[];
   created_at: string | null;
-  is_paid?: boolean;
-  price?: number;
-  payment_plan?: 'one_time' | 'monthly_recurring' | null;
   is_popular?: boolean;
 }): {
   id: string;
@@ -141,9 +132,6 @@ export function transformToPlugin(raw: {
   rating_count: number;
   capabilities: Set<string>;
   created_at: string | null;
-  is_paid?: boolean;
-  price?: number;
-  payment_plan?: 'one_time' | 'monthly_recurring' | null;
   is_popular?: boolean;
 } {
   return {
@@ -185,9 +173,6 @@ export interface V2AppData {
   rating_count: number;
   capabilities: string[];
   created_at: string | null;
-  is_paid?: boolean;
-  price?: number;
-  payment_plan?: 'one_time' | 'monthly_recurring' | null;
   is_popular?: boolean;
   approved?: boolean;
   status?: string;
@@ -204,8 +189,6 @@ export interface V2AppData {
   thumbnails?: any[];
   thumbnail_urls?: string[];
   is_influencer?: boolean;
-  is_user_paid?: boolean;
-  payment_link?: string | null;
 }
 
 export interface V2CapabilityGroup {
