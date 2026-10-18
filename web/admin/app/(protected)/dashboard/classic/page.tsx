@@ -3,7 +3,6 @@
 import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  DollarSign,
   TrendingUp,
   Users,
   MessageSquare,
@@ -18,7 +17,6 @@ import {
   MousePointerClick,
   Percent,
   AlertTriangle,
-  Smartphone,
   Share2,
 } from "lucide-react";
 import useSWR from "swr";
@@ -64,33 +62,6 @@ import {
 } from "@/lib/growth-metrics";
 
 // --- Types ---
-
-interface RevenueData {
-  mrr: number;
-  arr: number;
-  partial?: boolean;
-}
-
-interface MrrTrendPoint {
-  month: string;
-  monthKey: string;
-  mrr: number;
-}
-
-interface SubscriptionTrendPoint {
-  month: string;
-  monthKey: string;
-  monthly: number;
-  annual: number;
-}
-
-interface SubscriptionCounts {
-  totalSubscriptions: number;
-  partial?: boolean;
-  monthly: number;
-  annual: number;
-  trialing: number;
-}
 
 interface ConversationCount {
   totalConversations: number;
@@ -328,84 +299,13 @@ interface MacosVersionStatsData {
   truncated?: boolean;
 }
 
-interface ProfitabilityPoint {
-  date: string;
-  desktop: number;
-  mobile: number;
-  total: number;
-}
-
-interface ProfitabilityData {
-  days: number;
-  users: ProfitabilityPoint[];
-  cumulativeUsers: ProfitabilityPoint[];
-  activeUsers?: ProfitabilityPoint[];
-  revenue: ProfitabilityPoint[];
-  cost: ProfitabilityPoint[];
-  /** Nullable: cost/user is unmeasurable on days with no billing data. */
-  costPerUser?: Array<{
-    date: string;
-    desktop: number | null;
-    mobile: number | null;
-    total: number | null;
-  }>;
-  conversion: ProfitabilityPoint[];
-  summary: {
-    mrr: number;
-    mrrDesktop: number;
-    mrrMobile: number;
-    mrrUnknown: number;
-    totalNewDesktop: number;
-    totalNewMobile: number;
-    totalUsersDesktop: number;
-    totalUsersMobile: number;
-    totalUsersUnknown: number;
-    totalCostUsd?: number;
-    avgCostPerUserDesktop?: number;
-    avgCostPerUserMobile?: number;
-    assumptions: {
-      desktopCostPerUser: number;
-      mobileCostPerUser: number;
-      overheadMonthlyUsd?: number;
-      costSource?: "real" | "estimated";
-    };
-    partial: boolean;
-    sources: {
-      firebaseAuth: boolean;
-      firestoreTokens: boolean;
-      posthogDesktop?: boolean;
-      posthogMobile?: boolean;
-      stripeActive: boolean;
-      stripeNewPaid: boolean;
-      infraCosts?: boolean;
-    };
-  };
-  generatedAt: number;
-}
-
 // --- Helpers ---
 
 const authFetcher = authenticatedFetcher;
 
-const COLORS = {
-  mrr: "#6366f1",
-  monthly: "#6366f1",
-  annual: "#22c55e",
-  area: "#6366f1",
-};
-
 function retentionHeatColor(pct: number): string {
   const alpha = Math.min(pct / 100, 1);
   return `rgba(99, 102, 241, ${(alpha * 0.7 + 0.05).toFixed(2)})`;
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
 }
 
 function formatCompact(value: number): string {
@@ -512,64 +412,12 @@ const ONE_MILLION_PRIORITY_IDS = [
 
 export default function AnalyticsPage() {
   const { token } = useAuthToken();
-  const [months, setMonths] = useState(12);
   const [retentionDays, setRetentionDays] = useState(30);
   const [retentionPlatform, setRetentionPlatform] = useState("macos");
   const [retentionView, setRetentionView] = useState<"average" | "cohorts">(
     "average"
   );
-  const [cumulativeWindow, setCumulativeWindow] = useState<
-    "7d" | "30d" | "all"
-  >("all");
-  const [profitDays, setProfitDays] = useState<30 | 60 | 90>(30);
-
   const swrOpts = { revalidateOnFocus: false };
-
-  const {
-    data: revenue,
-    isLoading: revenueLoading,
-    error: revenueError,
-  } = useSWR<RevenueData>(
-    token ? ["/api/omi/stats/revenue", token] : null,
-    authFetcher,
-    swrOpts
-  );
-
-  const {
-    data: mrrTrends,
-    isLoading: mrrLoading,
-    error: mrrError,
-  } = useSWR<{
-    data: MrrTrendPoint[];
-  }>(
-    token ? [`/api/omi/stats/mrr-trends?months=${months}`, token] : null,
-    authFetcher,
-    swrOpts
-  );
-
-  const {
-    data: subTrends,
-    isLoading: subTrendsLoading,
-    error: subTrendsError,
-  } = useSWR<{
-    data: SubscriptionTrendPoint[];
-  }>(
-    token
-      ? [`/api/omi/stats/subscription-trends?months=${months}`, token]
-      : null,
-    authFetcher,
-    swrOpts
-  );
-
-  const {
-    data: subCounts,
-    isLoading: subCountsLoading,
-    error: subCountsError,
-  } = useSWR<SubscriptionCounts>(
-    token ? ["/api/omi/stats/subscriptions", token] : null,
-    authFetcher,
-    swrOpts
-  );
 
   const {
     data: convCount,
@@ -650,45 +498,6 @@ export default function AnalyticsPage() {
       swrOpts
     );
 
-  // `days` only. Sending desktop_cost/mobile_cost re-injected invented
-  // per-user costs AND missed the precomputed cache entirely (the cache key
-  // includes the cost params, and precompute writes the no-cost-params key),
-  // so the dashboard paid for a full inline recompute to display made-up
-  // numbers. Cost now comes from billing, via the route's own defaults.
-  const profitQuery = useMemo(() => `days=${profitDays}`, [profitDays]);
-
-  const {
-    data: profitability,
-    isLoading: profitLoading,
-    error: profitError,
-  } = useSWR<ProfitabilityData>(
-    token ? [`/api/omi/stats/profitability?${profitQuery}`, token] : null,
-    authFetcher,
-    swrOpts
-  );
-
-  interface InfraCostsData {
-    breakdown: Array<{
-      service: string;
-      mtdUsd: number;
-      aprProjectionUsd: number;
-      desktopProjectionUsd: number;
-      mobileProjectionUsd: number;
-    }>;
-    summary: {
-      assumptions: {
-        overheadMonthlyUsd: number;
-        desktopShare: number;
-        mobileShare: number;
-      };
-    };
-  }
-  const { data: infraCosts } = useSWR<InfraCostsData>(
-    token ? [`/api/omi/stats/infra-costs?days=${profitDays}`, token] : null,
-    authFetcher,
-    swrOpts
-  );
-
   const retentionPlatformParam = retentionPlatform
     ? `&platform=${retentionPlatform}`
     : "";
@@ -716,40 +525,10 @@ export default function AnalyticsPage() {
       swrOpts
     );
 
-  const isLoading =
-    revenueLoading ||
-    mrrLoading ||
-    subTrendsLoading ||
-    subCountsLoading ||
-    convLoading;
+  const isLoading = convLoading;
+  const hasError = convError;
 
-  const hasError =
-    revenueError || mrrError || subTrendsError || subCountsError || convError;
-
-  const mrr = revenue?.mrr ?? 0;
-  const arr = revenue?.arr ?? 0;
-  const totalSubs = subCounts?.totalSubscriptions ?? 0;
-  const monthlySubs = subCounts?.monthly ?? 0;
-  const annualSubs = subCounts?.annual ?? 0;
-  const hasPartialData = !!(
-    revenue?.partial ||
-    subCounts?.partial ||
-    (mrrTrends as any)?.partial ||
-    (subTrends as any)?.partial
-  );
   const totalConversations = convCount?.totalConversations ?? 0;
-  const mrrData = mrrTrends?.data ?? [];
-  const subData = subTrends?.data ?? [];
-
-  let mrrGrowthPct: number | null = null;
-  if (mrrData.length >= 2) {
-    const current = mrrData[mrrData.length - 1].mrr;
-    const previous = mrrData[mrrData.length - 2].mrr;
-    if (previous > 0) {
-      mrrGrowthPct = ((current - previous) / previous) * 100;
-    }
-  }
-
   const cohorts = retention?.cohorts ?? [];
   let cohortMaxDays = 0;
   for (const c of cohorts) {
@@ -824,22 +603,6 @@ export default function AnalyticsPage() {
       });
   }, [ratingsData]);
 
-  // Slice the all-time daily series to the selected window for the
-  // Cumulative Users chart. Granularity stays daily; only the visible
-  // range changes.
-  const cumulativeSeries = useMemo(() => {
-    if (allDailyData.length === 0) return allDailyData;
-    if (cumulativeWindow === "all") return allDailyData;
-    const days = cumulativeWindow === "7d" ? 7 : 30;
-    return allDailyData.slice(-days);
-  }, [allDailyData, cumulativeWindow]);
-
-  // On a tight window the cumulative values barely move relative to the
-  // absolute total, so pin the y-axis to the window's min/max. For the
-  // full history we anchor at zero so the curve sweeps from 0 → total.
-  const cumulativeYDomain: [number | "dataMin", number | "dataMax"] =
-    cumulativeWindow === "all" ? [0, "dataMax"] : ["dataMin", "dataMax"];
-
   // 7-day rolling average for daily new users
   const dailyWithRollingAvg = useMemo(() => {
     return allDailyData
@@ -889,578 +652,6 @@ export default function AnalyticsPage() {
   const latestWeeklyActivation = weeklyActivationData.at(-1) ?? null;
   const growthRetentionW4 =
     growthRetention?.data?.find((point) => point.day === 28)?.retention ?? null;
-
-  const profitCharts = useMemo<ChartItem[]>(() => {
-    const summary = profitability?.summary;
-    const usersData = profitability?.users ?? [];
-    const revenueData = profitability?.revenue ?? [];
-    const costData = profitability?.cost ?? [];
-    const costPerUserData = (profitability as any)?.costPerUser ?? [];
-    const conversionData = profitability?.conversion ?? [];
-    const costSource = (summary?.assumptions as any)?.costSource as
-      | string
-      | undefined;
-    const avgCostDesktop = (summary as any)?.avgCostPerUserDesktop as
-      | number
-      | undefined;
-    const avgCostMobile = (summary as any)?.avgCostPerUserMobile as
-      | number
-      | undefined;
-
-    return [
-      {
-        id: "profit-users",
-        title: "New users / day",
-        periodChange: latestPeriodChange(
-          usersData,
-          (point) => point.total,
-          "vs previous day"
-        ),
-        subtitle: summary
-          ? `Desktop ${summary.totalNewDesktop.toLocaleString()} · Mobile ${summary.totalNewMobile.toLocaleString()}`
-          : "Per-platform signups",
-        icon: <Users className="h-4 w-4" />,
-        initialLayout: { cols: 6, rows: 4 },
-        render: () => (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={usersData}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis
-                dataKey="date"
-                className="text-xs"
-                tick={{ fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={shortDate}
-                minTickGap={30}
-              />
-              <YAxis
-                className="text-xs"
-                tick={{ fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={formatCompact}
-                width={40}
-              />
-              <Tooltip contentStyle={tooltipStyle} labelFormatter={fullDate} />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar
-                dataKey="desktop"
-                stackId="u"
-                fill="#6366f1"
-                name="Desktop"
-              />
-              <Bar dataKey="mobile" stackId="u" fill="#22c55e" name="Mobile" />
-            </BarChart>
-          </ResponsiveContainer>
-        ),
-      },
-      {
-        id: "profit-revenue",
-        title: "Revenue / day (est.)",
-        periodChange: latestPeriodChange(
-          revenueData,
-          (point) => point.total,
-          "vs previous day"
-        ),
-        subtitle: "Daily MRR share by platform active-user ratio",
-        icon: <DollarSign className="h-4 w-4" />,
-        initialLayout: { cols: 6, rows: 4 },
-        render: () => (
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={revenueData}>
-              <defs>
-                <linearGradient
-                  id="profitRevDesktop"
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
-                </linearGradient>
-                <linearGradient
-                  id="profitRevMobile"
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="1"
-                >
-                  <stop offset="5%" stopColor="#22c55e" stopOpacity={0.4} />
-                  <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis
-                dataKey="date"
-                className="text-xs"
-                tick={{ fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={shortDate}
-                minTickGap={30}
-              />
-              <YAxis
-                className="text-xs"
-                tick={{ fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={(v) => `$${formatCompact(v)}`}
-                width={50}
-              />
-              <Tooltip
-                contentStyle={tooltipStyle}
-                labelFormatter={fullDate}
-                formatter={(v: number, name) => [formatCurrency(v), name]}
-              />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Area
-                type="monotone"
-                dataKey="desktop"
-                stackId="r"
-                stroke="#6366f1"
-                strokeWidth={2}
-                fill="url(#profitRevDesktop)"
-                name="Desktop"
-              />
-              <Area
-                type="monotone"
-                dataKey="mobile"
-                stackId="r"
-                stroke="#22c55e"
-                strokeWidth={2}
-                fill="url(#profitRevMobile)"
-                name="Mobile"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        ),
-      },
-      {
-        id: "profit-cost-per-user",
-        title: `Cost / user / day${costSource === "real" ? "" : " (est.)"}`,
-        periodChange: latestPeriodChange(
-          costPerUserData,
-          (point: ProfitabilityPoint) => point.total,
-          "vs previous day"
-        ),
-        subtitle:
-          avgCostDesktop != null && avgCostMobile != null
-            ? `Avg: Desktop $${avgCostDesktop.toFixed(
-                2
-              )} · Mobile $${avgCostMobile.toFixed(2)}`
-            : "Daily infra spend ÷ active users, per platform",
-        icon: <Activity className="h-4 w-4" />,
-        initialLayout: { cols: 6, rows: 4 },
-        render: () => (
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={costPerUserData}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis
-                dataKey="date"
-                className="text-xs"
-                tick={{ fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={shortDate}
-                minTickGap={30}
-              />
-              <YAxis
-                className="text-xs"
-                tick={{ fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={(v) => `$${Number(v).toFixed(2)}`}
-                width={56}
-              />
-              {/* A null cost/user is unmeasurable (no billing data, or no active
-                  users that day) — it must read as a gap, not as $0.00. */}
-              <Tooltip
-                contentStyle={tooltipStyle}
-                labelFormatter={fullDate}
-                formatter={(v, name) => [
-                  v == null ? "n/a" : `$${Number(v).toFixed(2)}`,
-                  name,
-                ]}
-              />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Line
-                type="monotone"
-                dataKey="desktop"
-                stroke="#f59e0b"
-                strokeWidth={2}
-                dot={false}
-                name="Desktop $/user"
-                connectNulls={false}
-              />
-              <Line
-                type="monotone"
-                dataKey="mobile"
-                stroke="#ef4444"
-                strokeWidth={2}
-                dot={false}
-                name="Mobile $/user"
-                connectNulls={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        ),
-      },
-      {
-        id: "profit-cost",
-        title: `Total infra cost / day${
-          costSource === "real" ? "" : " (est.)"
-        }`,
-        periodChange: latestPeriodChange(
-          costData,
-          (point) => point.total,
-          "vs previous day"
-        ),
-        subtitle:
-          summary?.totalCostUsd != null
-            ? `Total last ${profitability?.days ?? 30}d: ${formatCurrency(
-                summary.totalCostUsd
-              )}`
-            : "Desktop + mobile daily burn",
-        icon: <DollarSign className="h-4 w-4" />,
-        initialLayout: { cols: 6, rows: 4 },
-        render: () => (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={costData}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis
-                dataKey="date"
-                className="text-xs"
-                tick={{ fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={shortDate}
-                minTickGap={30}
-              />
-              <YAxis
-                className="text-xs"
-                tick={{ fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={(v) => `$${formatCompact(v)}`}
-                width={50}
-              />
-              <Tooltip
-                contentStyle={tooltipStyle}
-                labelFormatter={fullDate}
-                formatter={(v: number, name) => [formatCurrency(v), name]}
-              />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Bar
-                dataKey="desktop"
-                stackId="c"
-                fill="#f59e0b"
-                name="Desktop"
-              />
-              <Bar dataKey="mobile" stackId="c" fill="#ef4444" name="Mobile" />
-            </BarChart>
-          </ResponsiveContainer>
-        ),
-      },
-      {
-        id: "profit-conversion",
-        title: "Free → paid %",
-        periodChange: latestPeriodChange(
-          conversionData,
-          (point) => point.total,
-          "vs previous day"
-        ),
-        subtitle: "New paid subs / new users",
-        icon: <Percent className="h-4 w-4" />,
-        initialLayout: { cols: 6, rows: 4 },
-        render: () => (
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={conversionData}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis
-                dataKey="date"
-                className="text-xs"
-                tick={{ fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={shortDate}
-                minTickGap={30}
-              />
-              <YAxis
-                className="text-xs"
-                tick={{ fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={(v) => `${v}%`}
-                width={40}
-              />
-              <Tooltip
-                contentStyle={tooltipStyle}
-                labelFormatter={fullDate}
-                formatter={(v: number, name) => [`${v}%`, name]}
-              />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Line
-                type="monotone"
-                dataKey="desktop"
-                stroke="#6366f1"
-                strokeWidth={2}
-                dot={false}
-                name="Desktop"
-              />
-              <Line
-                type="monotone"
-                dataKey="mobile"
-                stroke="#22c55e"
-                strokeWidth={2}
-                dot={false}
-                name="Mobile"
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        ),
-      },
-      {
-        id: "profit-cost-breakdown",
-        title: "Infra cost by service — last 30 days",
-        subtitle: infraCosts?.summary?.assumptions
-          ? `Trailing-30-day actual spend, split by platform (Desktop ${Math.round(
-              (infraCosts.summary.assumptions.desktopShare ?? 0) * 100
-            )}% · Mobile ${Math.round(
-              (infraCosts.summary.assumptions.mobileShare ?? 0) * 100
-            )}%)`
-          : "Per-service actual spend from GCP bill + external LLMs, split by platform",
-        icon: <DollarSign className="h-4 w-4" />,
-        initialLayout: { cols: 12, rows: 6 },
-        render: () => {
-          const rows = infraCosts?.breakdown ?? [];
-          if (!rows.length) {
-            return (
-              <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                Loading cost breakdown…
-              </div>
-            );
-          }
-          const totalMtd = rows.reduce((s, r) => s + r.mtdUsd, 0);
-          const totalProj = rows.reduce((s, r) => s + r.aprProjectionUsd, 0);
-          const totalDesktopProj = rows.reduce(
-            (s, r) => s + r.desktopProjectionUsd,
-            0
-          );
-          const totalMobileProj = rows.reduce(
-            (s, r) => s + r.mobileProjectionUsd,
-            0
-          );
-          return (
-            <div className="h-full overflow-auto">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-card">
-                  <tr className="border-b text-xs uppercase text-muted-foreground">
-                    <th className="px-3 py-2 text-left font-medium">Service</th>
-                    <th className="px-3 py-2 text-right font-medium">
-                      Gross MTD
-                    </th>
-                    <th className="px-3 py-2 text-right font-medium">
-                      Last 30 days
-                    </th>
-                    <th className="px-3 py-2 text-right font-medium text-indigo-500">
-                      Desktop
-                    </th>
-                    <th className="px-3 py-2 text-right font-medium text-green-500">
-                      Mobile
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((r) => (
-                    <tr
-                      key={r.service}
-                      className="border-b border-border/40 last:border-b-0"
-                    >
-                      <td className="px-3 py-2 font-medium">{r.service}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {formatCurrency(r.mtdUsd)}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums">
-                        {formatCurrency(r.aprProjectionUsd)}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums text-indigo-500">
-                        {formatCurrency(r.desktopProjectionUsd)}
-                      </td>
-                      <td className="px-3 py-2 text-right tabular-nums text-red-500">
-                        {formatCurrency(r.mobileProjectionUsd)}
-                      </td>
-                    </tr>
-                  ))}
-                  <tr className="border-t-2 border-border/60 font-semibold">
-                    <td className="px-3 py-2">Total</td>
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {formatCurrency(totalMtd)}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {formatCurrency(totalProj)}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-indigo-500">
-                      {formatCurrency(totalDesktopProj)}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-red-500">
-                      {formatCurrency(totalMobileProj)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          );
-        },
-      },
-    ];
-  }, [profitability, infraCosts]);
-
-  const revenueCharts = useMemo<ChartItem[]>(() => {
-    return [
-      {
-        id: "rev-cumulative",
-        title: "Cumulative users",
-        periodChange: latestPeriodChange(
-          cumulativeSeries,
-          (point) => point.cumulative,
-          "vs previous day"
-        ),
-        subtitle: "Total users across all platforms",
-        icon: <Users className="h-4 w-4" />,
-        initialLayout: { cols: 12, rows: 4 },
-        render: () =>
-          cumulativeSeries.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={cumulativeSeries}>
-                <defs>
-                  <linearGradient
-                    id="cumulativeGradientRev"
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                  >
-                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis
-                  dataKey="date"
-                  className="text-xs"
-                  tick={{ fill: "hsl(var(--muted-foreground))" }}
-                  tickFormatter={shortDate}
-                  minTickGap={40}
-                />
-                <YAxis
-                  className="text-xs"
-                  tick={{ fill: "hsl(var(--muted-foreground))" }}
-                  tickFormatter={formatCompact}
-                  domain={cumulativeYDomain}
-                  allowDataOverflow={false}
-                  width={56}
-                />
-                <Tooltip
-                  formatter={(value: number) => [
-                    value.toLocaleString(),
-                    "Total Users",
-                  ]}
-                  labelFormatter={fullDate}
-                  contentStyle={tooltipStyle}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="cumulative"
-                  stroke="#22c55e"
-                  strokeWidth={2}
-                  fill="url(#cumulativeGradientRev)"
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-              No data available
-            </div>
-          ),
-      },
-      {
-        id: "rev-mrr",
-        title: "MRR over time",
-        periodChange: latestPeriodChange(
-          mrrData,
-          (point) => point.mrr,
-          "vs previous month"
-        ),
-        subtitle: "Monthly recurring revenue from Stripe",
-        icon: <DollarSign className="h-4 w-4" />,
-        initialLayout: { cols: 6, rows: 4 },
-        render: () => (
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={mrrData}>
-              <defs>
-                <linearGradient id="mrrGradientRev" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={COLORS.area} stopOpacity={0.2} />
-                  <stop offset="95%" stopColor={COLORS.area} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis
-                dataKey="month"
-                className="text-xs"
-                tick={{ fill: "hsl(var(--muted-foreground))" }}
-              />
-              <YAxis
-                className="text-xs"
-                tick={{ fill: "hsl(var(--muted-foreground))" }}
-                tickFormatter={(v) => `$${formatCompact(v)}`}
-              />
-              <Tooltip
-                formatter={(value: number) => [formatCurrency(value), "MRR"]}
-                contentStyle={tooltipStyle}
-              />
-              <Area
-                type="monotone"
-                dataKey="mrr"
-                stroke={COLORS.mrr}
-                strokeWidth={2}
-                fill="url(#mrrGradientRev)"
-                dot={{ r: 3, fill: COLORS.mrr }}
-                activeDot={{ r: 5 }}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        ),
-      },
-      {
-        id: "rev-subs",
-        title: "New subscriptions",
-        periodChange: latestPeriodChange(
-          subData,
-          (point) => point.monthly + point.annual,
-          "vs previous month"
-        ),
-        subtitle: "Monthly vs annual subscriptions created each month",
-        icon: <TrendingUp className="h-4 w-4" />,
-        initialLayout: { cols: 6, rows: 4 },
-        render: () => (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={subData}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-              <XAxis
-                dataKey="month"
-                className="text-xs"
-                tick={{ fill: "hsl(var(--muted-foreground))" }}
-              />
-              <YAxis
-                className="text-xs"
-                tick={{ fill: "hsl(var(--muted-foreground))" }}
-              />
-              <Tooltip contentStyle={tooltipStyle} />
-              <Legend />
-              <Bar
-                dataKey="monthly"
-                name="Monthly"
-                fill={COLORS.monthly}
-                radius={[2, 2, 0, 0]}
-                stackId="a"
-              />
-              <Bar
-                dataKey="annual"
-                name="Annual"
-                fill={COLORS.annual}
-                radius={[2, 2, 0, 0]}
-                stackId="a"
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        ),
-      },
-    ];
-  }, [cumulativeSeries, cumulativeYDomain, mrrData, subData]);
 
   const macosGrowthCharts = useMemo<ChartItem[]>(() => {
     return [
@@ -2963,8 +2154,6 @@ export default function AnalyticsPage() {
   const chatRatingsItems = useChatRatingsItems({ token });
   const responseReliabilityItems = useResponseReliabilityItems({ token });
 
-  const cpuMobile = profitability?.summary.avgCostPerUserMobile ?? null;
-  const cpuDesktop = profitability?.summary.avgCostPerUserDesktop ?? null;
   const totalFirebaseUsers = dailyNewUsers?.totalUsers ?? null;
   const goalProgressPct =
     totalFirebaseUsers != null
@@ -3260,60 +2449,6 @@ export default function AnalyticsPage() {
         render: () => <AgentPromptWidget />,
       },
       {
-        id: "kpi-mrr",
-        title: "MRR",
-        variant: "kpi",
-        icon: <DollarSign className="h-3.5 w-3.5" />,
-        initialLayout: { cols: 3, rows: 1 },
-        render: () => (
-          <div>
-            <div className="text-2xl font-bold">{formatCurrency(mrr)}</div>
-            {mrrGrowthPct !== null && (
-              <p
-                className={`text-xs ${
-                  mrrGrowthPct >= 0 ? "text-green-600" : "text-red-600"
-                }`}
-              >
-                {mrrGrowthPct >= 0 ? "+" : ""}
-                {mrrGrowthPct.toFixed(1)}% from last month
-              </p>
-            )}
-          </div>
-        ),
-      },
-      {
-        id: "kpi-arr",
-        title: "ARR",
-        variant: "kpi",
-        icon: <TrendingUp className="h-3.5 w-3.5" />,
-        initialLayout: { cols: 3, rows: 1 },
-        render: () => (
-          <div>
-            <div className="text-2xl font-bold">{formatCurrency(arr)}</div>
-            <p className="text-xs text-muted-foreground">
-              Based on current MRR
-            </p>
-          </div>
-        ),
-      },
-      {
-        id: "kpi-subscriptions",
-        title: "Subscriptions",
-        variant: "kpi",
-        icon: <Users className="h-3.5 w-3.5" />,
-        initialLayout: { cols: 3, rows: 1 },
-        render: () => (
-          <div>
-            <div className="text-2xl font-bold">
-              {totalSubs.toLocaleString()}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {monthlySubs} monthly · {annualSubs} annual
-            </p>
-          </div>
-        ),
-      },
-      {
         id: "kpi-conversations",
         title: "Conversations",
         variant: "kpi",
@@ -3325,40 +2460,6 @@ export default function AnalyticsPage() {
               {formatCompact(totalConversations)}
             </div>
             <p className="text-xs text-muted-foreground">All time</p>
-          </div>
-        ),
-      },
-      {
-        id: "kpi-cost-per-user-mobile",
-        title: "Cost / user (Mobile)",
-        variant: "kpi",
-        icon: <DollarSign className="h-3.5 w-3.5" />,
-        initialLayout: { cols: 3, rows: 1 },
-        render: () => (
-          <div>
-            <div className="text-2xl font-bold">
-              {cpuMobile != null ? `$${cpuMobile.toFixed(3)}` : "--"}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              avg / day · last {profitDays}d
-            </p>
-          </div>
-        ),
-      },
-      {
-        id: "kpi-cost-per-user-desktop",
-        title: "Cost / user (Desktop)",
-        variant: "kpi",
-        icon: <Monitor className="h-3.5 w-3.5" />,
-        initialLayout: { cols: 3, rows: 1 },
-        render: () => (
-          <div>
-            <div className="text-2xl font-bold">
-              {cpuDesktop != null ? `$${cpuDesktop.toFixed(3)}` : "--"}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              avg / day · last {profitDays}d
-            </p>
           </div>
         ),
       },
@@ -3428,104 +2529,13 @@ export default function AnalyticsPage() {
       },
     ];
   }, [
-    mrr,
-    arr,
-    totalSubs,
-    monthlySubs,
-    annualSubs,
     totalConversations,
-    mrrGrowthPct,
-    cpuMobile,
-    cpuDesktop,
-    profitDays,
     allDailyData,
   ]);
 
   // Section headers + per-section control widgets that sit inline between
   // groups of charts. They are full-width by default so the user sees a
   // clear visual break, but they can be moved or shrunk like any widget.
-
-  const profitabilityHeader: ChartItem = {
-    id: "header-profitability",
-    title: "Profitability by Platform",
-    subtitle:
-      "Daily users, revenue, cost and free→paid conversion — desktop (macOS) vs mobile (iOS/Android).",
-    variant: "header",
-    initialLayout: { cols: 12, rows: 1 },
-    render: () => null,
-  };
-
-  const profitabilityControls: ChartItem = {
-    id: "controls-profitability",
-    title: "Profit controls",
-    variant: "card",
-    initialLayout: { cols: 12, rows: 1 },
-    render: () => (
-      <div className="flex h-full flex-wrap items-center gap-2">
-        <div className="flex overflow-hidden rounded-md border border-input">
-          {([30, 60, 90] as const).map((d) => (
-            <button
-              key={d}
-              onClick={() => setProfitDays(d)}
-              className={`px-2.5 py-1 text-xs font-medium transition-colors ${
-                profitDays === d
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-background text-muted-foreground hover:bg-accent"
-              }`}
-            >
-              {d}d
-            </button>
-          ))}
-        </div>
-        {profitability?.summary.partial && (
-          <span className="ml-auto inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-xs text-amber-800">
-            <AlertTriangle className="h-3 w-3" /> Partial data
-          </span>
-        )}
-      </div>
-    ),
-  };
-
-  const revenueHeader: ChartItem = {
-    id: "header-revenue",
-    title: "Revenue Overview",
-    variant: "header",
-    initialLayout: { cols: 12, rows: 1 },
-    render: () => null,
-  };
-
-  const revenueControls: ChartItem = {
-    id: "controls-revenue",
-    title: "Revenue window",
-    variant: "card",
-    initialLayout: { cols: 6, rows: 1 },
-    render: () => (
-      <div className="flex h-full items-center gap-2">
-        <span className="text-xs text-muted-foreground">
-          Cumulative window:
-        </span>
-        <div className="flex overflow-hidden rounded-md border border-input">
-          {(["7d", "30d", "all"] as const).map((w) => (
-            <button
-              key={w}
-              onClick={() => setCumulativeWindow(w)}
-              className={`px-2.5 py-1 text-xs font-medium transition-colors ${
-                cumulativeWindow === w
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-background text-muted-foreground hover:bg-accent"
-              }`}
-            >
-              {w === "7d"
-                ? "Last week"
-                : w === "30d"
-                ? "Last month"
-                : "All time"}
-            </button>
-          ))}
-        </div>
-      </div>
-    ),
-  };
 
   const macosHeader: ChartItem = {
     id: "header-macos-growth",
@@ -3537,40 +2547,6 @@ export default function AnalyticsPage() {
 
   const macosKpis = useMemo<ChartItem[]>(
     () => [
-      {
-        id: "kpi-total-users-macos",
-        title: "Total Users (macOS)",
-        variant: "kpi",
-        icon: <Monitor className="h-3.5 w-3.5" />,
-        initialLayout: { cols: 2, rows: 1 },
-        render: () => (
-          <div>
-            <div className="text-2xl font-bold">
-              {profitability?.summary.totalUsersDesktop != null
-                ? profitability.summary.totalUsersDesktop.toLocaleString()
-                : "--"}
-            </div>
-            <p className="text-xs text-muted-foreground">All-time signups</p>
-          </div>
-        ),
-      },
-      {
-        id: "kpi-total-users-mobile",
-        title: "Total Users (Mobile)",
-        variant: "kpi",
-        icon: <Smartphone className="h-3.5 w-3.5" />,
-        initialLayout: { cols: 2, rows: 1 },
-        render: () => (
-          <div>
-            <div className="text-2xl font-bold">
-              {profitability?.summary.totalUsersMobile != null
-                ? profitability.summary.totalUsersMobile.toLocaleString()
-                : "--"}
-            </div>
-            <p className="text-xs text-muted-foreground">All-time signups</p>
-          </div>
-        ),
-      },
       {
         id: "kpi-dau",
         title: "DAU",
@@ -3685,7 +2661,7 @@ export default function AnalyticsPage() {
         ),
       },
     ],
-    [vm, profitability, activationStats]
+    [vm, activationStats]
   );
 
   const notificationsHeader: ChartItem = {
@@ -4017,14 +2993,6 @@ export default function AnalyticsPage() {
       ...responseReliabilityItems,
       ...topKpiAndNewWidgets,
 
-      profitabilityHeader,
-      profitabilityControls,
-      ...profitCharts,
-
-      revenueHeader,
-      revenueControls,
-      ...revenueCharts,
-
       macosHeader,
       ...macosKpis,
       ...macosGrowthCharts,
@@ -4046,8 +3014,6 @@ export default function AnalyticsPage() {
     growthGoalItems,
     responseReliabilityItems,
     topKpiAndNewWidgets,
-    profitCharts,
-    revenueCharts,
     macosKpis,
     macosGrowthCharts,
     notificationKpis,
@@ -4059,8 +3025,6 @@ export default function AnalyticsPage() {
     chatRatingsItems,
     // Inline header/control items capture state via closures; React's
     // dep tracking is handled by the per-item render callbacks.
-    profitabilityControls,
-    revenueControls,
     retentionControls,
     cohortTableItem,
   ]);
@@ -4079,21 +3043,6 @@ export default function AnalyticsPage() {
         <h1 className="text-3xl font-bold tracking-tight">
           Analytics Dashboard
         </h1>
-        <div className="flex gap-2">
-          {[6, 12, 24].map((m) => (
-            <button
-              key={m}
-              onClick={() => setMonths(m)}
-              className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
-                months === m
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-accent"
-              }`}
-            >
-              {m}mo
-            </button>
-          ))}
-        </div>
       </div>
 
       {hasError && (
@@ -4105,14 +3054,6 @@ export default function AnalyticsPage() {
       )}
 
       {/* Unified single-grid dashboard — every widget is draggable & resizable. */}
-      {hasPartialData && (
-        <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-          <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span>
-            Some data sources failed to load. Numbers may be incomplete.
-          </span>
-        </div>
-      )}
       <ResizableChartGrid
         storageKey="admin:unified:v1"
         items={unifiedItems}
