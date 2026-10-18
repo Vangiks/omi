@@ -370,7 +370,7 @@ def test_pool_selects_ambiguity_then_centroid_not_labels(monkeypatch):
     assert 0 < distance < 0.5 and len(digest) == 64
 
 
-def test_free_service_selects_one_owner_card_and_claims_quota_durably(world, monkeypatch):
+def test_service_selects_one_owner_card_and_claims_quota_durably(world, monkeypatch):
     store, path, _ = world
     store.rows[path].pop(FIELD)
     settings = dict(speaker_tag_prompts_enabled=True, save_other_voice_profiles=False)
@@ -379,22 +379,25 @@ def test_free_service_selects_one_owner_card_and_claims_quota_durably(world, mon
     monkeypatch.setattr(service.voice_profiles_db, 'mark_tag_prompts_empty', lambda *a: None)
     monkeypatch.setattr(service.voice_profiles_db, 'record_tag_prompts_shown', lambda *a: False)
     monkeypatch.setattr(service.users_db, 'get_user_speaker_embedding', lambda uid: [1.0, 0.0])
-    monkeypatch.setattr(service.users_db, 'get_people', lambda uid: pytest.fail('Free owner selector loaded people'))
+    monkeypatch.setattr(service.users_db, 'get_people', lambda uid: [])
     monkeypatch.setattr(service.conversations_db, 'get_conversations', lambda *a, **k: [decoded(store, path)])
-    monkeypatch.setattr(service, 'named_speaker_prompts_allowed', lambda uid: False)
     monkeypatch.setattr(service, 'extract_embedding_from_bytes', lambda *a, **k: np.array([[0.5, 0.8660254]]))
     monkeypatch.setattr(service.redis_db, 'get_generic_cache', lambda key: None)
     monkeypatch.setattr(service.redis_db, 'set_generic_cache', lambda *a, **k: None)
     monkeypatch.setattr(service, 'emit_product_event', lambda **k: None)
+
+    def owner_cards(**kwargs):
+        return [p for p in service.get_prompts('u', NOW, **kwargs).prompts if p.kind == 'owner_check']
+
     # Older clients do not receive owner cards or consume the durable quota.
-    assert service.get_prompts('u', NOW).prompts == []
+    assert owner_cards() == []
     assert FIELD not in store.rows[path]
-    result = service.get_prompts('u', NOW, owner_excerpt=True)
-    assert len(result.prompts) == 1 and result.prompts[0].kind == 'owner_check'
-    prompt = result.prompts[0]
+    cards = owner_cards(owner_excerpt=True)
+    assert len(cards) == 1
+    prompt = cards[0]
     assert prompt.segment_ids == ['played'] and prompt.evidence_id
     assert prompt.suggested_person_id is None and not prompt.candidates
-    assert not service.get_prompts('u', NOW, owner_excerpt=True).prompts
+    assert not owner_cards(owner_excerpt=True)
     service.mark_shown('u', [prompt.id], NOW)
     assert store.rows[path][FIELD]['shown']
     assert not owner_confirmation_db.record('u', 'c', 'shown', store.rows[path][FIELD])

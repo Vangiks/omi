@@ -102,8 +102,6 @@ def world(monkeypatch):
         return world.assign_fn(uid, conversation_id, **kwargs)
 
     monkeypatch.setattr(conversations_router.conversations_db, 'assign_conversation_speaker', assign)
-    # Free plan for every route test: labeling your own transcript is never a paid action.
-    monkeypatch.setattr('utils.speaker_permissions.users_db.get_user_valid_subscription', lambda uid, **kwargs: None)
     app = FastAPI()
     app.include_router(conversations_router.router)
     app.dependency_overrides[auth.get_current_user_uid] = lambda: UID
@@ -185,19 +183,6 @@ def test_person_assignment_keeps_person_teaching(world):
         {'uid': UID, 'person_id': 'p1', 'conversation_id': CONV, 'segment_ids': ['s1']}
     ]
     assert world.scheduled['deleted'] == ['old.wav']
-
-
-def test_owner_teaching_never_checks_named_entitlement(world, monkeypatch):
-    def banned(uid):
-        raise AssertionError('owner teaching must not consult the named-people entitlement')
-
-    monkeypatch.setattr(service, 'named_speaker_prompts_allowed', banned)
-    _set_assign_result(world, [_segment('s1', 0.0, 8.0, is_user=True)], resolved=['s1'])
-    response = world.client.patch(
-        f'/v1/conversations/{CONV}/assign-speaker/0', params={'assign_type': 'is_user', 'value': 'true'}
-    )
-    assert response.status_code == 200
-    assert world.scheduled['owner']
 
 
 def test_owner_window_allows_split_same_voice_run():

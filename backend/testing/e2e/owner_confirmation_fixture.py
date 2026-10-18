@@ -109,7 +109,7 @@ def install_fixtures():
     service.voice_profiles_db.record_tag_prompts_shown = shown
     service.voice_profiles_db.record_tag_prompt_answered = lambda *a: None
     service.users_db.get_user_speaker_embedding = lambda uid: [1.0, 0.0]
-    service.named_speaker_prompts_allowed = lambda uid: False
+    service.users_db.get_people = lambda uid: []
     service.verified_clip_pcm = lambda *a, **k: PCM
     routes.conversation_clip_pcm = lambda *a, **k: PCM
     service.extract_embedding_from_bytes = lambda *a, **k: np.array([[0.5, 0.8660254]])

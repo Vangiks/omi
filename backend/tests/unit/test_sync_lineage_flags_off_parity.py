@@ -276,6 +276,8 @@ def test_process_segment_saved_rows_results_finish_and_log_bytes_match_main(
     for name in ('bounded_envelope', 'merge_track_receipts', 'sync_segment_receipt', 'unknown_envelope'):
         module.__dict__[name] = getattr(capture_evidence, name)
     module.OMI_CAPTURE_EVIDENCE_ENVELOPES_TOTAL = metrics.OMI_CAPTURE_EVIDENCE_ENVELOPES_TOTAL
+    # The frozen main source predates the plan-check removal; its candidate wrapper is now a plain dict.
+    module.PersonEmbeddingsCache = lambda named_allowed: {}
     original = module.process_segment
 
     def old_process(*args, lineage_binding=None, **kwargs):

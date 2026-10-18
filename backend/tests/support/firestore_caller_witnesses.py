@@ -457,7 +457,6 @@ def _run_speaker_prompts(monkeypatch: pytest.MonkeyPatch, capture: HelperCapture
         lambda uid: ({'save_other_voice_profiles': False, 'speaker_tag_prompts_enabled': True}, False),
     )
     _stub(monkeypatch, speaker_tag_service.voice_profiles_db, 'get_tag_prompt_state', lambda uid: {})
-    _stub(monkeypatch, speaker_tag_service, 'named_speaker_prompts_allowed', lambda uid: True)
     _stub(monkeypatch, users_db, 'get_people', lambda uid: [])
     trial(capture, speaker_tag_service.get_prompts, 'u1', now=FROZEN_NOW)
 

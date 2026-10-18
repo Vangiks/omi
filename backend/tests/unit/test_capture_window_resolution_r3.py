@@ -21,6 +21,7 @@ from tests.unit.test_conversation_speaker_resolution_stage import (
     stage,
 )
 from utils.other.audio_chunks import AudioChunkReadSession
+from tests.support.retired_speaker_permissions import retired_speaker_permissions
 
 
 @pytest.fixture(scope='module')
@@ -34,7 +35,8 @@ def base_stage():
         text=True,
     ).stdout
     module = types.ModuleType('capture_resolution_pre_r2')
-    exec(compile(source, 'speaker_resolution_pre_r2.py', 'exec'), module.__dict__)
+    with retired_speaker_permissions():
+        exec(compile(source, 'speaker_resolution_pre_r2.py', 'exec'), module.__dict__)
     return module
 
 

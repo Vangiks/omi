@@ -19,7 +19,6 @@ from utils.conversations.speaker_resolution import decode_cache
 from utils.executors import db_executor, run_blocking, storage_executor
 from utils.manual_speaker_assignments import manual_rejected_speakers
 from utils.other.storage import download_speaker_embedding_cache
-from utils.speaker_permissions import named_speaker_prompts_allowed
 from utils.speaker_tag_prompts.selection import MAX_CLIP_SECONDS, speaker_id_of
 from utils.stt.conversation_speakers import (
     MIN_EMBED_SECONDS,
@@ -173,7 +172,7 @@ def _conversation_matches(
 
 
 def _competing_voiceprints(uid: str) -> dict[str, np.ndarray]:
-    """Called only after the request entitlement; include owner and usable people."""
+    """Include the owner and every person with a usable voiceprint."""
     prints = {}
     # 'user' is the owner identity that select_speaker_match reserves.
     competitors = [('user', users_db.get_user_speaker_embedding(uid))]
@@ -199,8 +198,6 @@ async def find_person_voice_matches(uid: str, person_id: str) -> VoiceMatchesRes
         person = await _read(db_executor, partial(users_db.get_person, uid, person_id), deadline)
         if person is None:
             raise LookupError('Person not found')
-        if not await _read(db_executor, partial(named_speaker_prompts_allowed, uid), deadline):
-            return VoiceMatchesResponse()
         raw_print = usable_person_voiceprint(person)
         if raw_print is None:
             return VoiceMatchesResponse()

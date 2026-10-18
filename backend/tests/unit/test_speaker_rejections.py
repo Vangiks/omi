@@ -189,10 +189,7 @@ def test_not_person_rejects_a_missing_person(world, monkeypatch):
     assert receipt(world) == {}
 
 
-def test_not_person_is_free_on_every_plan(world, monkeypatch):
-    # Correcting a label in your own transcript is not a paid action; only
-    # automatic naming (prompts, earlier matches) follows the entitlement.
-    monkeypatch.setattr('utils.speaker_permissions.users_db.get_user_valid_subscription', lambda uid, **kwargs: None)
+def test_not_person_records_a_rejection_receipt(world):
     response = world.client.post(
         f'/v1/conversations/{CONV}/speakers/4/reject', json={'kind': 'not_person', 'person_id': 'p1'}
     )
@@ -510,7 +507,6 @@ def test_identify_someone_else_writes_a_plain_anonymous_decision(world, monkeypa
     )
     monkeypatch.setattr(service.voice_profiles_db, 'record_tag_prompt_answered', lambda *a: None)
     monkeypatch.setattr(service, 'emit_product_event', lambda **kwargs: None)
-    monkeypatch.setattr(service, 'named_speaker_prompts_allowed', lambda uid: True)
     service.apply_answer(
         UID,
         SpeakerTagPromptAnswerRequest(
@@ -538,7 +534,6 @@ def test_confirm_person_someone_else_requires_a_known_suggestion(world, monkeypa
     )
     monkeypatch.setattr(service.voice_profiles_db, 'record_tag_prompt_answered', lambda *a: None)
     monkeypatch.setattr(service, 'emit_product_event', lambda **kwargs: None)
-    monkeypatch.setattr(service, 'named_speaker_prompts_allowed', lambda uid: True)
     request = SpeakerTagPromptAnswerRequest(
         prompt_id='p',
         kind=SpeakerTagPromptKind.confirm_person,

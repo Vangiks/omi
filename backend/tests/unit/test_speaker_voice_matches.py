@@ -48,7 +48,6 @@ def env(monkeypatch):
             'speech_samples': ['sample'],
             'speech_samples_version': 3,
         },
-        allowed=True,
         conversations=[_conversation()],
         cache={'c1': _cache()},
         ignored={},
@@ -81,7 +80,6 @@ def env(monkeypatch):
     monkeypatch.setattr(matches.users_db, 'get_people', lambda uid: [state.person] if state.person else [])
     monkeypatch.setattr(matches.users_db, 'get_user_speaker_embedding', lambda uid: None)
     monkeypatch.setattr(matches.conversations_db, 'get_conversations', get_conversations)
-    monkeypatch.setattr(matches, 'named_speaker_prompts_allowed', lambda uid: state.allowed)
     monkeypatch.setattr(
         matches.voice_profiles_db, 'get_tag_prompt_state', lambda uid: {'ignored_voices': state.ignored}
     )
@@ -197,12 +195,6 @@ def test_one_named_segment_excludes_whole_voice(env, identity):
 )
 def test_no_usable_voiceprint_returns_empty_without_scan(env, change):
     env.person.update(change)
-    assert _find() == []
-    assert env.queries == env.reads == []
-
-
-def test_entitlement_denied_returns_empty_without_scan(env):
-    env.allowed = False
     assert _find() == []
     assert env.queries == env.reads == []
 

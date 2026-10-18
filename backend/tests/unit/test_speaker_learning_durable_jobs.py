@@ -517,15 +517,6 @@ def test_ensure_job_for_legacy_live_request(world):
     assert job_id and the_job(world.store)[1]['state'] == 'pending'
 
 
-def test_manual_teaching_is_not_subscription_gated(world, monkeypatch):
-    monkeypatch.setattr(
-        'utils.speaker_permissions.users_db.get_user_valid_subscription',
-        lambda uid, **kwargs: (_ for _ in ()).throw(AssertionError('no plan check on manual teaching')),
-    )
-    assign(person_id='p', segment_ids=['s0'])
-    assert the_job(world.store)[1]['state'] == 'pending'
-
-
 def _publish_person(world, *, person_id='p', ids=('s0',), generation=1, embedding=(1.0,)):
     _, job = the_job(world.store)
     world.store.rows[('users', UID, 'people', person_id)].update(

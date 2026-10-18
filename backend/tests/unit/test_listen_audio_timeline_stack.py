@@ -64,6 +64,7 @@ from utils.stt.vad_gate import GatedSTTSocket
 from utils.stt import vad_gate as vad_gate_module
 from utils.stt.soniox import SafeSonioxSocket
 from utils.stt.streaming import SafeModulateSocket
+from tests.support.retired_speaker_permissions import retired_speaker_permissions
 
 RATE = 16000
 UID = 'uid-at'
@@ -1261,7 +1262,6 @@ class _MarkerDiarizer:
 
 
 def _patch_stage_io(monkeypatch, module, store, diarizer, uploads):
-    monkeypatch.setattr(module, 'named_speaker_prompts_allowed', lambda uid: True)
     monkeypatch.setattr(module, 'speaker_embedding_configured', lambda: True)
     monkeypatch.setattr(module, 'download_speaker_embedding_cache', lambda uid, cid: store.get(cid))
     monkeypatch.setattr(
@@ -1287,7 +1287,8 @@ def _round3_module(name, relpath):
         text=True,
     ).stdout
     module = types.ModuleType(name)
-    exec(compile(source, relpath, 'exec'), module.__dict__)
+    with retired_speaker_permissions():
+        exec(compile(source, relpath, 'exec'), module.__dict__)
     return module
 
 

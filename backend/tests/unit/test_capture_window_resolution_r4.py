@@ -25,6 +25,7 @@ from tests.unit.test_conversation_speaker_resolution_stage import (
 )
 from utils.conversations.audio_placement import AudioPlacement
 from utils.other.audio_chunks import AudioChunkReadSession
+from tests.support.retired_speaker_permissions import retired_speaker_permissions
 
 
 @pytest.fixture(scope='module')
@@ -39,7 +40,8 @@ def previous_stage():
     module = types.ModuleType('capture_resolution_pre_r4')
     with pytest.MonkeyPatch.context() as patch:
         patch.setitem(sys.modules, module.__name__, module)
-        exec(compile(source, 'speaker_resolution_pre_r4.py', 'exec'), module.__dict__)
+        with retired_speaker_permissions():
+            exec(compile(source, 'speaker_resolution_pre_r4.py', 'exec'), module.__dict__)
         yield module
 
 

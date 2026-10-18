@@ -1216,7 +1216,6 @@ def _load_sync_router_for_fast_path():
         'utils.sync.backfill_cutover',
         'utils.sync.content_id',
         'utils.speaker_assignment',
-        'utils.speaker_permissions',
         'utils.speaker_identification',
         'utils.speaker_learning_jobs',
         'utils.stt.speaker_embedding',

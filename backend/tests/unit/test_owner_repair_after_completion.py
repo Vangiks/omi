@@ -34,7 +34,7 @@ async def test_scan_processing_then_completion_persists_owner(env, monkeypatch, 
     for segment in conversation.transcript_segments:
         segment.speaker_id_scope = 'conversation:c1'
     monkeypatch.setattr(stage.users_db, 'get_user_speaker_embedding', lambda uid: VOICES[0].tolist())
-    monkeypatch.setattr(stage, 'named_speaker_prompts_allowed', lambda uid: False)
+    monkeypatch.setattr(stage.users_db, 'get_people', lambda uid: [])
     store, path, read = _commit_store(monkeypatch, conversation, level)
     store.rows[path]['status'] = 'processing'
     first_read = asyncio.Event()

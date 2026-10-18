@@ -1413,7 +1413,6 @@ class TestAsyncCoordinatorBehavioral:
             'utils.sync.backfill',
             'utils.sync.content_id',
             'utils.speaker_assignment',
-            'utils.speaker_permissions',
             'utils.speaker_identification',
             'utils.speaker_learning_jobs',
             'utils.stt.speaker_embedding',
@@ -1429,11 +1428,6 @@ class TestAsyncCoordinatorBehavioral:
         # Dispatch tests supply their own cache and do not acquire voiceprints.
         sys.modules['utils.stt.owner_profile'].load_owner_embedding = MagicMock(return_value=None)
         sys.modules['utils.stt.owner_profile'].validated_embedding = MagicMock(return_value=None)
-
-        # The speaker entitlement must be a visible, fixed contract, not a truthy
-        # MagicMock: sync identification consults it when building the person
-        # cache, so pin it to paid explicitly.
-        sys.modules['utils.speaker_permissions'].named_speaker_prompts_allowed = lambda uid: True
 
         # New conversation-assignment seam: pipeline imports the pure
         # deterministic minimum and the lifecycle intake. The former is
@@ -3412,7 +3406,6 @@ class TestV2EndpointExecution:
             'utils.sync.backfill',
             'utils.sync.content_id',
             'utils.speaker_assignment',
-            'utils.speaker_permissions',
             'utils.speaker_identification',
             'utils.speaker_learning_jobs',
             'utils.stt.speaker_embedding',
@@ -3428,11 +3421,6 @@ class TestV2EndpointExecution:
         # Dispatch tests supply their own cache and do not acquire voiceprints.
         sys.modules['utils.stt.owner_profile'].load_owner_embedding = MagicMock(return_value=None)
         sys.modules['utils.stt.owner_profile'].validated_embedding = MagicMock(return_value=None)
-
-        # The speaker entitlement must be a visible, fixed contract, not a truthy
-        # MagicMock: sync identification consults it when building the person
-        # cache, so pin it to paid explicitly.
-        sys.modules['utils.speaker_permissions'].named_speaker_prompts_allowed = lambda uid: True
 
         # New conversation-assignment seam: pipeline imports the pure
         # deterministic minimum and the lifecycle intake. The former is

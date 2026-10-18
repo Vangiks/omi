@@ -34,6 +34,7 @@ from tests.unit.test_owner_recognition_telemetry import (
 )
 from utils.observability import owner_identity_retry as telemetry, owner_recognition
 from utils import executors
+from tests.support.retired_speaker_permissions import retired_speaker_permissions
 
 
 def count(pass_name, stage, reason):
@@ -301,7 +302,8 @@ def baseline_module(monkeypatch):
     ).stdout
     module = types.ModuleType('owner_retry_funnel_baseline')
     monkeypatch.setitem(sys.modules, module.__name__, module)
-    exec(compile(source, 'baseline_speaker_resolution.py', 'exec'), module.__dict__)
+    with retired_speaker_permissions():
+        exec(compile(source, 'baseline_speaker_resolution.py', 'exec'), module.__dict__)
     return module
 
 
@@ -323,7 +325,6 @@ def test_literal_baseline_and_instrumented_outputs_and_cache_bytes_identical(env
     store, diarizer = env
     for name in (
         'speaker_embedding_configured',
-        'named_speaker_prompts_allowed',
         'download_speaker_embedding_cache',
         'upload_speaker_embedding_cache',
         'extract_embedding_from_bytes',

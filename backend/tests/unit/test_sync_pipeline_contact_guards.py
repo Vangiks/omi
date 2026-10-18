@@ -7,11 +7,8 @@ from utils.sync import pipeline
 
 
 @pytest.fixture(autouse=True)
-def paid_plan():
-    # These guards cover naming other people, which is paid; declare the plan instead of reading it.
-    with patch('utils.sync.speaker_identity.named_speaker_prompts_allowed', return_value=True), patch(
-        'database.owner_profile_updates.get_user_speaker_embedding_recovery_state', return_value=None
-    ):
+def no_owner_recovery_state():
+    with patch('database.owner_profile_updates.get_user_speaker_embedding_recovery_state', return_value=None):
         yield
 
 

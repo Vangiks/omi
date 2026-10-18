@@ -326,7 +326,6 @@ def test_processing_merge_retains_concurrent_live_generation_and_immutable_first
 
 @pytest.mark.parametrize('case', ['missing', 'malformed', 'failed', 'ineligible'])
 def test_profile_refusals_preserve_distinct_bounded_metadata(monkeypatch, caplog, case):
-    monkeypatch.setattr(speakers, 'named_speaker_prompts_allowed', lambda uid: True)
     monkeypatch.setattr(speakers.user_db, 'get_people', lambda uid: [])
 
     def stored(uid):
