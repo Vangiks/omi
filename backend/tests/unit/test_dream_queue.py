@@ -63,7 +63,7 @@ def test_repeated_writes_coalesce_with_one_bounded_priority_read(queue):
         dream_store.mark_dirty(UID, [('conversations', 'same'), ('conversations', 'same')])
     rows = dream_store.dirty_refs(UID)
     assert len(rows) == 1 and rows[0].to_dict()['change_count'] == 50
-    # Every user has full access (#3), so each write carries the paid weight of 2.
+    # Every write carries the same weight of 2.
     assert queue.rows[('dream_users', UID)]['score'] == 100
     assert queue.reads == [('users', UID), ('dream_users', UID)] * 50
     assert not queue.transactions
@@ -71,10 +71,7 @@ def test_repeated_writes_coalesce_with_one_bounded_priority_read(queue):
     assert dream_store.dirty_refs(UID)[0].to_dict()['id'] == 'other'
 
 
-def test_paid_weight_and_ref_identity(queue):
-    from config.plan_catalog import PAID_PLAN_IDS
-
-    queue.rows[('users', UID)] = {'plan': next(iter(PAID_PLAN_IDS))}
+def test_weight_and_ref_identity(queue):
     dream_store.mark_dirty(UID, [('people', 'same'), ('conversations', 'same')])
     assert dream_store.dirty_count(UID) == 2
     assert queue.rows[('dream_users', UID)]['score'] == 2

@@ -50,7 +50,7 @@ def test_staleness_and_backlog_priority_are_bounded():
     assert dream_scheduler.priority({'score': 500}, NOW)[0] == dream_scheduler.priority({'score': 500000}, NOW)[0]
 
 
-@pytest.mark.parametrize('policy,allowed', [('all', True), ('paid', True), ('allowlist', False), ('unknown', False)])
+@pytest.mark.parametrize('policy,allowed', [('all', True), ('allowlist', False), ('paid', False), ('unknown', False)])
 def test_eligibility_defaults_and_optional_restrictions(monkeypatch, policy, allowed):
     monkeypatch.setenv('DREAM_AGENT_ELIGIBILITY', policy)
     monkeypatch.delenv('DREAM_AGENT_UID_ALLOWLIST', raising=False)

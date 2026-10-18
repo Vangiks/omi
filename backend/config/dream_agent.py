@@ -3,7 +3,6 @@
 import math
 import os
 from dataclasses import dataclass
-from config.plan_catalog import FULL_ACCESS_PLAN, PAID_PLAN_IDS
 
 from utils.agent_capabilities.registry import AUTO, KINDS
 
@@ -29,7 +28,7 @@ def mode():
 
 def eligibility():
     value = os.getenv('DREAM_AGENT_ELIGIBILITY', 'all').strip().lower()
-    return value if value in {'all', 'paid', 'allowlist'} else 'invalid'
+    return value if value in {'all', 'allowlist'} else 'invalid'
 
 
 def _allowlisted(uid):
@@ -49,11 +48,7 @@ def eligible(uid, user):
     if not may_be_eligible(uid) or user.get('dream_canary') or user.get('deleted') or user.get('deletion_requested_at'):
         return False
     policy = eligibility()
-    return (
-        policy == 'all'
-        or (policy == 'allowlist' and _allowlisted(uid))
-        or (policy == 'paid' and FULL_ACCESS_PLAN.value in PAID_PLAN_IDS)
-    )
+    return policy == 'all' or (policy == 'allowlist' and _allowlisted(uid))
 
 
 def auto_apply_kinds(uid=None):
