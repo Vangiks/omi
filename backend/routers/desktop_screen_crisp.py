@@ -93,12 +93,6 @@ class ScreenActivitySyncResponse(BaseModel):
     frame_requests: list[FrameRequestDelivery] | None = None
 
 
-async def _authorized_desktop_user(
-    uid: str = Depends(with_rate_limit(get_current_user_uid, "screen_activity:sync")),
-) -> str:
-    return uid
-
-
 def _parity_screen_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Keep screen capture text-only and bounded; never retain embeddings/video."""
     return [
@@ -114,7 +108,8 @@ def _parity_screen_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 @router.post("/v1/screen-activity/sync", response_model=ScreenActivitySyncResponse, response_model_exclude_none=True)
 async def sync_screen_activity(
-    request: ScreenActivitySyncRequest, uid: str = Depends(_authorized_desktop_user)
+    request: ScreenActivitySyncRequest,
+    uid: str = Depends(with_rate_limit(get_current_user_uid, "screen_activity:sync")),
 ) -> ScreenActivitySyncResponse:
     if len(request.rows) > 100:
         raise HTTPException(status_code=400, detail="Maximum 100 rows per batch")
