@@ -92,7 +92,6 @@ export default function AppsPage() {
   // --- Filter State ---
   const [statusFilter, setStatusFilter] = useState('approved');
   const [privacyFilter, setPrivacyFilter] = useState('public');
-  const [priceFilter, setPriceFilter] = useState('all');
   const [dateFilter, setDateFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCapabilities, setSelectedCapabilities] = useState<Set<OmiAppCapability>>(new Set());
@@ -140,10 +139,6 @@ export default function AppsPage() {
       if (privacyFilter === 'public' && app.private === true) return false;
       if (privacyFilter === 'private' && app.private === false) return false;
 
-      // Price Filter
-      if (priceFilter === 'free' && app.is_paid === true) return false;
-      if (priceFilter === 'paid' && app.is_paid === false) return false;
-
       // Date Filter
       if (!filterByDate(app.created_at ?? '', dateFilter)) return false;
 
@@ -167,7 +162,7 @@ export default function AppsPage() {
       return true; // Include app if all checks pass
     });
     // Ensure dependencies include combinedApps and all filter states
-  }, [combinedApps, statusFilter, privacyFilter, priceFilter, dateFilter, searchTerm, selectedCapabilities]);
+  }, [combinedApps, statusFilter, privacyFilter, dateFilter, searchTerm, selectedCapabilities]);
   
   // Sort the filtered apps before pagination
   const sortedAndFilteredApps = useMemo(() => {
@@ -307,7 +302,7 @@ export default function AppsPage() {
 
       {/* --- Filter Controls --- */}
       <div className="flex flex-col gap-4 rounded-md border p-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
            {/* Status */}
           <div>
             <label htmlFor="status-filter" className="text-sm font-medium text-muted-foreground block mb-1">Status</label>
@@ -335,20 +330,6 @@ export default function AppsPage() {
                 <SelectItem value="all">All Apps</SelectItem>
                 <SelectItem value="public">Public</SelectItem>
                 <SelectItem value="private">Private</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          {/* Price */}
-          <div>
-            <label htmlFor="price-filter" className="text-sm font-medium text-muted-foreground block mb-1">Price</label>
-            <Select value={priceFilter} onValueChange={(value) => handleFilterChange(setPriceFilter, value)}>
-              <SelectTrigger id="price-filter" className="h-9">
-                <SelectValue placeholder="All Apps" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Apps</SelectItem>
-                <SelectItem value="free">Free</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
               </SelectContent>
             </Select>
           </div>

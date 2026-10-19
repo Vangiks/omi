@@ -244,7 +244,7 @@ export function AppsList({
               <TableHead>Name</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Capabilities</TableHead>
-              {!showActions ? (
+              {!showActions && (
                 <>
                   <TableHead>
                     <button
@@ -255,7 +255,6 @@ export function AppsList({
                       {getSortIcon('installs')}
                     </button>
                   </TableHead>
-                  <TableHead>Pricing</TableHead>
                   {!minimal && (
                     <TableHead>
                       <button
@@ -268,8 +267,6 @@ export function AppsList({
                     </TableHead>
                   )}
                 </>
-              ) : (
-                 <TableHead>Pricing</TableHead>
               )}
               {!minimal && (
                 <TableHead>
@@ -350,14 +347,9 @@ export function AppsList({
                     ))}
                   </div>
                 </TableCell>
-                {!showActions ? (
+                {!showActions && (
                     <>
                         <TableCell>{app.installs?.toLocaleString() || 0}</TableCell>
-                        <TableCell>
-                          <Badge variant={app.is_paid ? "default" : "secondary"}>
-                            {app.is_paid ? "Paid" : "Free"}
-                          </Badge>
-                        </TableCell>
                         {!minimal && (
                              <TableCell>
                               {(app.rating_avg ?? 0) > 0 ? (
@@ -371,12 +363,6 @@ export function AppsList({
                             </TableCell>
                         )}
                     </>
-                ) : (
-                   <TableCell>
-                      <Badge variant={app.is_paid ? "default" : "secondary"}>
-                        {app.is_paid ? "Paid" : "Free"}
-                      </Badge>
-                    </TableCell>
                 )}
                 {!minimal && (
                   <TableCell>

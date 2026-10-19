@@ -9,7 +9,6 @@ interface AppStats {
   total: number;
   approved: number;
   inReview: number;
-  paid: number;
   partial?: boolean;
 }
 
@@ -103,7 +102,6 @@ export function DashboardStats() {
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
               <StatItem color="bg-green-500" count={appStats.approved ?? 0} label="Approved" />
               <StatItem color="bg-yellow-500" count={appStats.inReview ?? 0} label="In Review" />
-              <StatItem color="bg-blue-500" count={appStats.paid ?? 0} label="Paid" />
             </div>
           </CardContent>
         </Card>

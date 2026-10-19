@@ -74,7 +74,6 @@ export async function POST(req: NextRequest, props: { params: Promise<{ app_id: 
           case 'price':
             data['price'] = value === '' ? undefined : Number(value);
             return;
-          case 'is_paid':
           case 'private':
           case 'enabled':
             data[key] = value === 'true' || value === '1';
