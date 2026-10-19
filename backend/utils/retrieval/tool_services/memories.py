@@ -100,10 +100,8 @@ def get_memories_text(
                         break
                 scan_offset += len(batch)
                 for memory in batch:
-                    if (
-                        memory.is_locked
-                        or getattr(memory, 'user_review', None) is False
-                        or (belief_model_enabled() and memory_use_suppressed(memory))
+                    if getattr(memory, 'user_review', None) is False or (
+                        belief_model_enabled() and memory_use_suppressed(memory)
                     ):
                         continue
                     created = _memory_read_date(memory, temporal=True)
@@ -124,10 +122,8 @@ def get_memories_text(
                     break
                 scan_offset += len(batch)
                 for memory in batch:
-                    if (
-                        memory.is_locked
-                        or getattr(memory, 'user_review', None) is False
-                        or (belief_model_enabled() and memory_use_suppressed(memory))
+                    if getattr(memory, 'user_review', None) is False or (
+                        belief_model_enabled() and memory_use_suppressed(memory)
                     ):
                         continue
                     created = memory.created_at
@@ -234,11 +230,7 @@ def search_memories_text(
         if effective_view != 'released':
             search_kwargs.update(view=effective_view, as_of=as_of)
         matches = MemoryService(db_client=firestore_db).search(uid, query, **search_kwargs)
-        matches = [
-            match
-            for match in matches
-            if not match.memory.is_locked and not (belief_model_enabled() and memory_use_suppressed(match.memory))
-        ]
+        matches = [match for match in matches if not (belief_model_enabled() and memory_use_suppressed(match.memory))]
         if not matches:
             return f"No memories found matching '{query}'."
         records = []

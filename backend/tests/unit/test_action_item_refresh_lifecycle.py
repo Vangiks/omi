@@ -65,7 +65,6 @@ def test_silence_split_merge_late_sync_and_repeated_refresh(monkeypatch):
         ]
         conversation = SimpleNamespace(
             id='p',
-            is_locked=False,
             sync_content_revision=row['sync_content_revision'],
             structured=SimpleNamespace(action_items=items),
         )

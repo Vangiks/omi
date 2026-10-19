@@ -99,7 +99,6 @@ _RESOLVER_DEFINITION_FILE = 'utils/llm/model_config.py'
 # clients.get_llm: pass-through of the caller's feature into _get_model_config.
 # clients._so_gemini: iterates the active profile.
 # judge.py: model_feature defaults to the pinned screen_frame_judge key.
-# managed_compute.py: pass-through of authorize_managed_compute's feature into get_provider.
 KNOWN_DYNAMIC_FEATURE_SITES = frozenset(
     {
         ('utils/llm/persona.py', 'get_llm', 'feature'),
@@ -109,74 +108,14 @@ KNOWN_DYNAMIC_FEATURE_SITES = frozenset(
         ('utils/memory/belief_backfill.py', 'get_llm', 'BELIEF_BACKFILL_LLM_FEATURE'),
         ('utils/llm/clients.py', '_get_model_config', 'f'),
         ('utils/screen_frames/judge.py', 'get_llm', 'model_feature'),
-        ('utils/managed_compute.py', 'get_provider', 'feature'),
     }
 )
 _FEATURE_SCAN_SKIP_DIRS = {'.venv', 'venv', '.openapi-venv', '__pycache__', 'tests'}
 _SNIPPET_CONFIGURED = {'chat_agent', 'memory_l1', 'conv_structure', 'what_matters_now'}
 
 
-def _frozenset_literals_from_assign(tree: ast.Module, name: str) -> frozenset[str]:
-    for node in tree.body:
-        target = None
-        value = None
-        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
-            target, value = node.targets[0].id, node.value
-        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            target, value = node.target.id, node.value
-        if target != name or value is None:
-            continue
-        call = value
-        if isinstance(call, ast.Call) and isinstance(call.func, ast.Name) and call.func.id == 'frozenset':
-            arg = call.args[0] if call.args else None
-            if isinstance(arg, (ast.Set, ast.List, ast.Tuple)):
-                return frozenset(
-                    elt.value for elt in arg.elts if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
-                )
-        if isinstance(call, (ast.Tuple, ast.List)):
-            return frozenset(
-                elt.value for elt in call.elts if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
-            )
-    raise AssertionError(f'could not read {name} from managed_compute.py')
+FUNDING_OWNERS = frozenset({'omi', 'byok', 'system'})
 
-
-def _str_constant_from_assign(tree: ast.Module, name: str) -> str:
-    for node in tree.body:
-        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
-            if (
-                node.targets[0].id == name
-                and isinstance(node.value, ast.Constant)
-                and isinstance(node.value.value, str)
-            ):
-                return node.value.value
-        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            if node.target.id == name and isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
-                return node.value.value
-    raise AssertionError(f'could not read {name} from managed_compute.py')
-
-
-# Reuse S1's vocabulary without importing managed_compute (that module pulls
-# database.users and hangs this file's existing import graph).
-_MANAGED_COMPUTE_TREE = ast.parse(
-    (Path(__file__).resolve().parents[2] / 'utils' / 'managed_compute.py').read_text(encoding='utf-8')
-)
-DECISION_REASONS = _frozenset_literals_from_assign(_MANAGED_COMPUTE_TREE, 'DECISION_REASONS')
-FREE_ALLOWLIST_FEATURES = _frozenset_literals_from_assign(_MANAGED_COMPUTE_TREE, 'FREE_ALLOWLIST_FEATURES')
-FREE_ALLOWLIST_PREFIX = _str_constant_from_assign(_MANAGED_COMPUTE_TREE, 'FREE_ALLOWLIST_PREFIX')
-FUNDING_OWNERS = _frozenset_literals_from_assign(_MANAGED_COMPUTE_TREE, 'FUNDING_OWNERS')
-
-# S7: plan-gating is S1's reason vocabulary plus the realtime quota label.
-PLAN_GATING_VALUES = DECISION_REASONS | {'unified_chat_quota'}
-FALLBACK_ON_DENY_VALUES = frozenset(
-    {
-        'deterministic_minimum',
-        'http_402',
-        'quota_refuse',
-        'none_unwired',
-        'gateway_fail_closed',
-        'n/a_allowed',
-    }
-)
 # Sol claim 9 missed list + realtime usage/relay companions. A rename fails CI.
 REQUIRED_USER_SURFACES = frozenset(
     {
@@ -307,9 +246,7 @@ def test_inventory_surfaces_have_status_guardrails_and_resolvable_code_paths():
         assert surface['code_path']
         assert surface['entrypoint']
         assert surface['feature']
-        assert surface['plan_gating'] in PLAN_GATING_VALUES, surface['surface']
         assert surface['funding_owner'] in FUNDING_OWNERS, surface['surface']
-        assert surface['fallback_on_deny'] in FALLBACK_ON_DENY_VALUES, surface['surface']
         assert isinstance(surface.get('call_sites'), list), surface['surface']
         assert surface['current_provider_model']
         assert surface['request_shape']
@@ -317,32 +254,8 @@ def test_inventory_surfaces_have_status_guardrails_and_resolvable_code_paths():
         assert surface['migration_status']
         assert surface['test_guardrail_coverage']
         assert _inventory_file_exists(surface['code_path']), surface['code_path']
-        _assert_plan_gating_matches_allowlist(surface)
     assert len(names) == len(set(names))
     assert REQUIRED_USER_SURFACES <= set(names)
-
-
-def _assert_plan_gating_matches_allowlist(surface: dict) -> None:
-    feature = surface['feature']
-    gating = surface['plan_gating']
-    if gating == 'unified_chat_quota' or feature in {
-        '*',
-        'desktop_vertex',
-        'desktop_tts',
-        'omni_relay',
-        'desktop_chat_realtime',
-        'public_shared_conversation_chat',
-        'openai_embeddings',
-        'gemini_embeddings',
-        'file_chat_vision',
-        'file_chat_documents',
-    }:
-        return
-    on_allowlist = feature in FREE_ALLOWLIST_FEATURES or feature.startswith(FREE_ALLOWLIST_PREFIX)
-    if gating == 'free_allowlist':
-        assert on_allowlist, surface['surface']
-    if gating == 'basic_not_entitled':
-        assert not on_allowlist, surface['surface']
 
 
 def test_required_user_surfaces_are_named():

@@ -333,7 +333,6 @@ _add(
         neutrals={'replacements': (None, 'optional rename map; not filter-affecting')},
     )
 )
-_add(DriverEntry('database.action_items.unlock_all_action_items', base={'uid': UID}, domains={'limit': [None, 100]}))
 
 _add(
     DriverEntry(
@@ -938,7 +937,6 @@ _add(
         ),
     )
 )
-_add(DriverEntry('database.conversations.unlock_all_conversations', base={'uid': UID}, domains={'limit': [None, 100]}))
 
 _add(
     DriverEntry(
@@ -1023,13 +1021,6 @@ for _fn in (
         )
     )
 
-_add(DriverEntry('database.fair_use.get_fair_use_events', base={'uid': UID}, neutrals={'limit': _LIMIT}))
-_add(
-    DriverEntry(
-        'database.fair_use.get_flagged_users', domains={'stage_filter': [None, 'stage-1']}, neutrals={'limit': _LIMIT}
-    )
-)
-_add(DriverEntry('database.fair_use.get_violation_counts', base={'uid': UID}))
 _add(
     DriverEntry(
         'database.feedback.list_negative_events', base={'start_at': T0, 'end_at': T1}, neutrals={'limit': _LIMIT}
@@ -1679,7 +1670,6 @@ _add(
         neutrals={'limit': _LIMIT, 'budget': _BUDGET},
     )
 )
-_add(DriverEntry('database.memories.unlock_all_memories', base={'uid': UID}, domains={'limit': [None, 100]}))
 
 _add(
     DriverEntry(
@@ -2377,7 +2367,6 @@ _add(
 )
 _add(DriverEntry('database.person_aliases.find_person_by_name', base={'uid': UID, 'name': 'shape-name'}))
 _add(DriverEntry('database.users.get_task_integrations', base={'uid': UID}))
-_add(DriverEntry('database.users.get_user_by_stripe_customer_id', base={'customer_id': 'cus_1'}))
 _add(DriverEntry('database.users.resolve_deletion_wipe_job_id', base={'wipe_job_id': 'job-1'}))
 
 _add(
@@ -2800,18 +2789,6 @@ _add(
 )
 
 
-_add(DriverEntry('database.locked_content.has_recoverable_locked_content', base={'uid': UID}))
-_add(
-    CoveredByEntry(
-        'database.locked_content.unlock_query_rows',
-        covered_by=(
-            'database.action_items.unlock_all_action_items',
-            'database.conversations.unlock_all_conversations',
-            'database.memories.unlock_all_memories',
-        ),
-        reason='Shared batch mechanics and bounded projection exercised by upgrade/reset unlock drivers',
-    )
-)
 
 
 from database.chat_context import ChatContextStore

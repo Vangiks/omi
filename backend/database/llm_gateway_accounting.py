@@ -20,7 +20,7 @@ from google.api_core.exceptions import AlreadyExists
 from google.cloud import firestore
 
 from database._client import get_firestore_client
-from database.llm_usage import resolve_usage_plan_id
+from database.llm_usage import USAGE_PLAN_ID, resolve_usage_plan_id
 from database.usage_units import gateway_shadow
 
 ATTEMPTS_COLLECTION = 'llm_gateway_attempts'
@@ -76,25 +76,7 @@ def record_llm_gateway_attempt(
 def _subscription_tier(client: Any, uid: object) -> str:
     if not isinstance(uid, str) or not uid:
         return 'unattributed'
-    try:
-        snapshot = client.collection('users').document(uid).get(['subscription'])
-        if not getattr(snapshot, 'exists', False):
-            return 'basic'
-        raw = snapshot.to_dict()
-        if not isinstance(raw, Mapping):
-            return 'unknown'
-        subscription = raw.get('subscription')
-        if not isinstance(subscription, Mapping):
-            return 'basic'
-        plan = subscription.get('plan')
-        if not isinstance(plan, str) or not plan.strip():
-            return 'basic'
-        # `free` was migrated to the current internal basic-plan identifier.
-        return 'basic' if plan.strip() == 'free' else plan.strip()
-    except Exception:
-        # A plan lookup must not discard a confirmed provider-usage event. The
-        # event remains attributable by UID and is auditable as tier unknown.
-        return 'unknown'
+    return USAGE_PLAN_ID
 
 
 def _required_string(event: Mapping[str, Any], key: str) -> str:

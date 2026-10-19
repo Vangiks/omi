@@ -1,4 +1,4 @@
-"""The I/O side of the relevance step: lookups, the model-withheld path, and recording.
+"""The I/O side of the relevance step: lookups and recording.
 
 ``relevance.py`` stays pure (policy and tiers); this module holds what touches
 Firestore or metrics, so ``process_conversation`` only wires them together.
@@ -8,22 +8,17 @@ from __future__ import annotations
 
 import logging
 from datetime import timedelta
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 from database import conversations as conversations_db
 from utils.conversation_continuity import DEFAULT_GAP_SECONDS
-from utils.conversations.processing_trigger import ProcessingTrigger
 from utils.conversations.relevance import (
-    RELEVANCE_DECISION_FIELD,
     Neighbor,
     RelevanceDecision,
-    decide_relevance,
     find_neighbor,
 )
-from utils.conversations.wake_word import find_wake_word_matches
 from utils.integration_telemetry import emit_posthog_event
 from utils.metrics import record_conversation_relevance
-from utils.release_probe import is_release_probe_uid
 
 logger = logging.getLogger(__name__)
 
@@ -54,33 +49,6 @@ def adjacent_conversation(uid: str, conversation: Any, conversation_id: Optional
     )
 
 
-def rules_only_relevance(
-    uid: str,
-    conversation: Any,
-    trigger: ProcessingTrigger,
-    user_kept: bool,
-    calendar_retains: Callable[[], bool],
-) -> RelevanceDecision:
-    """The relevance step where the plan withholds the model (free-tier desktop).
-
-    The rules cost nothing, so capture that stores without enrichment is still
-    assessed; anything they cannot settle is kept. Any wake-word match skips the
-    rules entirely, the conservative reading of the model path's trusted marker.
-    """
-    segments = list(getattr(conversation, 'transcript_segments', None) or [])
-    return decide_relevance(
-        trigger=trigger,
-        texts=[segment.text for segment in segments],
-        speech_seconds=None,
-        has_photos=any((photo.description or '').strip() for photo in getattr(conversation, 'photos', None) or []),
-        user_kept=user_kept,
-        exempt=is_release_probe_uid(uid),
-        trusted_wake_word=bool(find_wake_word_matches(segments)),
-        model_discards=None,
-        calendar_retains=calendar_retains,
-    )
-
-
 def record_decision(decision: RelevanceDecision) -> None:
     record_conversation_relevance(
         trigger=decision.trigger.value,
@@ -88,14 +56,6 @@ def record_decision(decision: RelevanceDecision) -> None:
         decided_by=decision.decided_by,
         reason=decision.reason,
     )
-
-
-def apply_relevance(conversation: Any, payload: dict[str, Any], decision: RelevanceDecision) -> None:
-    """Stamp a decision onto an in-memory conversation and its persist payload."""
-    conversation.discarded = decision.discard
-    payload['discarded'] = decision.discard
-    payload[RELEVANCE_DECISION_FIELD] = decision.as_record()
-    record_decision(decision)
 
 
 def emit_recorded_decision(uid: str, conversation_id: str, decision: RelevanceDecision) -> None:

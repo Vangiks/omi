@@ -46,8 +46,6 @@ return 1
 
 def import_quota_limit(kind: str) -> int:
     """The configured limit; uploads and bytes have the same allowance on every plan."""
-    # TODO #20647: hook tier limits into users.get_existing_user_subscription and
-    # utils.subscription.is_paid_plan when a cached paid-status check is available.
     default = _IMPORT_QUOTA_DEFAULTS[kind]
     return max(0, int(os.getenv(f'IMPORT_MONTHLY_{kind.upper()}_LIMIT', str(default))))
 

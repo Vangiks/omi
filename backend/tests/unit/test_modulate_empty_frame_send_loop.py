@@ -9,8 +9,8 @@ rest of the session with no error and no reconnect. Both Parakeet sockets alread
 ``if not data: return True``.
 
 Empty frames are reachable from the live path: ``send_live_stt_audio`` passes its ``audio``
-straight to ``stt_socket.send`` with no emptiness check, ``decide_multi_channel_stt_send`` takes
-``pcm_len`` only for usage accounting and never requires it to be non-zero, and
+straight to ``stt_socket.send`` with no emptiness check, the multi-channel receiver sends whenever
+the channel's socket exists without checking the frame length, and
 ``resample_pcm(b'', ...)`` returns ``b''`` (so a zero-length client frame, or a PCM multi-channel
 frame carrying only its channel byte, produces one).
 """

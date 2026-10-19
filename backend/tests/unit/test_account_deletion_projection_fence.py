@@ -21,7 +21,7 @@ def test_missing_deletion_marker_allows_projection_writes():
     assert fence.blocks_projection_writes is False
 
 
-@pytest.mark.parametrize('status', ['cancelled', 'billing_failed'])
+@pytest.mark.parametrize('status', ['cancelled'])
 def test_explicit_non_destructive_states_allow_projection_writes(status):
     fence = read_account_deletion_projection_fence(
         'uid', db_client=_Client(exists=True, payload={'wipe_status': status})
@@ -32,7 +32,14 @@ def test_explicit_non_destructive_states_allow_projection_writes(status):
 
 
 @pytest.mark.parametrize(
-    'payload', [{}, {'wipe_status': ''}, {'wipe_status': 'future_state'}, {'wipe_status': 'completed'}]
+    'payload',
+    [
+        {},
+        {'wipe_status': ''},
+        {'wipe_status': 'future_state'},
+        {'wipe_status': 'completed'},
+        {'wipe_status': 'billing_failed'},
+    ],
 )
 def test_existing_unknown_or_destructive_marker_fails_closed(payload):
     fence = read_account_deletion_projection_fence('uid', db_client=_Client(exists=True, payload=payload))

@@ -39,8 +39,6 @@ def reject_speaker_label(
         )
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
-    except PermissionError as error:
-        raise HTTPException(status_code=402, detail='A paid plan is required to access this conversation.') from error
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     if data.kind == 'not_a_person':

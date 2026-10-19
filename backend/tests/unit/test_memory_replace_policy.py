@@ -1035,7 +1035,6 @@ def test_canonical_dense_capture_is_bounded_before_atomic_replacement(monkeypatc
             )
             for index in range(60)
         ],
-        is_locked=True,
     )
 
     result = pc._extract_memories_canonical(
@@ -1124,7 +1123,6 @@ def test_canonical_capture_deduplicates_per_subject_and_assigns_subject_scoped_i
                 end=2.0,
             ),
         ],
-        is_locked=True,
     )
 
     result = pc._extract_memories_canonical(

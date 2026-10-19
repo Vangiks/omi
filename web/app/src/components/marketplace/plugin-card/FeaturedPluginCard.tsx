@@ -45,12 +45,6 @@ export const FeaturedPluginCard = memo(function FeaturedPluginCard({
           <h3 className="line-clamp-1 flex-1 text-base font-medium text-white sm:text-lg">
             {plugin.name}
           </h3>
-          {plugin.is_paid && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-xs font-medium text-amber-400">
-              ${plugin.price?.toFixed(2)}
-              {plugin.payment_plan === 'monthly_recurring' ? '/mo' : ''}
-            </span>
-          )}
           <NewBadge plugin={plugin} />
         </div>
 

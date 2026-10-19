@@ -20,7 +20,7 @@ os.environ.setdefault(
 import asyncio
 import io
 import wave
-from unittest.mock import Mock, call
+from unittest.mock import Mock
 
 import httpx
 import pytest
@@ -31,7 +31,6 @@ import routers.stt as stt_router
 from utils.stt import duration_probe
 from utils.other import endpoints as auth
 from utils.rate_limit_config import RATE_POLICIES
-from utils.subscription import TranscriptionAllowance, TRANSCRIPTION_MODE_MANAGED, TRANSCRIPTION_MODE_ON_DEVICE
 
 _PARAKEET_URL = 'http://parakeet.internal:8000'
 _UID = 'test-uid'
@@ -40,46 +39,20 @@ _REAL_PROBE_AUDIO_SECONDS = stt_router._probe_audio_seconds
 
 @pytest.fixture(autouse=True)
 def metering(monkeypatch):
-    # Every request exercises real route control flow without touching account
-    # data or the production usage ledger. Media probing has its own WAV test.
-    allowance = Mock(return_value=TranscriptionAllowance(TRANSCRIPTION_MODE_MANAGED, 100, 'plan_within_allowance'))
+    # Every request exercises real route control flow without touching the
+    # production usage ledger. Media probing has its own WAV test.
     record = Mock()
 
     async def probe(data):
         return 10
 
     monkeypatch.setattr(stt_router, '_probe_audio_seconds', probe)
-    monkeypatch.setattr(stt_router, 'resolve_transcription_allowance', allowance)
     monkeypatch.setattr(stt_router, 'record_usage', record)
-    return allowance, record
+    return record
 
 
-@pytest.mark.parametrize('remaining', [0, 9])
-def test_exhausted_or_insufficient_allowance_never_calls_provider(monkeypatch, metering, remaining):
-    allowance, record = metering
-    allowance.return_value = TranscriptionAllowance(TRANSCRIPTION_MODE_MANAGED, remaining, 'plan_within_allowance')
-    fake = _FakeSttClient()
-    response = _upload(_make_client(monkeypatch, fake))
-    assert response.status_code == 402
-    assert fake.calls == []
-    record.assert_not_called()
-
-
-@pytest.mark.parametrize('reason', ['allowance_unavailable', 'usage_invalid'])
-def test_unavailable_allowance_never_calls_provider(monkeypatch, metering, reason):
-    allowance, record = metering
-    allowance.return_value = TranscriptionAllowance(TRANSCRIPTION_MODE_ON_DEVICE, 0, reason)
-    fake = _FakeSttClient()
-    response = _upload(_make_client(monkeypatch, fake))
-    assert response.status_code == 503
-    assert fake.calls == []
-    record.assert_not_called()
-
-
-@pytest.mark.parametrize('remaining', [10, None])
-def test_success_charges_media_duration_even_without_transcript(monkeypatch, metering, remaining):
-    allowance, record = metering
-    allowance.return_value = TranscriptionAllowance(TRANSCRIPTION_MODE_MANAGED, remaining, 'plan_within_allowance')
+def test_success_charges_media_duration_even_without_transcript(monkeypatch, metering):
+    record = metering
     fake = _FakeSttClient(response=_FakeResponse(json_data={'text': '', 'segments': []}))
     response = _upload(_make_client(monkeypatch, fake))
     assert response.status_code == 200
@@ -88,11 +61,10 @@ def test_success_charges_media_duration_even_without_transcript(monkeypatch, met
         transcription_seconds=10,
         usage_metadata={'funding': 'omi', 'provider': 'parakeet', 'source': 'parakeet_proxy'},
     )
-    assert allowance.call_args_list == [call(_UID, source=None, byok_active=False)] * 2
 
 
 def test_provider_failure_does_not_record_success_usage(monkeypatch, metering):
-    _, record = metering
+    record = metering
     fake = _FakeSttClient(response=_FakeResponse(status_code=503))
     assert _upload(_make_client(monkeypatch, fake)).status_code == 503
     record.assert_not_called()
@@ -431,40 +403,6 @@ def test_non_json_success_body_becomes_502(monkeypatch):
     assert response.status_code == 502
 
 
-def test_platform_forwarding_and_admission_before_slot(monkeypatch, metering):
-    allowance, _ = metering
-    semaphore = asyncio.Semaphore(1)
-    monkeypatch.setattr(stt_router, 'get_stt_proxy_semaphore', lambda: semaphore)
-    states = []
-
-    def resolve(*args, **kwargs):
-        states.append(semaphore.locked())
-        return TranscriptionAllowance(TRANSCRIPTION_MODE_MANAGED, 100, 'plan_within_allowance')
-
-    allowance.side_effect = resolve
-    fake = _FakeSttClient(response=_FakeResponse(json_data={'text': 'ok'}))
-    response = _make_client(monkeypatch, fake).post(
-        '/v1/stt/transcribe',
-        files={'file': ('audio.wav', b'audio', 'audio/wav')},
-        headers={'X-App-Platform': 'ios'},
-    )
-    assert response.status_code == 200
-    assert states == [False, True]
-    assert allowance.call_args_list == [call(_UID, source='ios', byok_active=False)] * 2
-
-
-def test_credit_rechecked_after_queueing(monkeypatch, metering):
-    allowance, record = metering
-    allowance.side_effect = [
-        TranscriptionAllowance(TRANSCRIPTION_MODE_MANAGED, 100, 'plan_within_allowance'),
-        TranscriptionAllowance(TRANSCRIPTION_MODE_ON_DEVICE, 0, 'plan_exhausted'),
-    ]
-    fake = _FakeSttClient()
-    assert _upload(_make_client(monkeypatch, fake)).status_code == 402
-    assert fake.calls == []
-    record.assert_not_called()
-
-
 async def test_probe_deadline_is_503_before_provider_slot(monkeypatch, metering):
     fake = _FakeSttClient()
     monkeypatch.setenv('HOSTED_PARAKEET_API_URL', _PARAKEET_URL)
@@ -483,7 +421,7 @@ async def test_probe_deadline_is_503_before_provider_slot(monkeypatch, metering)
     assert exc.value.status_code == 503
     assert 'probe timed out' in exc.value.detail
     assert fake.calls == []
-    metering[0].assert_not_called()
+    metering.assert_not_called()
 
 
 @pytest.mark.parametrize('duration,expected', [(1_250_000, 2), (None, 2), (0, 400), (float('nan'), 400)])
@@ -529,7 +467,7 @@ def test_real_probe_rewinds_upload_for_provider(monkeypatch, metering):
     fake = _FakeSttClient(response=_FakeResponse(json_data={'text': 'ok'}))
     assert _upload(_make_client(monkeypatch, fake), content=body).status_code == 200
     assert fake.calls[0]['files']['file'][1] == body
-    metering[1].assert_called_once_with(
+    metering.assert_called_once_with(
         _UID,
         transcription_seconds=2,
         usage_metadata={'funding': 'omi', 'provider': 'parakeet', 'source': 'parakeet_proxy'},
@@ -603,7 +541,7 @@ async def test_timed_out_native_probe_is_killed_and_reaped_before_response(monke
         assert processes and processes[0].returncode is not None
         assert not spool.closed  # caller can now safely close its upload
         assert not semaphore.locked()
-    metering[0].assert_not_called()
+    metering.assert_not_called()
 
 
 async def test_repeated_request_cancellation_waits_for_probe_reaping(monkeypatch):

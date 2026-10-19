@@ -32,9 +32,12 @@ omiGlass and device SDKs were removed. `CLAUDE.md` points here.
 - Upstream release and PR tooling is gone from this fork (most of `.github/`, Codemagic,
   `make preflight`, `scripts/pr-preflight`). Do not rely on it or restore it.
 - Migrate in-tree callers together rather than preserving retired APIs with compatibility wrappers.
-- Take upstream updates by merging `upstream/main` while the backend has not diverged; once it
-  has (own server backend), cherry-pick selectively. Keep changes useful to everyone (e.g. Linux
-  meeting detection) separable so they can go to `upstream` as their own PR.
+- Billing is removed from the fork: no subscriptions, plans, quotas, trials, payments or paid
+  marketplace apps; every user gets every feature. Do not restore any of it.
+- Never merge `upstream/main` wholesale: the fork has diverged, and a merge brings billing back.
+  Cherry-pick upstream commits selectively, together with an agent: drop hunks that touch
+  billing, plans or quotas, and port only what the fork still has. Keep changes useful to
+  everyone (e.g. Linux meeting detection) separable so they can go to `upstream` as their own PR.
 
 ## Задачи: GitHub Issues
 
@@ -50,7 +53,7 @@ omiGlass and device SDKs were removed. `CLAUDE.md` points here.
 
 У каждого issue две метки: тип и стадия.
 
-- Тип: `type:bug`, `type:feature`, `type:refactor`. Тип не меняется.
+- Тип: `type:bug`, `type:feature`, `type:refactor`. Тип меняется, только если задачу переформулировали целиком, см. «Правила».
 - Стадия показывает, чего не хватает, чтобы начать работу. Стадия движется в одну сторону, любую можно пропустить:
   - `stage:discuss` — неясна цель. Для бага: неизвестна причина.
   - `stage:idea` — цель ясна, есть несколько вариантов решения. Для бага: причина известна, но исправить можно по-разному или неясно, стоит ли чинить вообще.
@@ -76,13 +79,18 @@ omiGlass and device SDKs were removed. `CLAUDE.md` points here.
 ### Правила
 
 - Не переписывайте исходный текст issue. Уточнения пишите в комментарии. Исключение — галочки в разделе «Готово, когда»: пункт, который проверен, отмечайте `- [x]`.
+- Если задачу переформулировали целиком (например, баг превратился в удаление целой подсистемы), не заводите новый issue. Перенесите старый заголовок и текст первым комментарием, затем замените заголовок, текст и метки. Агент видит только текущий текст и комментарии, а историю правок и смену меток `gh issue view` не показывает.
 - Сменили стадию — оставьте комментарий с результатом шага. Следующий агент берет из него все, что нужно для работы.
 - `/plan` заводит подзадачи дочерними issues (`gh issue create --parent N`), у каждой свои метки. Зависимости между ними ставьте через `gh issue edit --add-blocked-by`.
+- Подзадачи одного уровня: у подзадачи не бывает своих подзадач. Если подзадачу пришлось разбить, новые части заводите дочерними к тому же родителю, а разбитую закройте как not planned с комментарием «заменена #A, #B».
 - Родительский issue переходит в `stage:ready`, только когда все подзадачи в `stage:ready`. Иначе `/build` остановится на неясной подзадаче.
 - Если задача в `stage:ready` оказалась больше одного захода, остановитесь и смените стадию на `stage:spec`.
+- Если по ходу работы подзадачу разбили или завели новую подзадачу, в том же шаге поправьте `tasks/plan.md` в рабочей ветке: добавьте строки новых issues с зависимостями и порядок, в котором их делать. Иначе `/build` пойдет по старому плану и пропустит их.
 - `SPEC.md` и `tasks/` для задачи живут только в ее рабочей ветке. Удалите их последним коммитом перед мержем. Решение, которое нужно сохранить надолго, запишите в ADR в `adr/` или в комментарий к issue.
 - В main нет `SPEC-*.md`, `tasks/` и карты модулей: планы прежнего порядка работы перенесены в issues.
-- Перед мержем проверьте код через `/agent-skills:review`. В Claude Code `/review` занят встроенной командой, поэтому команду плагина вызывайте с префиксом.
-- Issue закрывает PR со строкой `Closes #N` в описании. Вручную issues не закрывайте. Исключение — задача, которую решили не делать: ее закрывает человек как not planned и пишет причину в комментарии.
+- Перед мержем в main запустите `/agent-skills:ship`: после мержа CI собирает desktop и web, так что мерж — это релиз. Ship сам проверяет код, безопасность и тесты, отдельный review перед ним не нужен. `/agent-skills:review` остается для проверки по ходу работы. В Claude Code `/review` занят встроенной командой, поэтому команды плагина вызывайте с префиксом.
+- Подзадачу закрывайте сразу, как только ее коммиты запушены в рабочую ветку: `gh issue close M --comment "..."`. В комментарии хэши коммитов, ветка, номер родителя и пункты «Готово, когда», которые остались пустыми, с причиной. Так у родителя видна полоса прогресса: закрытая подзадача значит «сделано в ветке», а не «в main».
+- После первой закрытой подзадачи откройте draft PR рабочей ветки в main со строкой `Closes #N` для родителя. Дальше коммиты идут в этот PR. Родителя закрывает только мерж PR.
+- Задача без подзадач закрывается мержем PR со строкой `Closes #N`. Задачу, которую решили не делать, закрывает человек как not planned и пишет причину в комментарии.
 
 Keep this file a router. Add component facts to the owning guide.

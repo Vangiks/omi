@@ -11,7 +11,7 @@ import utils.apps as apps_utils
 from utils.apps import verify_api_key
 import database.redis_db as redis_db
 from database._client import db as firestore_db
-from utils.memory.memory_service import MemoryService, truncate_locked_memory_preview
+from utils.memory.memory_service import MemoryService
 from database.redis_db import get_enabled_apps
 import database.action_items as action_items_db
 import models.integrations as integration_models
@@ -249,13 +249,7 @@ def get_memories_via_integration(
     memory_items: List[integration_models.MemoryItem] = []
     for memory in memories:
         try:
-            # Keep the released integration privacy contract: a locked memory
-            # may be listed, but only with its bounded preview.  MemoryService
-            # is the authority for both physical origins, so apply the same
-            # exposure rule after the universal read rather than trusting the
-            # route's former legacy-only branch.
-            exposed = truncate_locked_memory_preview(memory)
-            memory_items.append(integration_models.MemoryItem(**exposed.model_dump(mode='json')))
+            memory_items.append(integration_models.MemoryItem(**memory.model_dump(mode='json')))
         except Exception as e:  # noqa: BLE001 - intentional broad catch: skip any malformed record
             logger.error(f"Error parsing memory {getattr(memory, 'id', None)}: {str(e)}")
             continue
@@ -697,9 +691,6 @@ def get_tasks_via_integration(
     task_items: List[integration_models.TaskItem] = []
     for task in tasks:
         task_data = task.copy()
-        if task_data.get('is_locked', False):
-            description = task_data.get('description') or ''
-            task_data['description'] = (description[:70] + '...') if len(description) > 70 else description
         try:
             task_items.append(integration_models.TaskItem(**task_data))
         except Exception as e:  # noqa: BLE001 - intentional broad catch: skip any malformed record

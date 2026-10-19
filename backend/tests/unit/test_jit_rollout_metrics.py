@@ -76,8 +76,6 @@ def test_lazy_desktop_deferral_metric_is_bounded_and_uid_free():
     assert LAZY_DESKTOP_DEFERRAL_TOTAL._labelnames == ('event',)
     assert 'uid' not in LAZY_DESKTOP_DEFERRAL_TOTAL._labelnames
     assert LAZY_DESKTOP_DEFERRAL_EVENTS == {
-        'stored',
-        'fenced',
         'enrich_started',
         'enrich_lost_ownership',
         'enrich_reacquire_error',
@@ -91,18 +89,15 @@ def test_lazy_desktop_deferral_metric_is_bounded_and_uid_free():
     for event in LAZY_DESKTOP_DEFERRAL_EVENTS | {'other'}:
         _rendered_lazy_sample(payload, event)
 
-    # The HELP text has to carry the three constraints on reading the ratio,
+    # The HELP text has to carry the constraint on reading the ratio,
     # because whoever writes the PromQL will not read utils/metrics.py.
     help_line = next(line for line in payload.splitlines() if line.startswith('# HELP lazy_desktop_deferral_total'))
-    assert 'sum by (event)' in help_line  # stored is emitted by backend AND pusher
-    assert 'pusher' in help_line
-    assert 'attempt/persist ratio' in help_line  # not per-conversation
-    assert 'FREE_TIER_LOCAL_PROCESSING' in help_line  # ratio undefined while on
+    assert 'attempt ratio' in help_line  # not per-conversation
 
     # Assert on a rendered sample after a real increment, not just the HELP line.
-    before = _rendered_lazy_sample(payload, 'fenced')
-    record_lazy_desktop_deferral(event='fenced')
-    assert _rendered_lazy_sample(generate_latest().decode(), 'fenced') == before + 1
+    before = _rendered_lazy_sample(payload, 'enrich_failed')
+    record_lazy_desktop_deferral(event='enrich_failed')
+    assert _rendered_lazy_sample(generate_latest().decode(), 'enrich_failed') == before + 1
 
 
 def _lazy_count(event: str) -> float:
@@ -111,10 +106,10 @@ def _lazy_count(event: str) -> float:
 
 def test_lazy_desktop_deferral_unknown_event_collapses_to_other():
     before_other = _lazy_count('other')
-    before_stored = _lazy_count('stored')
-    record_lazy_desktop_deferral(event='stored')
+    before_started = _lazy_count('enrich_started')
+    record_lazy_desktop_deferral(event='enrich_started')
     record_lazy_desktop_deferral(event='uid:abc')  # a caller cannot mint a new series
-    assert _lazy_count('stored') == before_stored + 1
+    assert _lazy_count('enrich_started') == before_started + 1
     assert _lazy_count('other') == before_other + 1
     assert 'uid:abc' not in generate_latest().decode()
 
@@ -125,15 +120,15 @@ def test_lazy_desktop_deferral_recorder_never_raises(monkeypatch):
     monkeypatch.setattr(
         LAZY_DESKTOP_DEFERRAL_TOTAL, 'labels', lambda **_kw: (_ for _ in ()).throw(RuntimeError('down'))
     )
-    assert record_lazy_desktop_deferral(event='stored') is None
+    assert record_lazy_desktop_deferral(event='enrich_started') is None
 
 
 def test_lazy_desktop_deferral_unhashable_event_collapses_to_other():
     # An unhashable/invalid runtime value must not raise before the guarded
     # metric operation; it collapses to `other` like any unknown label.
     before_other = _lazy_count('other')
-    before_stored = _lazy_count('stored')
+    before_started = _lazy_count('enrich_started')
     bad_event: Any = ['not', 'hashable']
     assert record_lazy_desktop_deferral(event=bad_event) is None
     assert _lazy_count('other') == before_other + 1
-    assert _lazy_count('stored') == before_stored
+    assert _lazy_count('enrich_started') == before_started

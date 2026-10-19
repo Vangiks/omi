@@ -312,9 +312,6 @@ def _receiver_with_flowing_audio(monkeypatch: Any, *, primary: Any, replacement:
     receiver = _receiver_with_dead_socket(monkeypatch, replacement=replacement)
     receiver.stt_socket = primary
     host = receiver.host
-    host.state.fair_use_dg_budget_exhausted = False
-    host.state.fair_use_track_dg_usage = False
-    host.state.dg_usage_ms_pending = 0
     host.request.sample_rate = 16000
     host.request.websocket = MagicMock(send_json=AsyncMock(), close=AsyncMock())
     host.client_device_context.platform = 'ios'

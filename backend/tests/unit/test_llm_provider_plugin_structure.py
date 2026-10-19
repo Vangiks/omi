@@ -166,7 +166,7 @@ def test_unknown_openai_compatible_provider_fails_loudly():
 def test_route_options_keep_provider_quirks_out_of_callsites():
     assert get_route_options('wrapped_analysis', 'gemini-3-flash-preview', 'openrouter')['temperature'] == 0.7
     assert get_route_options('followup', 'gemini-2.5-flash-lite', 'gemini')['thinking_budget'] == 0
-    assert get_route_options('fair_use', 'gpt-5.1', 'openai')['extra_body'] == {"prompt_cache_retention": "24h"}
+    assert get_route_options('chat_agent', 'gpt-5.1', 'openai')['extra_body'] == {"prompt_cache_retention": "24h"}
 
 
 def test_validate_folder_assignment_rejects_unknown_folder_id():

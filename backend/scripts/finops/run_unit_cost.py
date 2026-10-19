@@ -7,7 +7,7 @@ What it does, in order:
   1. picks a run directory and records a manifest (window, identities, settlement)
   2. pulls the raw inputs for the window (GCP billing export, gateway ledger, users snapshot,
      hourly_usage transcription seconds, Prometheus VAD hours, OpenAI/Anthropic invoices,
-     Stripe subscription book, PostHog DAU)
+     PostHog DAU)
   3. assembles the allocation (backend/scripts/finops/assemble_unit_cost.py)
   4. validates: every variable pool must reconcile within --recon-tolerance-pct, the window
      must be settled, and no raw uid may appear in any output
@@ -190,7 +190,7 @@ def main() -> None:
     ap.add_argument("--cohort-lookback-days", type=int, default=7)
     ap.add_argument("--reuse-raw", action="store_true", help="skip the pulls and use the run dir as-is")
     ap.add_argument(
-        "--skip", default="", help="comma-separated pulls to skip: gcp,ledger,users,stt,prom,providers,stripe,posthog"
+        "--skip", default="", help="comma-separated pulls to skip: gcp,ledger,users,stt,prom,providers,posthog"
     )
     ap.add_argument("--recon-tolerance-pct", type=float, default=0.5)
     ap.add_argument("--allow-unsettled", action="store_true")
@@ -230,8 +230,6 @@ def main() -> None:
             sh([str(HERE / "pull_prometheus.py"), "--start", start, "--end", end, "--raw", str(raw)], log, "prom")
         if "providers" not in skip:
             sh([str(HERE / "pull_providers.py"), "--start", start, "--end", end, "--raw", str(raw)], log, "providers")
-        if "stripe" not in skip:
-            sh([str(HERE / "pull_stripe.py"), "--raw", str(raw)], log, "stripe", required=False)
         if "posthog" not in skip:
             # denominator colour only; the allocation does not depend on it
             nxt = (dt.date.fromisoformat(end) + dt.timedelta(days=1)).isoformat()
@@ -292,8 +290,6 @@ def main() -> None:
                 str(HERE / "load_bigquery.py"),
                 "--derived",
                 str(derived),
-                "--raw",
-                str(raw),
                 "--run-id",
                 run_id,
                 "--settled-through",

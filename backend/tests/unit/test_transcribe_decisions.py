@@ -1,13 +1,11 @@
 from utils.transcribe_decisions import (
     ConversationLifecycleAction,
     RecordingSessionReconnectAction,
-    TARGET_SAMPLE_RATE,
     USER_SELF_PERSON_ID,
     decide_existing_conversation_action,
     decide_lifecycle_action,
     decide_recording_session_reconnect_action,
     decide_multi_channel_mix,
-    decide_multi_channel_stt_send,
     decide_stt_buffer_flush,
     decide_text_speaker_assignment,
     effective_conversation_timeout,
@@ -435,9 +433,6 @@ def test_stt_buffer_flush_waits_for_budget_and_force_flushes():
         force=False,
         socket_dead=False,
         socket_available=True,
-        fair_use_dg_budget_exhausted=False,
-        fair_use_track_dg_usage=True,
-        sample_rate=16000,
     )
     assert small.should_flush is False
 
@@ -447,13 +442,9 @@ def test_stt_buffer_flush_waits_for_budget_and_force_flushes():
         force=True,
         socket_dead=False,
         socket_available=True,
-        fair_use_dg_budget_exhausted=False,
-        fair_use_track_dg_usage=True,
-        sample_rate=16000,
     )
     assert forced.should_flush is True
     assert forced.send_to_stt is True
-    assert forced.dg_usage_ms == 100 * 1000 // (16000 * 2)
 
 
 def test_stt_buffer_flush_empty_buffer_is_noop():
@@ -463,63 +454,24 @@ def test_stt_buffer_flush_empty_buffer_is_noop():
         force=False,
         socket_dead=False,
         socket_available=True,
-        fair_use_dg_budget_exhausted=False,
-        fair_use_track_dg_usage=True,
-        sample_rate=16000,
     )
     assert empty.should_flush is False
 
 
-def test_stt_buffer_flush_dead_socket_and_budget_do_not_send_or_bill():
+def test_stt_buffer_flush_dead_socket_does_not_send():
     dead = decide_stt_buffer_flush(
         buffer_len=960,
         flush_size=960,
         force=False,
         socket_dead=True,
         socket_available=True,
-        fair_use_dg_budget_exhausted=False,
-        fair_use_track_dg_usage=True,
-        sample_rate=16000,
     )
     assert dead.should_flush is True
     assert dead.socket_dead is True
     assert dead.send_to_stt is False
-    assert dead.dg_usage_ms == 0
-
-    exhausted = decide_stt_buffer_flush(
-        buffer_len=960,
-        flush_size=960,
-        force=False,
-        socket_dead=False,
-        socket_available=True,
-        fair_use_dg_budget_exhausted=True,
-        fair_use_track_dg_usage=True,
-        sample_rate=16000,
-    )
-    assert exhausted.should_flush is True
-    assert exhausted.send_to_stt is False
-    assert exhausted.dg_usage_ms == 0
 
 
-def test_multi_channel_send_and_mix_plans():
-    should_send, dg_ms = decide_multi_channel_stt_send(
-        socket_available=True,
-        fair_use_dg_budget_exhausted=False,
-        pcm_len=TARGET_SAMPLE_RATE * 2,
-        fair_use_track_dg_usage=True,
-    )
-    assert should_send is True
-    assert dg_ms == 1000
-
-    blocked, blocked_ms = decide_multi_channel_stt_send(
-        socket_available=True,
-        fair_use_dg_budget_exhausted=True,
-        pcm_len=TARGET_SAMPLE_RATE * 2,
-        fair_use_track_dg_usage=True,
-    )
-    assert blocked is False
-    assert blocked_ms == 0
-
+def test_multi_channel_mix_plans():
     not_ready = decide_multi_channel_mix([bytearray(b'ab'), bytearray()], audio_bytes_enabled=True)
     assert not_ready.should_mix is False
     assert not_ready.min_len == 0

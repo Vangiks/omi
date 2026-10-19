@@ -30,7 +30,6 @@ import type {
   MergeConversationsResponse,
   CreateConversationResponse,
   ActionItemsResponse,
-  FairUseStatusResponse,
   StoreRecordingPermissionResponse,
 } from './omiApi.generated';
 import {
@@ -57,7 +56,6 @@ import type {
   ThumbnailUploadResponse,
   GenerateDescriptionResponse,
   NotificationScope,
-  PaymentPlan,
 } from '@/types/apps';
 
 // Always use proxy to avoid CORS (browser → proxy → api.omi.me)
@@ -100,7 +98,6 @@ async function fetchWithAuthResponse<T>(
   new Headers(options.headers).forEach((value, name) => headers.set(name, value));
   headers.set('X-App-Platform', 'web');
   headers.set('X-App-Version', webAppVersion);
-  headers.set('X-Omi-Plan-Identity', '1');
   if (deviceIdHash) {
     headers.set('X-Device-Id-Hash', deviceIdHash);
   }
@@ -1415,7 +1412,6 @@ export async function getChatApps(): Promise<App[]> {
 export async function createApp(
   data: CreateAppRequest & {
     deleted?: boolean;
-    price?: number;
     thumbnails?: string[];
     uid?: string;
   },
@@ -1654,30 +1650,6 @@ export async function getNotificationScopes(): Promise<NotificationScope[]> {
   }
 }
 
-/**
- * Get available payment plans
- * Note: This endpoint may not exist in all API versions, returns empty array on 404
- */
-export async function getPaymentPlans(): Promise<PaymentPlan[]> {
-  try {
-    const token = await getIdToken();
-    if (!token) return [];
-
-    const response = await fetch(`${API_BASE_URL}/v1/app/plans`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        'X-App-Platform': 'web',
-      },
-    });
-
-    if (!response.ok) return [];
-    return response.json();
-  } catch {
-    return [];
-  }
-}
-
 // ============================================================================
 // User Settings API
 // ============================================================================
@@ -1692,11 +1664,8 @@ import type {
   UserUsageResponse,
   UsageStats,
   AllUsageData,
-  UserSubscription,
-  UserSubscriptionResponse,
   Person,
 } from '@/types/user';
-import { decodePlan, planGrantsPaidCapability } from '@/types/user';
 
 /**
  * Get user's primary language
@@ -1919,127 +1888,6 @@ export async function getAllUsageData(): Promise<AllUsageData> {
   return { today, monthly, yearly, all_time };
 }
 
-export async function getUserSubscription(): Promise<UserSubscription | null> {
-  try {
-    const response = await fetchWithAuth<UserSubscriptionResponse>(
-      '/v1/users/me/subscription',
-    );
-
-    const plan = decodePlan(response.subscription?.plan);
-    const result: UserSubscription = {
-      plan: plan.raw ?? '',
-      plan_identity: plan,
-      status: response.subscription?.status || 'active',
-      // Unknown plans never infer paid capability.
-      is_unlimited: planGrantsPaidCapability(plan),
-      transcription_seconds_used: response.transcription_seconds_used,
-      transcription_seconds_limit: response.transcription_seconds_limit,
-      current_period_end: response.subscription?.current_period_end,
-      stripe_subscription_id: response.subscription?.stripe_subscription_id,
-      cancel_at_period_end: response.subscription?.cancel_at_period_end,
-      current_price_id: response.subscription?.current_price_id,
-      features: response.subscription?.features || [],
-    };
-    return result;
-  } catch (error) {
-    console.error('getUserSubscription error:', error);
-    return null;
-  }
-}
-
-/**
- * Get available subscription plans
- */
-export async function getAvailablePlans(): Promise<AvailablePlansResponse | null> {
-  try {
-    const response = await fetchWithAuth<AvailablePlansResponse>(
-      '/v1/payments/available-plans',
-    );
-    return response;
-  } catch (error) {
-    console.error('getAvailablePlans error:', error);
-    return null;
-  }
-}
-
-/**
- * Create a checkout session for subscription
- */
-export async function createCheckoutSession(
-  priceId: string,
-): Promise<CheckoutSessionResponse | null> {
-  try {
-    const response = await fetchWithAuth<CheckoutSessionResponse>(
-      '/v1/payments/checkout-session',
-      {
-        method: 'POST',
-        body: JSON.stringify({ price_id: priceId }),
-      },
-    );
-    return response;
-  } catch (error) {
-    console.error('createCheckoutSession error:', error);
-    return null;
-  }
-}
-
-/**
- * Upgrade subscription to a different plan
- */
-export async function upgradeSubscription(
-  priceId: string,
-): Promise<UpgradeSubscriptionResponse | null> {
-  try {
-    const response = await fetchWithAuth<UpgradeSubscriptionResponse>(
-      '/v1/payments/upgrade-subscription',
-      {
-        method: 'POST',
-        body: JSON.stringify({ price_id: priceId }),
-      },
-    );
-    return response;
-  } catch (error) {
-    console.error('upgradeSubscription error:', error);
-    return null;
-  }
-}
-
-/**
- * Cancel subscription
- */
-export async function cancelSubscription(): Promise<CancelSubscriptionResponse | null> {
-  try {
-    const response = await fetchWithAuth<CancelSubscriptionResponse>(
-      '/v1/payments/subscription',
-      {
-        method: 'DELETE',
-      },
-    );
-    return response;
-  } catch (error) {
-    console.error('cancelSubscription error:', error);
-    return null;
-  }
-}
-
-/**
- * Get customer portal URL for managing payment methods
- */
-export async function getCustomerPortal(): Promise<CustomerPortalResponse | null> {
-  try {
-    const response = await fetchWithAuth<CustomerPortalResponse>(
-      '/v1/payments/customer-portal',
-      {
-        method: 'POST',
-      },
-    );
-    return response;
-  } catch (error) {
-    console.error('getCustomerPortal error:', error);
-    return null;
-  }
-}
-
 /**
  * Get all people for speaker identification
  */
@@ -2114,17 +1962,6 @@ export async function assignBulkTranscriptSegments(
 }
 
 /**
- * Error thrown when editing a transcript segment requires a paid plan
- * (backend returns HTTP 402 for `/segments/text` on gated accounts).
- */
-export class SegmentEditPlanRequiredError extends Error {
-  constructor(message = 'Editing the transcript requires the Unlimited plan.') {
-    super(message);
-    this.name = 'SegmentEditPlanRequiredError';
-  }
-}
-
-/**
  * Update the text of a single transcript segment.
  *
  * Mirrors the backend `PATCH /v1/conversations/{id}/segments/text`
@@ -2135,25 +1972,16 @@ export class SegmentEditPlanRequiredError extends Error {
  * @param conversationId - The conversation ID
  * @param segmentId - The `id` of the segment to edit (non-empty)
  * @param text - New segment text (1–10000 chars, enforced by the backend)
- * @throws SegmentEditPlanRequiredError when the account is plan-gated (402)
  */
 export async function updateSegmentText(
   conversationId: string,
   segmentId: string,
   text: string,
 ): Promise<void> {
-  try {
-    await fetchWithAuth(`/v1/conversations/${conversationId}/segments/text`, {
-      method: 'PATCH',
-      body: JSON.stringify({ segment_id: segmentId, text }),
-    });
-  } catch (error) {
-    // fetchWithAuth surfaces the status in the thrown message (`API error: 402 ...`).
-    if (error instanceof Error && error.message.includes('402')) {
-      throw new SegmentEditPlanRequiredError();
-    }
-    throw error;
-  }
+  await fetchWithAuth(`/v1/conversations/${conversationId}/segments/text`, {
+    method: 'PATCH',
+    body: JSON.stringify({ segment_id: segmentId, text }),
+  });
 }
 
 /**
@@ -2191,11 +2019,6 @@ import type {
   CustomVocabulary,
   Integration,
   McpApiKey,
-  AvailablePlansResponse,
-  CheckoutSessionResponse,
-  UpgradeSubscriptionResponse,
-  CancelSubscriptionResponse,
-  CustomerPortalResponse,
 } from '@/types/user';
 
 /** Get user's developer API keys; opt into errors for settings. */
@@ -2780,27 +2603,5 @@ export async function unregisterFCMToken(fcmToken: string): Promise<void> {
   } catch (error) {
     // Silently fail on logout - token cleanup is best-effort
     console.warn('Failed to unregister FCM token:', error);
-  }
-}
-
-// ============================================================================
-// Fair Use Status
-// ============================================================================
-
-/**
- * Client-narrowed view of the generated `FairUseStatusResponse` (backend
- * OpenAPI authority for `/v1/fair-use/status`). The backend types `stage` as a
- * plain string; this adapter narrows it to the union the UI renders.
- */
-export type FairUseStatus = Omit<FairUseStatusResponse, 'stage'> & {
-  stage: 'none' | 'warning' | 'throttle' | 'restrict';
-};
-
-export async function getFairUseStatus(): Promise<FairUseStatus | null> {
-  try {
-    return await fetchWithAuth<FairUseStatus>('/v1/fair-use/status');
-  } catch (error) {
-    console.error('getFairUseStatus error:', error);
-    return null;
   }
 }

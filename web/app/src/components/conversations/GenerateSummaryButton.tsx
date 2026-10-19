@@ -257,8 +257,6 @@ export function GenerateSummaryButton({
         category: 'conversation-analysis',
         capabilities: ['memories'],
         private: !isPublic,
-        is_paid: false,
-        price: 0.0,
         memory_prompt: templatePrompt.trim(),
         deleted: false,
         thumbnails: [],

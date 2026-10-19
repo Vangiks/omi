@@ -109,7 +109,7 @@ Apply and Undo rebuild transcript chunk vectors from the projection as well as s
 `DREAM_AGENT_ENABLED` and the operator document `dream_control/global.enabled` jointly control the global kill switch (10-second last-known cache; async callers refresh in the DB executor; deny until the first successful read): false prevents admission,
 dispatch and effects, including late executor completions. Code defaults false;
 the prod overlay ships true with `DREAM_AGENT_ELIGIBILITY=all`. Eligibility also
-supports `paid` and `allowlist`; invalid settings deny admission. Release-channel
+supports `allowlist`; invalid settings deny admission. Release-channel
 metadata is informational and cannot exclude Store users.
 
 An hourly sweep drains a durable `dream_due` queue ordered by due time, which

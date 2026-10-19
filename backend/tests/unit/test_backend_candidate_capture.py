@@ -60,7 +60,6 @@ def _conversation(*actions, source=ConversationSource.desktop):
     """Desktop by default: this file covers the surface that still proposes Candidates."""
     return SimpleNamespace(
         id='conversation-1',
-        is_locked=False,
         source=source,
         structured=SimpleNamespace(action_items=list(actions)),
     )

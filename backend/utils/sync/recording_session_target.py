@@ -1,7 +1,7 @@
 """Bind an unbound safety-WAL upload to the live conversation it belongs to.
 
 ``/v4/listen`` stamps ``external_data.recording_session_id`` with the client
-recording id. Binding also requires source, device, lock state, and full audio
+recording id. Binding also requires source, device, and full audio
 interval containment with bounded edge allowance. A client id can outlive
 server-side silence rollover; the bounded interval prevents a spanning WAL
 from binding to the earlier generation.
@@ -51,7 +51,6 @@ def select_recording_session_target(
     *,
     source: Any,
     client_device_id: str | None,
-    is_locked: bool,
     audio_start_seconds: float | None = None,
     audio_end_seconds: float | None = None,
 ) -> str | None:
@@ -83,8 +82,6 @@ def select_recording_session_target(
         if source_value(row.get('source')) != wanted_source:
             continue
         if clean_text(row.get('client_device_id')) != device_id:
-            continue
-        if bool(row.get('is_locked')) != bool(is_locked):
             continue
         conversation_start = unix_seconds(row.get('started_at'))
         conversation_end = unix_seconds(row.get('finished_at'))
@@ -141,7 +138,6 @@ def resolve_recording_session_sync_target(
     recording_session_id: str | None,
     source: Any,
     client_device_id: str | None,
-    is_locked: bool,
     audio_start_seconds: float | None = None,
     audio_end_seconds: float | None = None,
     *,
@@ -175,7 +171,6 @@ def resolve_recording_session_sync_target(
         session_id,
         source=source,
         client_device_id=client_device_id,
-        is_locked=is_locked,
         audio_start_seconds=audio_start_seconds,
         audio_end_seconds=audio_end_seconds,
     )

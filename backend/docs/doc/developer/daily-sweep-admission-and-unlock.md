@@ -1,4 +1,4 @@
-# Sweep admission, source selection and deferred unlock replay
+# Sweep admission and source selection
 
 ## Deployment boundary
 
@@ -118,78 +118,12 @@ plus one overflow probe, with at most 200 writes. Overflow remains fail-closed;
 this is not an unbounded historical repair scan. No extra alias fence or second
 repair mechanism is introduced.
 
-## Locked content: shipped behavior and deferred gap
-
-Locked rows are excluded before provider input and counted in
-`locked_rows_excluded` without IDs or content. The day completes, including
-complete-zero, and the cursor advances so free-tier users do not stall.
-**A day consumed while locked is not revisited after a later paid unlock.**
-Closing this rarer correctness gap is deferred to a separately reviewed PR.
-`database/conversations.py` matches `origin/main`; payment, conversation,
-memory and action-item unlock paths have no sweep metadata dependency.
-No generation bump, cursor rewind, replay handoff or replay-specific canonical
-write policy is shipped here.
-
-For completed-day agent calls, every actual provider boundary re-reads only
-`is_locked` on the selected source IDs, including before phase B. Missing rows
-or failed reads report `source_lock_check_unavailable`; locking reports
-`source_locked_before_dispatch`. Input is never silently replaced after claim.
-Before phase A, the instrumented agent can certify failure and release the
-claim under the existing bounded policy. After phase A dispatched, a failed
-phase-B check leaves the invocation indeterminate and cannot permit another call.
-Legacy rows with no `is_locked` field remain readable, matching other readers.
-This costs one additional document read per selected row per provider phase:
-at most 200 per phase / 400 across two phases in production, or 8 for QA's
-single phase. Projections reduce payload, not billed reads. No new index is
-needed for direct document reads. The check narrows but cannot eliminate the
-check-to-call race: a lock can commit after its row's last read and before the
-request is sent. There is no transaction spanning Firestore and the provider.
-Onboarding retains its source-read lock check; its separate extractor does not
-use the instrumented daily-summary provider boundary.
-
-## Deferred paid-unlock replay design (not implemented)
-
-The prior proposal correctly identified that a source-generation bump alone
-preserves the completed-day cursor. Replay needs both generation-scoped ownership
-and durable scheduling of affected days. It also requires an atomic publication
-point that prevents the sweep from seeing a partial unlock epoch. The removed
-implementation published each 100-row chunk separately; with 101 rows that
-can dispatch one day in successive generations. It cannot be used as-is.
-
-A follow-up should start from a durable, resumable unlock operation, with
-idempotent batch progress and **one** final activation after every batch completes.
-Payment success and sibling memory/action-item unlocks must not depend on sweep
-metadata. An already-subscribed retry must be able to finish partial conversation
-unlock after a crash. Invalid user timezones must be validated or resolved by a
-server-owned fallback without aborting paid unlock. Deletion and generation
-checks belong at the final activation and every later write. Coalesce overlapping
-unlock operations rather than publishing repeated replay generations per batch.
-
-Record affected local days, not a rewind through every intervening day. A
-single year-old row must not cause a year of repeat provider calls. The design
-needs an explicit aggregate replay budget as well as the existing per-run drain
-limit (3 days per user, 1 in QA; 32 candidates and 16 canonical writes per day).
-The durable queue, coalescing and overflow disposition need review before any
-new generation can become visible. Missing/string start dates need an explicit
-policy; the timestamp range alone cannot schedule those rows.
-
-Preserve old summaries, packets and stages as provenance; never restamp them
-into a new generation. A replay artifact should identify its predecessor and
-have one logical owner, with old pending work explicitly invalidated at activation.
-The earlier proposal kept UI summary documents unchanged and created new
-memory-extraction stages; regeneration of UI summaries belongs to that writer's
-update contract. Canonical provenance must distinguish replay from current
-knowledge. Skipping an occupied subject/slot avoids overwriting newer or
-user-authored facts but also loses historical corrections; an explicit recency
-and conflict policy is required. These cache, stage and canonical policies are
-design questions for the follow-up, not hidden behavior in this branch.
-
 ## Source observation and cost bounds
 
 The `started_at` timestamp range uses the existing ascending index, ordered by
 `started_at`, then document ID. No composite index is added. Its five-field
 projection reads at most 100,001 documents, including one overflow probe.
-The 2,000 ceiling now counts eligible rows only; discarded/locked rows do not
+The 2,000 ceiling now counts eligible rows only; discarded rows do not
 cause `eligibility_scan_over_budget`. A genuinely unexhausted 100,000-row scan
 returns `source_scan_over_budget`, since unseen eligibility cannot be proven.
 The higher scan ceiling accommodates 2,001 discarded/imported records and
@@ -203,8 +137,8 @@ overflow is checked before any full-document reads.
 
 Eligibility is an observed-read proof, not a stable snapshot. Projection and
 full-document reads are not atomic. A processing mutation beyond the full-read
-page or a later insert is not rechecked. Selected rows can change after reading; the dispatch-boundary lock re-check
-above narrows privacy exposure without claiming an atomic whole-window view. There is **no explicit settle margin**: yesterday becomes eligible at
+page or a later insert is not rechecked. Selected rows can change after reading;
+nothing claims an atomic whole-window view. There is **no explicit settle margin**: yesterday becomes eligible at
 local midnight, potentially immediately after its end. Missing/string-typed
 `started_at` values are outside the timestamp range, and attribution is by
 start day, not finish day. These pre-existing limitations remain explicit.
@@ -212,7 +146,7 @@ start day, not finish day. These pre-existing limitations remain explicit.
 `rows_seen` counts eligible projected rows; `rows_used` counts selected rows.
 Contentless eligible rows increment `contentless_rows_omitted`, set truncation
 and use that named reason when no stronger budget reason applies. Empty speaker
-labels are not transcript content. Locked exclusions are a separate count.
+labels are not transcript content.
 Individually oversized rows are always skipped, including after a selected row;
 an exactly-full page alone is never proof of truncation. Source evidence lives
 outside the dictionary the real agent clears. Scheduler and receipt reason
@@ -243,14 +177,13 @@ Workflow contract checks passed.
 13 files would be left unchanged.
 FIRESTORE_EMULATOR_HOST=127.0.0.1:8789 GOOGLE_CLOUD_PROJECT=demo-daily-memory-sweep GCLOUD_PROJECT=demo-daily-memory-sweep MEMORY_ENABLED=on backend/.venv/bin/python backend/scripts/daily_memory_sweep_emulator_test.py
 PASS: daily memory sweep Firestore emulator retry/interruption proof
-(crash/deletion/generation/paid-wipe/pre-dispatch-release-contention/source-digest-binding/legacy-fence/source-projection/accounting-pagination/lost-accounting-refusal/window-admission/pre-lock-preflight/attested-skip/lock-projection)
+(crash/deletion/generation/paid-wipe/pre-dispatch-release-contention/source-digest-binding/legacy-fence/source-projection/accounting-pagination/lost-accounting-refusal/window-admission/pre-lock-preflight/attested-skip)
 ```
 
 The admission/skip proof helper is now explicitly called by the emulator runner;
 its previous presence in the file and printed PASS labels were not evidence of
 execution. The emulator was stopped after the proof. New hermetic tests exercise
-locking during prompt preparation before both provider phases, permanent-state
-reasons (including missing payload and changed digest), and truthful abandonment
+permanent-state reasons (including missing payload and changed digest), and truthful abandonment
 receipts. Existing concurrency, mutation, onboarding and certified-release tests
 continue to pass. The assertion's existing exact identity/claim/lease/margin/
 single-use checks remain in the shared repair machinery.

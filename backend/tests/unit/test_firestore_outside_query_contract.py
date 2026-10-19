@@ -35,7 +35,6 @@ ROOT = Path(__file__).resolve().parents[2]
 OUTSIDE_FIELD_REQUIREMENT_PAIRS = (
     ('chat_first_dead_letters', 'created_at'),
     ('chat_first_proactive_intents', 'created_at'),
-    ('fair_use_events', 'case_ref'),
     ('llm_usage', 'date'),
 )
 
@@ -198,15 +197,11 @@ def test_relocated_queries_keep_their_exact_shapes():
     client = RecordingFirestore()
     module.list_active_desktop_prompt_snapshots(firestore_client=client)
     module.list_desktop_release_snapshots(firestore_client=client)
-    module.find_fair_use_case_snapshots('case-1', firestore_client=client)
-    prompts, releases, case = client.shapes
+    prompts, releases = client.shapes
     assert prompts.collection_group == 'desktop_prompts'
     assert [(p.field, p.operator, p.value) for p in prompts.filters] == [('active', '==', True)]
     assert prompts.limit == 50
     assert releases.orders == (('build_number', 'DESCENDING'),)
-    assert case.scope == 'COLLECTION_GROUP' and case.collection_group == 'fair_use_events'
-    assert [(p.field, p.operator, p.value) for p in case.filters] == [('case_ref', '==', 'case-1')]
-    assert case.limit == 1
 
 
 def test_outside_field_requirements_generate_their_manifest_overrides():
@@ -230,12 +225,6 @@ def test_outside_field_requirements_generate_their_manifest_overrides():
             and [part['fieldPath'] for part in entry['fields']] == [field, '__name__']
             for entry in manifest['indexes']
         )
-    fair_use = next(
-        requirement
-        for requirement in FIELD_INDEX_REQUIREMENTS
-        if (requirement.collection_group, requirement.field_path) == ('fair_use_events', 'case_ref')
-    )
-    assert set(fair_use.collection_group_modes) == {'ASCENDING', 'DESCENDING'}
 
 
 def test_nonserving_outside_row_flipped_to_serving_fails_the_guard(outside_contract_artifacts):
@@ -257,9 +246,11 @@ def test_outside_caller_witnesses_match_the_discovered_bindings(outside_caller_i
 
 def test_outside_caller_completeness_flags_a_new_discovered_binding(outside_caller_inventory):
     discovered = dict(outside_caller_inventory)
-    injected = 'routers/fair_use_admin.py:new_case_route:database.serving_query_reads.find_fair_use_case_snapshots'
+    injected = (
+        'routers/desktop_prompts.py:new_prompt_route:database.serving_query_reads.list_active_desktop_prompt_snapshots'
+    )
     discovered[injected] = {
-        'target': 'database.serving_query_reads.find_fair_use_case_snapshots',
+        'target': 'database.serving_query_reads.list_active_desktop_prompt_snapshots',
         'references': 1,
     }
     errors = witness_completeness_errors(discovered, OUTSIDE_WITNESSES)

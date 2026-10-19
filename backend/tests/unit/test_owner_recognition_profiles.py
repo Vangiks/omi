@@ -21,7 +21,7 @@ from utils.conversations import speaker_resolution as stage
 def test_newly_taught_owner_is_loaded_despite_false_connection_latch(monkeypatch):
     monkeypatch.setattr(speakers.user_db, 'get_user_speaker_embedding', lambda uid: [1.0, 0.0])
     monkeypatch.setattr(speakers, 'get_user_name', lambda *a: 'Owner')
-    monkeypatch.setattr(speakers, 'named_speaker_prompts_allowed', lambda uid: False)
+    monkeypatch.setattr(speakers.user_db, 'get_people', lambda uid: [])
     matcher = speakers.SpeakerMatcher(
         SimpleNamespace(
             request=SimpleNamespace(uid='u', include_speech_profile=True),
@@ -33,8 +33,8 @@ def test_newly_taught_owner_is_loaded_despite_false_connection_latch(monkeypatch
     assert matcher.person_embeddings['user']['name'] == 'Owner'
 
 
-def test_sync_name_failure_retains_owner_and_denies_free_people(monkeypatch):
-    monkeypatch.setattr(sync_identity, 'named_speaker_prompts_allowed', lambda uid: False)
+def test_sync_name_failure_retains_owner(monkeypatch):
+    monkeypatch.setattr(sync_identity.users_db, 'get_people', lambda uid: [])
     monkeypatch.setattr(sync_identity.users_db, 'get_user_speaker_embedding', lambda uid: [1.0, 0.0])
 
     def missing_name(uid):
@@ -46,9 +46,8 @@ def test_sync_name_failure_retains_owner_and_denies_free_people(monkeypatch):
     np.testing.assert_array_equal(cache['user']['embedding'], [[1.0, 0.0]])
 
 
-def test_resolution_failed_paid_people_read_retains_owner(monkeypatch):
+def test_resolution_failed_people_read_retains_owner(monkeypatch):
     monkeypatch.setattr(stage.users_db, 'get_user_speaker_embedding', lambda uid: [1.0, 0.0])
-    monkeypatch.setattr(stage, 'named_speaker_prompts_allowed', lambda uid: True)
 
     def failed(uid):
         raise RuntimeError('synthetic people failure')
@@ -77,6 +76,7 @@ def test_legacy_enrollment_audio_repair_reaches_all_consumers(monkeypatch, surfa
     monkeypatch.setattr(users, 'get_user_speaker_embedding', lambda uid: None)
     monkeypatch.setattr(recovery_db, 'get_user_speaker_embedding_recovery_state', lambda uid: (None, None))
     monkeypatch.setattr(recovery_db, 'recover_user_speaker_embedding', lambda *a, **kw: True)
+    monkeypatch.setattr(users, 'get_people', lambda uid: [])
     load = lambda uid, **kw: owner_profile.load_owner_embedding(
         uid,
         users=users,
@@ -86,13 +86,11 @@ def test_legacy_enrollment_audio_repair_reaches_all_consumers(monkeypatch, surfa
     )
     if surface == 'sync':
         monkeypatch.setattr(sync_identity, 'load_owner_embedding', load)
-        monkeypatch.setattr(sync_identity, 'named_speaker_prompts_allowed', lambda uid: False)
         cache = sync_identity.build_person_embeddings_cache(
             'u', dependencies=sync_identity.SpeakerIdentityDependencies(get_user_name=lambda uid: 'Owner')
         )
     else:
         monkeypatch.setattr(stage, 'load_owner_embedding', load)
-        monkeypatch.setattr(stage, 'named_speaker_prompts_allowed', lambda uid: False)
         cache = stage.load_voiceprints_for_resolution('u')
     assert set(cache) == {'user'}
 

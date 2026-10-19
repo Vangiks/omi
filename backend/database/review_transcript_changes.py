@@ -63,7 +63,7 @@ def record_change(
             raise store.ReviewConflict('Transcript correction already applied or undone')
         if current and current.get('transcript_corrections_moved_to'):
             raise store.ReviewConflict('Transcript correction anchors moved to a merged capture')
-        if current != expected_document or not current or current.get('deleted') or current.get('is_locked'):
+        if current != expected_document or not current or current.get('deleted'):
             raise store.ReviewConflict('Transcript changed while preparing a correction')
         # Read and validate the current overlay in this transaction too. Captured
         # text alone cannot fence a second correction of the same segment.
@@ -159,7 +159,7 @@ def set_undone(uid, change_id, undone):
         overlay = owner.collection('transcript_corrections').document(receipt['conversation_id'])
         current = target.get(transaction=tx).to_dict()
         rows = store.require_doc(uid, overlay.get(transaction=tx).to_dict())['source']
-        if not current or current.get('deleted') or current.get('is_locked'):
+        if not current or current.get('deleted'):
             raise store.ReviewConflict('Transcript no longer available')
         if (
             original_fingerprint(uid, current, receipt.get('original_anchor_indices'))
@@ -274,8 +274,6 @@ def edit_user_segment(uid, conversation_id, segment_id, text, *, firestore_clien
             return 'conflict'
         if not raw or raw.get('deleted'):
             return 'not_found'
-        if raw.get('is_locked'):
-            return 'locked'
         expected = deepcopy(raw)
         raw = {**raw, 'id': conversation_id}
         current = conversations.prepare_conversation_for_read(raw, uid, firestore_client=database)

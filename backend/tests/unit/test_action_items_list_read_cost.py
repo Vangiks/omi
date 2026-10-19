@@ -91,7 +91,7 @@ class _Response:
 
 
 def _item(item_id: str) -> dict:
-    return {'id': item_id, 'description': 'Do a thing', 'completed': False, 'is_locked': False}
+    return {'id': item_id, 'description': 'Do a thing', 'completed': False}
 
 
 def _call(*, request=None, response=None, uid='user-1', limit=50, offset=0, completed=None, **kwargs):

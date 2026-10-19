@@ -1,11 +1,10 @@
-"""Structural test: the Twilio TwiML voice webhook offloads its blocking quota calls.
+"""Structural test: the Twilio TwiML voice webhook offloads its blocking Firestore calls.
 
 twiml_voice_webhook in routers/phone_calls.py is the async handler Twilio POSTs to when a VoIP call
-starts, so it sits on the real-time call path. It reads the caller's verified number, snapshots
-quota state, and reserves free-tier quota through synchronous helpers that touch Firestore/Redis.
-This test parses the source (no import) and asserts those calls are routed through an awaited
-run_blocking(db_executor, ...) and never called directly. The await check guards against a dangling
-coroutine (offloaded but not awaited).
+starts, so it sits on the real-time call path. It reads the caller's verified number through a
+synchronous Firestore helper. This test parses the source (no import) and asserts that call is
+routed through an awaited run_blocking(db_executor, ...) and never called directly. The await check
+guards against a dangling coroutine (offloaded but not awaited).
 """
 
 import ast
@@ -14,7 +13,7 @@ from pathlib import Path
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 PHONE_CALLS = BACKEND_DIR / 'routers' / 'phone_calls.py'
 TARGET_FN = 'twiml_voice_webhook'
-BLOCKING_CALLS = ('get_primary_phone_number', 'get_quota_snapshot', 'reserve_phone_call_quota')
+BLOCKING_CALLS = ('get_primary_phone_number',)
 
 
 def _load_function(name):

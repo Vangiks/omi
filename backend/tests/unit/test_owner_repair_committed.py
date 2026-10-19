@@ -58,8 +58,7 @@ def test_late_legacy_cache_acquires_real_evidence_and_persists_owner(env, monkey
     cache['c1'] = stage.encode_cache({s.id: (s.end - s.start, VOICES[0]) for s in conversation.transcript_segments})
     legacy_bytes = cache['c1']
     monkeypatch.setattr(stage.users_db, 'get_user_speaker_embedding', lambda uid: VOICES[0].tolist())
-    monkeypatch.setattr(stage, 'named_speaker_prompts_allowed', lambda uid: False)
-    monkeypatch.setattr(stage.users_db, 'get_people', lambda uid: pytest.fail('free owner repair reads paid people'))
+    monkeypatch.setattr(stage.users_db, 'get_people', lambda uid: [])
     store, path, read = _commit_store(monkeypatch, conversation, level)
     before = _counter('owner_added')
     assert not any(s['is_user'] for s in read()['transcript_segments'])

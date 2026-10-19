@@ -28,7 +28,7 @@ from models.product_memory import (
     ProcessingState,
 )
 from utils.memory.canonical_memory_adapter import memory_item_to_memorydb, read_canonical_memories
-from utils.memory.memory_service import CanonicalMemoryBackend, truncate_locked_memory_preview
+from utils.memory.memory_service import CanonicalMemoryBackend
 from utils.memory.short_term_lifecycle import DEFAULT_SHORT_TERM_TTL_DAYS
 
 _STUB = (
@@ -45,7 +45,6 @@ _STUB = (
     "ulid",
     "langchain",
     "langchain_core",
-    "stripe",
     "openai",
     "anthropic",
     "redis",
@@ -146,7 +145,6 @@ def _item(
     tier: MemoryLayer,
     content: str,
     updated_at: datetime,
-    is_locked: bool = False,
     promotion: dict | None = None,
 ) -> MemoryItem:
     captured = updated_at - timedelta(hours=1)
@@ -170,7 +168,7 @@ def _item(
         ),
         "ledger_commit_id": "commit-1" if tier in {MemoryLayer.long_term, MemoryLayer.archive} else None,
         "ledger_sequence": 1 if tier in {MemoryLayer.long_term, MemoryLayer.archive} else None,
-        "promotion": promotion or ({"is_locked": True} if is_locked else None),
+        "promotion": promotion,
     }
     return MemoryItem(**data)
 
@@ -212,21 +210,20 @@ def test_memory_item_projection_preserves_canonical_arguments():
     assert memory_item_to_memorydb(oversized).arguments == {}
 
 
-def test_include_archive_pagination_and_locked_privacy(monkeypatch):
+def test_include_archive_pagination(monkeypatch):
     now = datetime(2026, 8, 12, 12, 0, tzinfo=timezone.utc)
-    locked_archive = _item(
-        "mem-locked-archive",
+    archive = _item(
+        "mem-archive",
         tier=MemoryLayer.archive,
         content="L" * 120,
         updated_at=now,
-        is_locked=True,
     )
     newer_short = _item("mem-short", tier=MemoryLayer.short_term, content="short", updated_at=now + timedelta(hours=1))
     short_row = memory_item_to_memorydb(newer_short)
-    locked_row = memory_item_to_memorydb(locked_archive)
+    archive_row = memory_item_to_memorydb(archive)
     slots = [
         (short_row, (newer_short.updated_at, newer_short.memory_id)),
-        (locked_row, (locked_archive.updated_at, locked_archive.memory_id)),
+        (archive_row, (archive.updated_at, archive.memory_id)),
     ]
 
     def _forbid_full_fetch(**_kwargs):
@@ -263,10 +260,8 @@ def test_include_archive_pagination_and_locked_privacy(monkeypatch):
         include_archive=True,
         now=now + timedelta(hours=1),
     )
-    assert [memory.id for memory in second] == ["mem-locked-archive"]
-    assert second[0].is_locked is True
-    assert second[0].content.endswith("...")
-    assert len(second[0].content) == 73
+    assert [memory.id for memory in second] == ["mem-archive"]
+    assert second[0].content == "L" * 120
 
 
 def test_get_memories_forwards_include_archive():
@@ -452,7 +447,7 @@ def test_memory_item_to_memorydb_round_trips_read_dismiss_state():
     memory = memory_item_to_memorydb(item)
     assert memory.is_read is True
     assert memory.is_dismissed is True
-    assert truncate_locked_memory_preview(memory).content == "tip"
+    assert memory.content == "tip"
 
 
 def test_memory_item_to_memorydb_preserves_canonical_alias_for_portability():

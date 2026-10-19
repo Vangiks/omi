@@ -65,10 +65,10 @@ describe('isRetryableDropError', () => {
     expect(isRetryableDropError('Omi transcription stopped: connection reset')).toBe(true)
   })
 
-  it('does NOT retry quota/entitlement/sign-in errors (reconnecting re-hits the same wall)', () => {
+  it('does NOT retry server refusal/sign-in errors (reconnecting re-hits the same wall)', () => {
     expect(
       isRetryableDropError(
-        'Omi transcription stopped: free Omi transcription quota is used up (1008)'
+        'Omi transcription stopped: the Omi server refused transcription for this account (1008)'
       )
     ).toBe(false)
     expect(isRetryableDropError('trial_expired')).toBe(false)

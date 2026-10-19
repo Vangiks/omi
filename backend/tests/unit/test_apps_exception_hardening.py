@@ -16,7 +16,6 @@ for name in [
     "pinecone",
     "typesense",
     "pycountry",
-    "stripe",
     "langchain_anthropic",
     "langchain_openai",
     "langchain_google_genai",

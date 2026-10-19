@@ -74,10 +74,10 @@ description: Включает на всю сессию правила «собы
 | Событие | Скилл |
 |---|---|
 | Код работает и тесты проходят, но его трудно читать. Человек просит «упрости», «отрефактори» | `code-simplification` |
-| Перед мержем. После фичи или исправления бага. Нужно оценить код другого агента. Человек просит ревью | `code-review-and-quality` |
+| После фичи или исправления бага. Нужно оценить код другого агента. Человек просит ревью | `code-review-and-quality` |
 | Коммит, ветка, worktree, PR, конфликт при мерже, слияние из `upstream/main`, разбор грязного рабочего дерева | `git-workflow-and-versioning` |
 | Изменение `lefthook.yml`, скриптов в `package.json`, скриптов проверок в `backend/scripts/`, `deploy/local/docker-compose.yaml`, `.github/workflows/`. Упала проверка в хуке | `ci-cd-and-automation` |
-| Сборка релиза desktop через electron-builder | `shipping-and-launch` |
+| Перед мержем в main: после него CI собирает desktop и web. Сборка релиза desktop через electron-builder | `shipping-and-launch` |
 | Агент путает соглашения проекта, придумывает несуществующие API. Нужно поменять `AGENTS.md` или правила | `context-engineering` |
 
 ### Задачи в GitHub Issues

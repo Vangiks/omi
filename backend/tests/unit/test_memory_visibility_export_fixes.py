@@ -1,4 +1,4 @@
-"""Regression: memory visibility / export / locked-preview fixes (QA PRs 11431/11433)."""
+"""Regression: memory visibility / export fixes (QA PRs 11431/11433)."""
 
 from __future__ import annotations
 
@@ -26,25 +26,12 @@ def service_mod(monkeypatch):
     return _load_memory_service(monkeypatch)
 
 
-def test_truncate_locked_preview_only_when_locked(service_mod):
-    unlocked = service_mod.MemoryDB.model_validate(
-        {**_sample_memory_dict("u1"), "is_locked": False, "content": "x" * 120}
-    )
-    locked = service_mod.MemoryDB.model_validate({**_sample_memory_dict("l1"), "is_locked": True, "content": "y" * 120})
-
-    assert service_mod.truncate_locked_memory_preview(unlocked).content == "x" * 120
-    preview = service_mod.truncate_locked_memory_preview(locked).content
-    assert preview.endswith("...")
-    assert len(preview) == 73
-    assert preview[:70] == "y" * 70
-
-
 def test_historical_adapt_logs_sanitized_validation_error(service_mod, monkeypatch, caplog):
     secret = "SUPER_SECRET_MEMORY_CONTENT_DO_NOT_LOG"
     raw = _sample_memory_dict("bad-1")
     raw["content"] = secret
 
-    def _raise_validation(_raw, *, include_locked_content=False):
+    def _raise_validation(_raw, *, uid=None):
         from pydantic import BaseModel
 
         class _Probe(BaseModel):
@@ -189,7 +176,6 @@ def test_portability_export_preserves_closed_ledger_history_without_changing_com
         status=MemoryItemStatus.superseded,
         valid_to=now,
         sensitivity_labels=["health"],
-        promotion={"is_locked": True},
     )
     migrated = _ledger_item(
         "legacy-generated",
@@ -243,7 +229,6 @@ def test_portability_export_preserves_closed_ledger_history_without_changing_com
     ]
     closed_row = next(row for row in portability_rows if row.id == "closed")
     assert closed_row.invalid_at == now
-    assert closed_row.is_locked is True
     assert closed_row.content == "content-closed"
     hidden_row = next(row for row in portability_rows if row.id == "hidden")
     assert hidden_row.ledger_status == MemoryItemStatus.hidden

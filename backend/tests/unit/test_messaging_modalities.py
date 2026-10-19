@@ -422,13 +422,6 @@ def test_linq_unknown_parts_are_silent(adapter):
         assert parsed(adapter, parts=[{'type': 'unknown_service'}]) == ()
 
 
-def test_null_plan_policy_does_not_hide_behind_seat_off(monkeypatch):
-    monkeypatch.setenv(
-        'OMI_MESSAGING_CHANNEL_POLICY', '{"imessage":{"enabled":true,"cohort":"*","seat_cap":"off","plans":null}}'
-    )
-    assert channel_policy('imessage')['enabled'] is False
-
-
 def test_ack_worker_has_one_light_reply_and_no_model_turn(adapter, monkeypatch):
     message = (
         parsed(adapter, text='🙂')[0]

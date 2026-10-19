@@ -43,7 +43,7 @@ BACKEND_DIR = Path(__file__).resolve().parents[2]
 
 @pytest.fixture(scope="module", autouse=True)
 def _replacement_backoff_import_isolation():
-    saved = snapshot_sys_modules(["database._client", "firebase_admin", "utils.subscription", "database.users"])
+    saved = snapshot_sys_modules(["database._client", "firebase_admin", "database.users"])
     install_database_client_stub()
     install_ws_j_heavy_import_stubs()
     yield

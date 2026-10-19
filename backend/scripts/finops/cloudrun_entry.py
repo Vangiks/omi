@@ -19,7 +19,7 @@ Contract (matches the laptop cron shim, minus laptop-only paths):
 Required runtime configuration:
   FINOPS_LOCK_BUCKET      GCS bucket for the daily overlap lease (name only, no secret).
   FINOPS_SECRETS_DIR      dir where Secret Manager volumes are mounted (default
-                          /run/secrets/finops), containing the provider/prometheus/stripe
+                          /run/secrets/finops), containing the provider/prometheus
                           keys by file name (see cloudrun.SECRET_FILES).
 Optional:
   FINOPS_WRITER_SA        expected runtime SA email (default finops-writer@based-hardware).

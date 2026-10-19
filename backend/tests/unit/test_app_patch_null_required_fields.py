@@ -30,7 +30,6 @@ def _run_update(monkeypatch, payload, stored=None):
     written = {}
     monkeypatch.setattr(apps, 'get_available_app_by_id', lambda app_id, uid: dict(stored))
     monkeypatch.setattr(apps, 'update_app_in_db', lambda data: written.update(data))
-    monkeypatch.setattr(apps, 'upsert_app_payment_link', lambda *a, **k: None)
     monkeypatch.setattr(apps, 'delete_app_cache_by_id', lambda *a, **k: None)
     monkeypatch.setattr(apps, 'invalidate_approved_apps_cache', lambda *a, **k: None)
 

@@ -29,7 +29,7 @@ NOW = datetime(2026, 9, 24, 12, 0, tzinfo=timezone.utc)
 
 
 class World:
-    def __init__(self, monkeypatch, *, paid=True, save_others=True, prompts_enabled=True, state=None):
+    def __init__(self, monkeypatch, *, save_others=True, prompts_enabled=True, state=None):
         self.assignments = []
         self.scheduled = []
         self.answered = []
@@ -39,7 +39,6 @@ class World:
         self.state = state or {}
         self.settings = {'speaker_tag_prompts_enabled': prompts_enabled, 'save_other_voice_profiles': save_others}
         db = service.voice_profiles_db
-        monkeypatch.setattr(service, 'named_speaker_prompts_allowed', lambda uid: paid)
         monkeypatch.setattr(db, 'get_voice_profile_settings', lambda uid: dict(self.settings))
         monkeypatch.setattr(db, 'get_voice_profile_context', lambda uid: (dict(self.settings), True))
         monkeypatch.setattr(db, 'get_tag_prompt_state', lambda uid: dict(self.state))
@@ -87,14 +86,14 @@ def _request(kind, origin, answer, **extra):
 
 
 def test_legacy_owner_card_without_excerpt_evidence_cannot_label_or_learn(monkeypatch):
-    world = World(monkeypatch, paid=False)
+    world = World(monkeypatch)
     with pytest.raises(service.StaleOwnerConfirmation):
         service.apply_answer('u', _request(K.owner_check, O.unnamed, A.me), world.schedule, NOW)
     assert not world.assignments and not world.scheduled
 
 
-def test_free_user_names_a_person_on_a_served_card(monkeypatch):
-    world = World(monkeypatch, paid=False)
+def test_user_names_a_person_on_a_served_card(monkeypatch):
+    world = World(monkeypatch)
     service.apply_answer('u', _request(K.identify, O.unnamed, A.person, person_id='p1'), world.schedule, NOW)
     with pytest.raises(service.TagPromptInvalid):
         service.apply_answer('u', _request(K.owner_check, O.unnamed, A.new_person, name='Ana'), world.schedule, NOW)
@@ -709,7 +708,7 @@ def test_owner_sample_verifies_only_text_inside_the_clip(monkeypatch):
 
 
 def test_stale_owner_card_never_schedules_partial_learning(monkeypatch):
-    world = World(monkeypatch, paid=False)
+    world = World(monkeypatch)
     with pytest.raises(service.StaleOwnerConfirmation):
         service.apply_answer(
             'u', _request(K.owner_check, O.unnamed, A.me, segment_ids=['s1', 'stale']), world.schedule, NOW
@@ -718,7 +717,7 @@ def test_stale_owner_card_never_schedules_partial_learning(monkeypatch):
 
 
 def test_owner_sample_not_queued_when_prompt_segments_are_gone(monkeypatch):
-    world = World(monkeypatch, paid=False)
+    world = World(monkeypatch)
     with pytest.raises(service.StaleOwnerConfirmation):
         service.apply_answer('u', _request(K.owner_check, O.unnamed, A.me), world.schedule, NOW)
     assert not world.scheduled
@@ -849,8 +848,8 @@ def test_not_a_person_clears_an_automatic_label_and_is_remembered(monkeypatch):
     assert len(world.assignments) == 2 and len(ignored) == 2
 
 
-def test_owner_question_is_binary_or_skip_on_every_plan(monkeypatch):
-    world = World(monkeypatch, paid=False)
+def test_owner_question_is_binary_or_skip(monkeypatch):
+    world = World(monkeypatch)
     with pytest.raises(service.TagPromptInvalid):
         service.apply_answer('u', _request(K.owner_check, O.unnamed, A.not_a_person), world.schedule, NOW)
     assert not world.assignments
@@ -944,8 +943,8 @@ def test_ignored_voice_uses_the_merged_survivor_and_resolved_speaker(monkeypatch
     assert markers == [(('u', 'survivor', 8, NOW), {'assignment_generation': 7})]
 
 
-def test_free_user_can_reject_previously_served_paid_card(monkeypatch):
-    world = World(monkeypatch, paid=False)
+def test_user_can_reject_a_served_confirm_card(monkeypatch):
+    world = World(monkeypatch)
     service.apply_answer(
         'u', _request(K.confirm_person, O.auto_person, A.someone_else, suggested_person_id='p1'), world.schedule, NOW
     )

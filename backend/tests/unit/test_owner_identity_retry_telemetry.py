@@ -34,6 +34,7 @@ from tests.unit.test_owner_recognition_telemetry import (
 )
 from utils.observability import owner_identity_retry as telemetry, owner_recognition
 from utils import executors
+from tests.support.retired_speaker_permissions import retired_speaker_permissions
 
 
 def count(pass_name, stage, reason):
@@ -53,8 +54,8 @@ def test_registration_reuses_collector_and_only_materializes_closed_pairs():
     telemetry.record_retry('late', 'resolver_exit', 'resolved')
     importlib.reload(telemetry)
     assert telemetry.OWNER_IDENTITY_RETRY is counter
-    assert len(telemetry.PAIRS) == 67
-    assert len(telemetry.PAIRS - {p for p in telemetry.PAIRS if p[0] in ('resolver_exit', 'segment_abstained')}) == 35
+    assert len(telemetry.PAIRS) == 65
+    assert len(telemetry.PAIRS - {p for p in telemetry.PAIRS if p[0] in ('resolver_exit', 'segment_abstained')}) == 33
     assert set(counter._metrics) <= {(p, s, r) for p in ('first', 'late') for s, r in telemetry.PAIRS}
     assert len(counter._metrics) < 134
     before = snapshot('late')
@@ -152,7 +153,6 @@ def test_empty_does_not_invent_acoustic_exit(env, pass_name):
         ({'status': 'in_progress', 'deleted': True}, 'not_completed'),
         ({'deleted': True, 'discarded': True}, 'deleted'),
         ({'discarded': True}, 'discarded'),
-        ({'is_locked': True}, 'locked'),
         ({'source': 'desktop'}, 'channel_source'),
         ({'private_cloud_sync_enabled': False}, 'private_cloud_disabled'),
         ({'updated_at': None}, 'missing_revision'),
@@ -265,7 +265,6 @@ def test_late_noop_commit_counts_terminal_but_neither_existing_outcome_counter(e
     [
         ({'deleted': True}, 'deleted'),
         ({'discarded': True}, 'discarded'),
-        ({'is_locked': True}, 'locked'),
         ({'status': 'in_progress'}, 'not_completed'),
         ({}, 'revision_changed'),
     ],
@@ -301,7 +300,8 @@ def baseline_module(monkeypatch):
     ).stdout
     module = types.ModuleType('owner_retry_funnel_baseline')
     monkeypatch.setitem(sys.modules, module.__name__, module)
-    exec(compile(source, 'baseline_speaker_resolution.py', 'exec'), module.__dict__)
+    with retired_speaker_permissions():
+        exec(compile(source, 'baseline_speaker_resolution.py', 'exec'), module.__dict__)
     return module
 
 
@@ -323,7 +323,6 @@ def test_literal_baseline_and_instrumented_outputs_and_cache_bytes_identical(env
     store, diarizer = env
     for name in (
         'speaker_embedding_configured',
-        'named_speaker_prompts_allowed',
         'download_speaker_embedding_cache',
         'upload_speaker_embedding_cache',
         'extract_embedding_from_bytes',

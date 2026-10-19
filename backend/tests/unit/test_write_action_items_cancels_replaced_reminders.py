@@ -43,7 +43,6 @@ def _extracted_item(description="Send the budget"):
 def _conversation():
     return SimpleNamespace(
         id="conv-1",
-        is_locked=False,
         structured=SimpleNamespace(action_items=[_extracted_item()]),
     )
 

@@ -214,8 +214,7 @@ def _module_import_closure(entry: Path) -> set[str]:
 def test_deterministic_minimum_module_reaches_no_managed_call() -> None:
     entry = _BACKEND / 'utils' / 'conversations' / 'deterministic_minimum.py'
     closure = _module_import_closure(entry)
-    # The minimum is the deny-fallback for `authorize_managed_compute`; if it
-    # could reach a model client it could not be the fallback.
+    # The minimum is the model-free fallback title; it must not reach a model client.
     forbidden = {'utils.llm.clients', 'utils.llms.clients', 'llm_gateway'}
     reachable_llm = {module for module in closure if module in forbidden or module.startswith('llm_gateway')}
     assert reachable_llm == set(), f'deterministic minimum reaches a model client: {sorted(reachable_llm)}'

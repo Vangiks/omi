@@ -13,7 +13,7 @@ import { BAR_SNOOZE_MS, buildBarContextMenuTemplate } from './barContextMenuTemp
  * context menu at all (right-clicking it did nothing).
  *
  * Bar-scoped on purpose: the snooze is only meaningful on the floating bar, so
- * it is NOT added via the shared `installContextMenu` that the main and checkout
+ * it is NOT added via the shared `installContextMenu` that the main and Gmail
  * windows use. Kept as thin wiring over the pure `buildBarContextMenuTemplate`
  * (the split mirrors contextMenu.ts / contextMenuTemplate.ts) so the menu logic
  * stays unit-testable without an Electron runtime.

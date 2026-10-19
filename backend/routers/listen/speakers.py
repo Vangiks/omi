@@ -25,7 +25,6 @@ from utils.live_speaker_suggestions import reconcile_pinned_suggestion
 from utils.log_sanitizer import sanitize
 from utils.executors import storage_executor, sync_executor, run_blocking
 from utils.other.storage import get_profile_audio_if_exists
-from utils.speaker_permissions import named_speaker_prompts_allowed
 from utils.speaker_sample import download_sample_audio
 from utils.speaker_sample_migration import maybe_migrate_person_samples
 from utils.manual_speaker_assignments import manual_owner_reserved, manual_rejected_speakers
@@ -179,8 +178,6 @@ class SpeakerMatcher:
         self.tasks: set[asyncio.Task[Any]] = set()
         self._profile_conversation_id: Optional[str] = None
         self._profile_lock = asyncio.Lock()
-        self._entitlement_lock = asyncio.Lock()
-        self._named_speakers_allowed: Optional[bool] = None
         # The account owner's own first name, so hearing it in the transcript cannot
         # mint a person who is really the user. Resolved lazily by
         # resolve_owner_name(); used for display and as a veto, never as voice-match evidence.
@@ -237,7 +234,7 @@ class SpeakerMatcher:
                     reasons[voice] = 'no_scope'
                 elif not donor:
                     reasons[voice] = 'donor_unavailable'
-                elif any(donor.get(k) for k in ('deleted', 'discarded', 'is_locked')):
+                elif any(donor.get(k) for k in ('deleted', 'discarded')):
                     reasons[voice] = 'donor_ineligible'
                 elif self._voice_scopes.get(voice) != owner_carry_scope:
                     reasons[voice] = 'scope_changed'
@@ -343,7 +340,7 @@ class SpeakerMatcher:
                 gate = 'stale_generation'
             elif read_failed or not donor:
                 gate = 'donor_unavailable'
-            elif any(donor.get(k) for k in ('deleted', 'discarded', 'is_locked')):
+            elif any(donor.get(k) for k in ('deleted', 'discarded')):
                 gate = 'donor_ineligible'
             elif owner is None or old_owner is None:
                 gate = 'profile_unavailable'
@@ -459,22 +456,6 @@ class SpeakerMatcher:
             self.owner_name = name.strip()
         return self.owner_name
 
-    async def named_speakers_allowed(self) -> bool:
-        """One subscription read per conversation; rotation/reconnect observes plan changes."""
-        async with self._entitlement_lock:
-            if self._named_speakers_allowed is None:
-                generation = self._generation
-                try:
-                    allowed = await self.host.persistence.call(named_speaker_prompts_allowed, self.host.request.uid)
-                except Exception as error:
-                    # Unresolved is not denied: stay closed for this call and ask again next time.
-                    logger.error('Speaker ID entitlement read failed type=%s', type(error).__name__)
-                    return False
-                if generation != self._generation:
-                    return False
-                self._named_speakers_allowed = bool(allowed)
-            return bool(self._named_speakers_allowed)
-
     async def _load_profiles(self, *, owner_only: bool = False) -> None:
         diagnostic_generation = self.diagnostics.current
         eligible = (
@@ -546,12 +527,10 @@ class SpeakerMatcher:
         if owner_only:
             if not self._owner_load_failed and USER_SELF_PERSON_ID in self.person_embeddings:
                 await self._reevaluate_loaded_owner()
-            # Paid people and entitlement were loaded by the conversation refresh.
+            # People were loaded by the conversation refresh.
             # Owner outages must not turn their projection into a polling loop.
             return
         try:
-            if not await self.named_speakers_allowed():
-                return
             people = await self.host.persistence.call(user_db.get_people, self.host.request.uid)
             for person in people:
                 if person.get('speech_samples'):
@@ -1173,8 +1152,8 @@ class SpeakerMatcher:
                     str(speaker_id)
                 )
                 if person_id and voice_wide:
-                    # A manual label is authoritative without a loaded profile: on a
-                    # free plan non-owner profiles stay unloaded, so resolve the name
+                    # A manual label is authoritative without a loaded profile: a person
+                    # without a verified voiceprint stays unloaded, so resolve the name
                     # from the receipt decision's voice rather than dropping the map.
                     if known is not None:
                         name = known['name']
@@ -1466,7 +1445,6 @@ class SpeakerMatcher:
         self._generation += 1
         self.collapse_monitor = LiveSpeakerCollapseMonitor()
         self._profile_conversation_id = None
-        self._named_speakers_allowed = None
         # Retire idle locks now, held/waited locks only after their last user
         # finishes. New-generation work for that voice stays serialized; every
         # old-generation await still fences publication into the new inventory.

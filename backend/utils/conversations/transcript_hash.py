@@ -8,8 +8,7 @@ numeric ``speaker_id`` is what the reader is shown when there is no person
 name. The digest therefore binds five fields per segment: speaker label,
 ``speaker_id``, ``is_user``, ``person_id``, and text. A re-diarized or
 re-identified transcript is EXPECTED to stop verifying — the fail-closed
-outcome is a drop to the deterministic minimum, not silent retention of a
-stale projection. Timings and ids are ignored.
+outcome is dropping the projection, not silent retention of a stale one. Timings and ids are ignored.
 
 Hashed value is stored value. The digest is over the identity the storage
 boundary persists, not a parallel spelling of the request JSON.

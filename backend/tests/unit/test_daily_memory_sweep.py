@@ -2587,160 +2587,6 @@ def test_scheduler_proceeds_for_ledger_mode_accounts(monkeypatch):
     assert source_calls != []
 
 
-# --- S5 (§1.8): a basic account is not admitted to the sweep -----------------
-
-
-def _ledger_control(monkeypatch):
-    """An account that has completed ledger cutover, so the writer-mode skip
-    above the plan gate does not fire and the plan gate is what is under test."""
-    control = MemoryControlState(
-        uid="user-1",
-        head_commit_id="head0",
-        account_generation=4,
-        source_generation=7,
-        writer_mode=WriterMode.ledger,
-    )
-    monkeypatch.setattr(
-        "utils.memory.daily_memory_sweep.read_account_deletion_projection_fence",
-        lambda _uid, db_client: type("Fence", (), {"blocks_projection_writes": False})(),
-    )
-    monkeypatch.setattr(
-        "utils.memory.daily_memory_sweep.ensure_canonical_apply_control_state",
-        lambda _uid, db_client: control,
-    )
-    monkeypatch.setattr(
-        "utils.memory.daily_memory_sweep.firestore.transactional",
-        lambda function: lambda transaction, *args: function(transaction, *args),
-    )
-    return control
-
-
-def _plan_decision(*, allowed: bool, reason: str):
-    from config.plan_catalog import PlanType
-    from utils.managed_compute import Decision
-
-    return Decision(
-        allowed=allowed,
-        reason=reason,
-        feature="memories",
-        funding_owner="omi",
-        plan=PlanType.basic if not allowed else PlanType.unlimited,
-        plan_resolved=True,
-    )
-
-
-def _run_sweep_for_plan(monkeypatch, *, suppression_on: bool, allowed: bool, reason: str):
-    db = _Db()
-    _ledger_control(monkeypatch)
-    source_calls = []
-    monkeypatch.setattr(
-        "utils.memory.daily_memory_sweep.free_tier_memory_suppression_enabled",
-        lambda uid=None: suppression_on,
-    )
-    monkeypatch.setattr(
-        "utils.memory.daily_memory_sweep.authorize_managed_compute",
-        lambda *_args, **_kwargs: _plan_decision(allowed=allowed, reason=reason),
-    )
-    summary = run_daily_memory_sweep_scheduler(
-        db_client=db,
-        now=datetime(2026, 8, 24, 12, tzinfo=timezone.utc),
-        uid_inventory=("user-1",),
-        source_provider=lambda *_args, **_kwargs: source_calls.append(True),
-        timezone_resolver=lambda _uid: "UTC",
-        timezone_reconciler=lambda *_args: True,
-        authority=SweepAuthorityState(enabled=True),
-        cohort_authority=DailySweepCohortAuthority(enabled=True, cohort_name="memory-sweep"),
-        cohort_authorizer=lambda *_args: DailySweepCohortDecision.enabled,
-    )
-    return summary, source_calls, db
-
-
-# red-proof: delete the `if free_tier_memory_suppression_enabled():` block in the scheduler
-def test_basic_account_is_not_admitted_by_the_sweep_producer(monkeypatch):
-    """Named proof (b). Acked, not rejected: a definite plan answer is a
-    successful bounded decision, so the fair page cursor may advance. A reject
-    would burn receipt leases and strand the tail behind an account that is
-    never going to be swept."""
-    summary, source_calls, db = _run_sweep_for_plan(
-        monkeypatch, suppression_on=True, allowed=False, reason="basic_not_entitled"
-    )
-    assert source_calls == [], "a basic account must not reach the candidate producer"
-    assert summary.completed_uids == ("user-1",)
-    assert summary.failed_uids == ()
-    assert summary.blocked_users == 1
-    assert db.store == {}, "a suppressed account must not write cursor or receipt state"
-
-
-def test_paid_account_is_still_swept_with_the_flag_on(monkeypatch):
-    _summary, source_calls, _db = _run_sweep_for_plan(
-        monkeypatch, suppression_on=True, allowed=True, reason="plan_paid"
-    )
-    assert source_calls != [], "a paid account must still reach the candidate producer"
-
-
-def test_flag_off_admits_a_basic_account_exactly_as_today(monkeypatch):
-    """Dark rollout: with the flag off the plan is not consulted at all."""
-    _summary, source_calls, _db = _run_sweep_for_plan(
-        monkeypatch, suppression_on=False, allowed=False, reason="basic_not_entitled"
-    )
-    assert source_calls != []
-
-
-# --- free-tier cohort gate, driven through the real scheduler ---------------
-#
-# `_run_sweep_for_plan` stubs `free_tier_memory_suppression_enabled`, so it
-# proves the scheduler honours *a* boolean but never executes the real reader
-# or the cohort gate behind it. These two drive the production reader inside
-# the real scheduler, which is the only place the wiring can be observed.
-# red-proof: revert `free_tier_memory_suppression_enabled(uid)` in the
-# scheduler to a uid-less call and the admitted case stops suppressing.
-
-
-def _run_sweep_with_the_real_cohort_gate(monkeypatch, *, cohort_value: str, uid: str = "user-1"):
-    from utils import free_tier_cohort, free_tier_memory_policy
-    from utils.jit_rollout import TriState
-
-    db = _Db()
-    _ledger_control(monkeypatch)
-    source_calls = []
-    monkeypatch.setattr(free_tier_memory_policy, "FREE_TIER_MEMORY_SUPPRESSION", True)
-    # Hermetic: no PostHog from a unit test, and no ambient kill.
-    monkeypatch.setattr(free_tier_cohort, "_kill_switch_state", lambda _uid: TriState.DISABLED)
-    monkeypatch.delenv(free_tier_cohort.EMERGENCY_STOP_ENV_VAR, raising=False)
-    monkeypatch.setenv(free_tier_cohort.cohort_env_name("FREE_TIER_MEMORY_SUPPRESSION"), cohort_value)
-    free_tier_cohort.reset_kill_switch_cache_for_tests()
-    monkeypatch.setattr(
-        "utils.memory.daily_memory_sweep.authorize_managed_compute",
-        lambda *_args, **_kwargs: _plan_decision(allowed=False, reason="basic_not_entitled"),
-    )
-    summary = run_daily_memory_sweep_scheduler(
-        db_client=db,
-        now=datetime(2026, 8, 24, 12, tzinfo=timezone.utc),
-        uid_inventory=(uid,),
-        source_provider=lambda *_args, **_kwargs: source_calls.append(True),
-        timezone_resolver=lambda _uid: "UTC",
-        timezone_reconciler=lambda *_args: True,
-        authority=SweepAuthorityState(enabled=True),
-        cohort_authority=DailySweepCohortAuthority(enabled=True, cohort_name="memory-sweep"),
-        cohort_authorizer=lambda *_args: DailySweepCohortDecision.enabled,
-    )
-    return summary, source_calls, db
-
-
-def test_real_cohort_gate_suppresses_the_admitted_account_in_the_scheduler(monkeypatch):
-    summary, source_calls, db = _run_sweep_with_the_real_cohort_gate(monkeypatch, cohort_value="uid:user-1")
-    assert source_calls == [], "an admitted basic account must not reach the candidate producer"
-    assert summary.completed_uids == ("user-1",)
-    assert summary.blocked_users == 1
-    assert db.store == {}
-
-
-def test_real_cohort_gate_leaves_a_non_admitted_account_alone_in_the_scheduler(monkeypatch):
-    """A lit flag whose cohort does not name this account is byte-identical to flag-off."""
-    _summary, source_calls, _db = _run_sweep_with_the_real_cohort_gate(monkeypatch, cohort_value="uid:someone-else")
-    assert source_calls != [], "a lit flag alone must not suppress an account outside the cohort"
-
-
 @pytest.mark.parametrize(
     'owners,about,basis,expected_scope,expected_slot',
     [
@@ -3538,7 +3384,6 @@ def _conversation_snapshot(
     status="completed",
     finished=True,
     discarded=False,
-    is_locked=False,
 ):
     payload = {
         "id": conversation_id,
@@ -3548,7 +3393,6 @@ def _conversation_snapshot(
         "structured": {"title": title, "overview": overview, "category": "personal"},
         "transcript_segments": [{"text": transcript, "speaker_id": 0, "is_user": True, "start": 0, "end": 1}],
         "discarded": discarded,
-        "is_locked": is_locked,
     }
     if finished:
         payload["finished_at"] = started + timedelta(minutes=1)
@@ -3842,8 +3686,6 @@ def test_completed_day_producer_keeps_processing_row_incomplete(monkeypatch):
         "invocation_pre_dispatch_exhausted",
         "invocation_indeterminate",
         "invocation_pending",
-        "source_locked_before_dispatch",
-        "source_lock_check_unavailable",
         "eligibility_scan_over_budget",
         "source_row_changed",
         "private_but_snake_case",
@@ -4012,7 +3854,7 @@ def test_eligibility_exact_cap_is_complete_and_full_reads_are_bounded():
     assert result.rows_seen == COMPLETED_DAY_ELIGIBILITY_CAP
     assert db.conversation_query.full_reads == [f"c-{index:04d}" for index in range(16)]
     assert db.conversation_query.order == ["started_at", "__name__"]
-    assert set(db.conversation_query.fields) == {"started_at", "status", "discarded", "is_locked", "finished_at"}
+    assert set(db.conversation_query.fields) == {"started_at", "status", "discarded", "finished_at"}
 
 
 def test_exact_selection_page_with_discarded_rows_is_not_truncated():
@@ -4053,9 +3895,6 @@ def window_stage(monkeypatch):
     window = completed_local_day_window(date(2026, 8, 23), "UTC")
 
     def stage(rows, runner):
-        for row in rows:
-            path = ("users", "user-1", "conversations", row.conversation_id)
-            db.rows.setdefault(path, {"is_locked": False})
         return sweep._load_or_stage_daily_summary_candidates(
             "user-1",
             date(2026, 8, 23),
@@ -4167,40 +4006,6 @@ def test_certified_release_allows_fresh_selection_on_same_window(window_stage, m
     assert calls == [(("new", "new selection"),)]
 
 
-def test_locked_rows_never_enter_provider_summary_or_transcript(monkeypatch):
-    started = datetime(2026, 8, 23, 8, tzinfo=timezone.utc)
-    db = _ConversationDb(
-        [
-            _conversation_snapshot(
-                "locked", started=started, title="locked secret", transcript="private", is_locked=True
-            ),
-            _conversation_snapshot("visible", started=started),
-        ]
-    )
-    control = _open_control(monkeypatch)
-    db.document("users/user-1/memory_state/apply_control").set(control.model_dump(mode="json"))
-    seen = []
-
-    def agent(_uid, rows, lookup, **_kwargs):
-        seen.append((rows, lookup))
-        return _agent_output()
-
-    result = produce_completed_day_daily_summary_sources(
-        "user-1",
-        date(2026, 8, 23),
-        "UTC",
-        control,
-        db_client=db,
-        model_authority=DailySweepModelAuthority(enabled=True, model_name="test", max_candidates=3, max_cost_usd=1),
-        agent_runner=agent,
-    )
-    assert result.complete
-    assert len(seen) == 1
-    assert [key for key, _ in seen[0][0]] == ["visible"]
-    assert set(seen[0][1]) == {"visible"}
-    assert db.conversation_query.full_reads == ["visible"]
-
-
 def test_source_truncation_survives_real_qa_agent_and_receipt(monkeypatch):
     from utils.llm import memories
     from utils.memory import daily_memory_sweep as sweep
@@ -4284,20 +4089,6 @@ def test_historical_transcript_keyed_fence_blocks_new_window_identity(window_sta
     assert stage([_day_source("changed", "new text")], lambda *_a, **_kw: calls.append(1) or _agent_output()) is None
     assert calls == []
     assert len([key for key in db.rows if key[0] == MODEL_INVOCATION_FENCE_COLLECTION]) == 1
-
-
-def test_onboarding_uses_the_same_locked_content_exclusion():
-    assert (
-        _onboarding_transcript_eligibility(
-            {
-                "status": "completed",
-                "finished_at": datetime(2026, 8, 23, 8, tzinfo=timezone.utc),
-                "finalization_status": "completed",
-                "is_locked": True,
-            }
-        )
-        == "discarded"
-    )
 
 
 def test_admission_serializes_overlapping_workers_before_identity_computation(window_stage):
@@ -4476,14 +4267,6 @@ def test_projection_is_not_a_stable_whole_window_snapshot(change):
     assert _read_test_day(db).reason == "row_not_eligible"
 
 
-def test_locked_only_day_records_exclusion_without_content():
-    started = datetime(2026, 8, 23, 8, tzinfo=timezone.utc)
-    result = _read_test_day(_ConversationDb([_conversation_snapshot("locked", started=started, is_locked=True)]))
-    assert result.status == "complete"
-    assert result.rows == ()
-    assert result.locked_rows_excluded == 1
-
-
 def test_skip_attestation_consumes_once_without_dispatch_and_survives_changed_input(window_stage):
     from utils.memory import daily_memory_sweep as sweep
 
@@ -4657,63 +4440,6 @@ def test_blocked_invocation_reports_durable_state(window_stage, state, changed_i
     expected = "invocation_input_changed" if changed_input and state == "pending" else f"invocation_{state}"
     assert evidence["failure_reason"] == expected
     assert expected in sweep.SOURCE_REASON_CODES
-
-
-@pytest.mark.parametrize("lock_before_phase", [1, 2])
-def test_selected_source_locked_during_preparation_never_reaches_next_provider_call(monkeypatch, lock_before_phase):
-    from utils.llm import memories
-
-    db = _ConversationDb([_conversation_snapshot("private", started=datetime(2026, 8, 23, 8, tzinfo=timezone.utc))])
-    control = _open_control(monkeypatch)
-    db.document("users/user-1/memory_state/apply_control").set(control.model_dump(mode="json"))
-    monkeypatch.setattr(memories, "get_prompt_memories", lambda _: ("Test", ""))
-    monkeypatch.setattr(memories, "current_date_for_uid", lambda _: "2026-08-24")
-    calls = []
-    payloads = []
-
-    class Model:
-        def _get_request_payload(self, prompt, **kwargs):
-            payloads.append(prompt)
-            if len(calls) + 1 == lock_before_phase:
-                db.store["users/user-1/conversations/private"]["is_locked"] = True
-            return {"messages": [{"role": "user", "content": prompt.to_string()}], **kwargs}
-
-        def invoke(self, prompt, **kwargs):
-            assert not db.store["users/user-1/conversations/private"]["is_locked"]
-            calls.append(prompt)
-            return '{"memories": [], "transcript_requests": [{"conversation_id": "private", "reason": "verify"}]}'
-
-    monkeypatch.setattr(memories, "get_llm", lambda *_a, **_kw: Model())
-    result = produce_completed_day_daily_summary_sources(
-        "user-1",
-        date(2026, 8, 23),
-        "UTC",
-        control,
-        db_client=db,
-        model_authority=DailySweepModelAuthority(enabled=True, model_name="test", max_candidates=3, max_cost_usd=1),
-        agent_runner=memories.run_daily_sweep_summary_agent,
-    )
-    assert not result.complete
-    assert result.model_dispatch_evidence["failure_reason"] == "source_locked_before_dispatch"
-    assert len(calls) == lock_before_phase - 1
-    assert len(payloads) >= lock_before_phase
-    fence = next(value for key, value in db.store.items() if key.startswith(MODEL_INVOCATION_FENCE_COLLECTION + "/"))
-    assert fence["state"] == ("pre_dispatch_released" if lock_before_phase == 1 else "indeterminate")
-
-
-@pytest.mark.parametrize("source", [None, {}, {"is_locked": False}, {"is_locked": True}])
-def test_dispatch_lock_projection_fails_closed_but_accepts_legacy_unlocked_row(source):
-    from models.memory_contracts import MemoryExtractionError
-    from utils.memory.daily_memory_sweep import _assert_selected_sources_unlocked
-
-    db = _Db()
-    if source is not None:
-        db.store["users/user-1/conversations/one"] = source
-    if source is None or source.get("is_locked"):
-        with pytest.raises(MemoryExtractionError):
-            _assert_selected_sources_unlocked(db, "user-1", ("one",))
-    else:
-        _assert_selected_sources_unlocked(db, "user-1", ("one",))
 
 
 @pytest.mark.parametrize("invalid", ["empty_attempts", "old_assertion", "no_abandonment", "dispatch_denial"])

@@ -7,7 +7,6 @@ import pytest
 from config.rate_card import (
     budget_units,
     display_equivalents,
-    free_budget_units,
     get_rate_card,
     price_llm_attempt,
     price_request,
@@ -113,9 +112,8 @@ def test_realtime_and_images_use_pinned_inputs_or_explicit_estimates():
     assert price_llm_attempt(img)['status'] == 'estimated'
 
 
-def test_free_and_equivalents_derive_from_card_and_mix():
+def test_budget_mix_derives_from_card():
     assert standard_chat_units() == Decimal('0.302974')
-    assert free_budget_units() == 4853
     assert (
         budget_units(
             {'budget': {'kind': 'rate_card_mix', 'speech_seconds': 18000, 'chat_messages': 30, 'chat_tier': 'standard'}}
@@ -189,15 +187,6 @@ def test_gemini_tool_tokens_are_not_complete_at_text_or_modality_rate(model, mod
     )
     assert priced['status'] == 'estimated'
     assert 'tool_use_prompt_tokens_unpriced' in priced['reasons']
-
-
-def test_free_covers_five_hours_of_every_free_routable_provider():
-    budget = free_budget_units()
-    assert get_rate_card()['default_speech_provider'] == 'deepgram'
-    assert budget == 4853
-    for provider in ('deepgram', 'soniox', 'modulate', 'parakeet'):
-        speech = Decimal(price_transcription(18000, provider=provider, accepted=True)['micro_units']) / 1000000
-        assert budget >= speech + 30 * standard_chat_units()
 
 
 def test_display_uses_routed_provider_shares_and_conservative_unknown_mix():

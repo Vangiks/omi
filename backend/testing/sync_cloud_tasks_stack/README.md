@@ -45,11 +45,11 @@ expiry verification remain outside this gauntlet.
 Scenarios cover:
 
 1. fresh admission, rejected unauthenticated worker delivery, durable
-   completion/readback, once-only fair-use meter, and terminal duplicate ACK;
+   completion/readback, and terminal duplicate ACK;
 2. failure after terminalization keeps staged material until a retry performs
    exact-job cleanup without reprocessing;
 3. a pre-ledger failure returns the job to queue, then skips its durable
-   processed-segment checkpoint without another STT call or fair-use charge;
+   processed-segment checkpoint without another STT call;
 4. a post-ledger failure returns the job to queue, then a later delivery
    converges the completed ledger without reprocessing;
 5. a first pipeline success on the final Cloud Tasks delivery converges its
@@ -69,7 +69,7 @@ storage, Cloud Tasks is the local strict recorder, Google OIDC verification
 uses one exact local token, and VAD/STT/conversation processing are deterministic.
 The gauntlet retains production PCM decoding, upload/staging ownership, task
 protobuf construction, route authentication, locks, job/ledger transitions,
-fair-use metering, status polling, and conversation persistence.
+status polling, and conversation persistence.
 
 It does not prove real GCS, Cloud Tasks IAM/control-plane delivery,
 Google-signed OIDC tokens, production VAD/STT/LLM quality, BYOK, or backfill

@@ -198,7 +198,6 @@ if ROLE == 'admission':
             'private_cloud_sync_enabled': False,
             'status': 'completed',
             'discarded': False,
-            'is_locked': False,
             'data_protection_level': 'enhanced',
             'client_device_id': device_id,
             'client_platform': platform,
@@ -313,7 +312,6 @@ else:
             transcript_segments=list(getattr(conversation, 'transcript_segments', [])),
             private_cloud_sync_enabled=bool(getattr(conversation, 'private_cloud_sync_enabled', False)),
             status=ConversationStatus.completed,
-            is_locked=bool(getattr(conversation, 'is_locked', False)),
             client_device_id=getattr(conversation, 'client_device_id', None),
             client_platform=getattr(conversation, 'client_platform', None),
             # Preserve the ingest-owned revision the processor read, exactly as a
@@ -371,7 +369,7 @@ else:
         return completed
 
     # Replace only external/provider leaves.  The decoder, staging/download,
-    # task route, fair-use policy/metering, Redis locks, ledger, and lifecycle
+    # task route, Redis locks, ledger, and lifecycle
     # owner remain production code.
     sync_pipeline.vad_is_empty = _local_vad
     sync_pipeline.get_prerecorded_service = lambda _language='en': ('parakeet', 'en', 'parakeet')

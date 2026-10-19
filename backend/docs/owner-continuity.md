@@ -24,7 +24,7 @@ meaning. These are the complete drop categories:
 | `scope_changed` | The old voice belongs to another provider epoch, or the provider restarts while the donor/profile reads await. Diarizer integers cannot cross that boundary. |
 | `donor_unavailable` | No eligible previous row, a failed donor/receipt read, or the refreshed donor disappeared. |
 | `donor_authority` | A shortened live owner proof has lost its original donor receipt revision, enrollment or readable authority. |
-| `donor_ineligible` | The old conversation is deleted, discarded, or locked, initially or on the reread. |
+| `donor_ineligible` | The old conversation is deleted or discarded, initially or on the reread. |
 | `manual_override` | Owner reservation, a voice rejection, or a positive voice-wide manual decision in either donor/current receipt takes precedence. A copied manual owner can preserve identity even though the old automatic map counts `none`. |
 | `no_evidence` | A mapping has no accepted owner decision/centroid/evidence backing it. This now abstains instead of indexing missing state. |
 | `profile_unavailable` | Speaker ID is disabled or the enrolled owner cannot be loaded, including bounded retry exhaustion, missing/invalid print/audio, or excluded onboarding/custom-STT/multichannel/profile-opt-out mode. |
@@ -50,7 +50,7 @@ invented. The leading code-based hypothesis is `scope_changed`: acoustically
 reconciled owner voices from multiple provider epochs can coexist in the old
 map, while only the active epoch can carry. A near 1:1 carried/dropped split is
 consistent with that mechanism. `manual_override` and profile acquisition failures
-are secondary candidates. Deliberate re-enrollment, deleted/locked donors,
+are secondary candidates. Deliberate re-enrollment, deleted donors,
 capacity, and tightly timed I/O races should be smaller absent a separate incident.
 Use counts of `target=owner carried=none` grouped by `reason` to test this ranking.
 

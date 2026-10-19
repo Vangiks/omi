@@ -58,7 +58,6 @@ The shared plumbing every feature call goes through.
 
 - `app_generator.py` / `app_generation_prompts.py` — AI app generation.
 - `external_integrations.py` — structured summaries for external integrations.
-- `fair_use_classifier.py` — LLM-based purpose detection for fair-use policy.
 
 ## Conventions
 

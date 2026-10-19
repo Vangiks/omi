@@ -3502,7 +3502,7 @@
     },
     "/v1/dev/user/action-items": {
       "get": {
-        "description": "Get action items with optional filters. Locked action items are excluded.\n\n- **conversation_id**: Filter by conversation ID (None for standalone items)\n- **completed**: Filter by completion status\n- **start_date**: Filter by start date (inclusive)\n- **end_date**: Filter by end date (inclusive)\n- **limit**: Maximum number of items to return\n- **offset**: Number of items to skip",
+        "description": "Get action items with optional filters.\n\n- **conversation_id**: Filter by conversation ID (None for standalone items)\n- **completed**: Filter by completion status\n- **start_date**: Filter by start date (inclusive)\n- **end_date**: Filter by end date (inclusive)\n- **limit**: Maximum number of items to return\n- **offset**: Number of items to skip",
         "operationId": "listActionItems",
         "parameters": [
           {
@@ -3863,7 +3863,7 @@
     },
     "/v1/dev/user/ask": {
       "post": {
-        "description": "Answer a natural-language question grounded in the user's own conversations.\n\nSemantically searches the user's conversations for the question, then synthesizes a\ncited answer from the most relevant ones — the same retrieval + RAG the chat surface\nuses, exposed for headless / Developer-API callers (CLI, CI, scripts). Read-only:\nit never writes; discarded conversations are excluded from retrieval and locked\nconversations are re-checked on the authoritative record before any go to the LLM.",
+        "description": "Answer a natural-language question grounded in the user's own conversations.\n\nSemantically searches the user's conversations for the question, then synthesizes a\ncited answer from the most relevant ones — the same retrieval + RAG the chat surface\nuses, exposed for headless / Developer-API callers (CLI, CI, scripts). Read-only:\nit never writes; discarded conversations are excluded from retrieval.",
         "operationId": "ask",
         "requestBody": {
           "content": {

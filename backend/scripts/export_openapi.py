@@ -20,7 +20,6 @@ initialization, and blocks non-local network while importing the app.
 from __future__ import annotations
 
 import argparse
-import copy
 import ipaddress
 import json
 import logging
@@ -76,7 +75,6 @@ APP_CLIENT_PREFIXES = (
     '/v1/csat',
     '/v1/dev',
     '/v1/dream/runs',
-    '/v1/fair-use',
     '/v1/frame-requests',
     '/v1/folders',
     '/v1/goals',
@@ -86,10 +84,8 @@ APP_CLIENT_PREFIXES = (
     '/v1/knowledge-graph',
     '/v1/mcp',
     '/v1/memories',
-    '/v1/payment-methods',
     '/v1/payments',
     '/v2/payments',
-    '/v1/paypal',
     '/v1/persons',
     '/v1/phone',
     '/v1/mobile',
@@ -98,7 +94,6 @@ APP_CLIENT_PREFIXES = (
     '/v1/screen-frame-egress',
     '/v1/search',
     '/v1/speaker-tag-prompts',
-    '/v1/stripe',
     '/v1/sync',
     '/v1/task-integrations',
     '/v1/task-intelligence',
@@ -465,8 +460,6 @@ def configure_hermetic_environment() -> None:
     os.environ['TYPESENSE_HOST'] = 'localhost'
     os.environ['TYPESENSE_HOST_PORT'] = '8108'
     os.environ['TYPESENSE_API_KEY'] = 'fake-typesense-key'
-    os.environ['STRIPE_SECRET_KEY'] = ''
-    os.environ['STRIPE_API_KEY'] = ''
     os.environ['ADMIN_KEY'] = ''
 
     for bucket_var in (
@@ -965,42 +958,6 @@ def _normalize_component_names(schema: dict[str, Any]) -> None:
         _rewrite_refs(schema, ref_map)
 
 
-def _publish_negotiated_plan_identity(schema: dict[str, Any]) -> None:
-    """Keep the default released contract; publish the opt-in catalog response.
-
-    The runtime model accepts catalog IDs. The route's capability/floor gate
-    continues to send the legacy projection to callers without a safe decoder.
-    Keeping distinct schemas lets the unchanged compatibility checker validate
-    that default response, without widening any installed decoder's contract.
-    """
-    from config.plan_catalog import LEGACY_WIRE_PLAN_VALUES
-
-    operation = schema.get('paths', {}).get('/v1/users/me/subscription', {}).get('get')
-    components = schema.get('components', {}).get('schemas', {})
-    if operation is None or 'Subscription' not in components or 'UserSubscriptionResponse' not in components:
-        return
-    components['PlanIdentitySubscription'] = copy.deepcopy(components['Subscription'])
-    components['PlanIdentitySubscription']['title'] = 'PlanIdentitySubscription'
-    components['PlanIdentityUserSubscriptionResponse'] = copy.deepcopy(components['UserSubscriptionResponse'])
-    capable = components['PlanIdentityUserSubscriptionResponse']
-    capable['title'] = 'PlanIdentityUserSubscriptionResponse'
-    capable['properties']['subscription'] = {'$ref': '#/components/schemas/PlanIdentitySubscription'}
-    components['Subscription']['properties']['plan']['enum'] = list(LEGACY_WIRE_PLAN_VALUES)
-    operation.setdefault('parameters', []).append(
-        {
-            'name': 'X-Omi-Plan-Identity',
-            'in': 'header',
-            'required': False,
-            'schema': {'type': 'string'},
-            'description': 'Value 1 declares catalog plan IDs and lossless unknown-plan decoding on a recognized client platform. Otherwise the platform release floor determines capability; older or unidentified clients retain legacy labels.',
-        }
-    )
-    operation['x-omi-plan-identity-response'] = {
-        'schema': {'$ref': '#/components/schemas/PlanIdentityUserSubscriptionResponse'},
-        'description': 'application/json response when the server plan-identity capability predicate accepts the header or platform/version floor. The default 200 schema is the legacy projection.',
-    }
-
-
 def build_openapi(app, surface: str) -> dict[str, Any]:
     if surface == 'public':
         routes = public_contract_routes(app)
@@ -1034,8 +991,6 @@ def build_openapi(app, surface: str) -> dict[str, Any]:
     elif surface == 'integration-public':
         _normalize_integration_public_security(schema)
     _normalize_component_names(schema)
-    if surface == 'app-client':
-        _publish_negotiated_plan_identity(schema)
     validate_contract(app, schema, surface)
     return schema
 

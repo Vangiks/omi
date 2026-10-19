@@ -1,15 +1,13 @@
-"""Fail-closed channel admission using the existing subscription authority."""
+"""Fail-closed channel admission: rollout cohort, operator switch and account deletion."""
 
 import os
 import time
 import threading
 
-from config.messaging import cohort_enabled, channel_policy
+from config.messaging import cohort_enabled
 
-from database.users import get_user_valid_subscription
 from database.account_deletion_marker import get_user_deletion_wipe_status
 from database.account_deletion_policy import account_deletion_blocks_access
-from utils.subscription import is_paid_plan
 
 
 class AccessDenied(PermissionError):
@@ -51,18 +49,6 @@ def require_access(uid, channel='telegram'):
         raise AccessDenied('channel_disabled', 'Messaging channels disabled')
     if account_deletion_blocks_access(get_user_deletion_wipe_status(uid)):
         raise AccessDenied('account_deletion', 'Account deletion in progress')
-    subscription = get_user_valid_subscription(uid, provision=False)
-    if subscription is None or not is_paid_plan(subscription.plan):
-        raise AccessDenied('paid_plan', 'Paid plan required')
-
-    plans = channel_policy(channel).get('plans')
-    plan = getattr(subscription.plan, 'value', subscription.plan)
-    if plans is not None:
-        if not isinstance(plans, list):
-            raise AccessDenied('channel_disabled', 'Invalid channel plan policy')
-        allowed_plans: list[str] = [value for value in plans if isinstance(value, str)]
-        if plan not in allowed_plans:
-            raise AccessDenied('channel_plan', 'Operator or Architect plan required for iMessage')
 
 
 def require_app_access(uid):

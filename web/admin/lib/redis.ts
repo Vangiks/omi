@@ -51,19 +51,3 @@ export async function setJsonCache(key: string, value: unknown, ttlSeconds: numb
     console.error(`Redis set ${key} failed:`, err);
   }
 }
-
-/**
- * Delete the enforcement stage cache for a user.
- * Matches backend's invalidate_enforcement_cache() in utils/fair_use.py.
- * Fail-open: errors are logged but do not block the admin action.
- */
-export async function invalidateEnforcementCache(uid: string): Promise<void> {
-  const redis = getRedis();
-  if (!redis) return;
-
-  try {
-    await redis.del(`fair_use:stage:${uid}`);
-  } catch (err) {
-    console.error('Failed to invalidate enforcement cache:', err);
-  }
-}

@@ -35,7 +35,6 @@ _STUB = (
     'pydub',
     'redis',
     'langchain',
-    'stripe',
     'openai',
     'anthropic',
     'modal',

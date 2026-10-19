@@ -74,7 +74,7 @@ def translate_open_page(
     config = resolve_ondemand_config()
     if not config.onopen_enabled or not config.admits(uid):
         return conversation, 'unavailable', None
-    if conversation.get('deleted') or conversation.get('is_locked'):
+    if conversation.get('deleted'):
         return conversation, 'unavailable', None
     target = users_db.get_user_language_preference(uid)
     if not target or not is_translation_target(target):

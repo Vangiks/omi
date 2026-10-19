@@ -207,7 +207,7 @@ async def test_success_and_failure_logs_redact_userinfo_query_and_fragment(deliv
 
 async def _deliver(kind):
     if kind == WebhookType.memory_created:
-        await webhooks.conversation_created_webhook('uid', MagicMock(is_locked=False, client_platform='mobile_ios'))
+        await webhooks.conversation_created_webhook('uid', MagicMock(client_platform='mobile_ios'))
     elif kind == WebhookType.day_summary:
         await webhooks.day_summary_webhook('uid', 'summary')
     elif kind == WebhookType.realtime_transcript:

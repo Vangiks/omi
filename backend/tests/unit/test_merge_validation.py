@@ -203,13 +203,12 @@ class TestCoerceDt:
 # ---------------------------------------------------------------------------
 
 
-def _conv(conv_id="c1", started=None, finished=None, status="completed", locked=False, deleted=False):
+def _conv(conv_id="c1", started=None, finished=None, status="completed", deleted=False):
     return {
         "id": conv_id,
         "started_at": started,
         "finished_at": finished,
         "status": status,
-        "is_locked": locked,
         "deleted": deleted,
     }
 
@@ -249,12 +248,6 @@ class TestValidateGateChecks:
         ok, err, warn = merge.validate_merge_compatibility([])
         assert ok is False
         assert "At least 2" in err
-
-    def test_rejects_locked_conversation(self, merge):
-        convs = [_conv("c1", locked=True), _conv("c2")]
-        ok, err, warn = merge.validate_merge_compatibility(convs)
-        assert ok is False
-        assert "locked" in err.lower()
 
     def test_rejects_deleted_conversation(self, merge):
         # A soft-deleted tombstone must never be a merge source: merging it

@@ -1,7 +1,6 @@
 """Reversible removal retains the canonical authority and hides all normal reads."""
 
 from datetime import datetime, timedelta, timezone
-from types import SimpleNamespace
 
 import pytest
 
@@ -41,7 +40,6 @@ def test_removal_and_undo_restore_product_metadata_through_canonical_apply(monke
     monkeypatch.setattr(service, 'ensure_canonical_mutation_ready', lambda uid: None)
     monkeypatch.setattr(service, '_ensure_canonical_target', lambda uid, target: False)
     monkeypatch.setattr(service, '_invalidate_prompt_cache', lambda uid: None)
-    monkeypatch.setattr(module, 'memory_item_to_memorydb', lambda memory: SimpleNamespace(is_locked=False))
 
     def apply(uid, target, *, mutation_kind, build_patch, db_client):
         nonlocal current

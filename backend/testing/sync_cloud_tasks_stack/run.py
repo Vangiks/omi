@@ -216,8 +216,6 @@ class Stack:
                 'SYNC_TASKS_INVOKER_SA': LOCAL_INVOKER_SA,
                 'SYNC_TASKS_MAX_ATTEMPTS': '2',
                 'HTTP_SYNC_JOBS_RUN_TIMEOUT': '30',
-                'FAIR_USE_ENABLED': 'true',
-                'MAX_DAILY_AUDIO_HOURS': '30',
                 'STT_PRERECORDED_MODEL': 'parakeet',
                 'STT_SERVICE_MODELS': 'parakeet',
                 'HOSTED_PARAKEET_API_URL': 'http://127.0.0.1:1',
@@ -229,7 +227,6 @@ class Stack:
                 'BUCKET_APP_THUMBNAILS': 'app-thumbnails',
                 'BUCKET_CHAT_FILES': 'chat-files',
                 'BUCKET_DESKTOP_UPDATES': 'desktop-updates',
-                'STRIPE_SECRET_KEY': '',
                 'OMI_SYNC_STACK_STATE_DIR': str(self.state_dir),
                 'OMI_SYNC_STACK_STORAGE_DIR': str(self.storage_dir),
                 'OMI_SYNC_STACK_CONTROL_TOKEN': self.control_token,
@@ -395,9 +392,6 @@ class Stack:
                 'subscription': {'plan': 'basic', 'status': 'active'},
             }
         )
-        self.firestore.collection('users').document(uid).collection('fair_use_state').document('current').set(
-            {'stage': 'none'}
-        )
 
     def scenario_uid(self, scenario: str) -> str:
         """Give each stack instance a private Sync workspace namespace."""
@@ -422,10 +416,6 @@ class Stack:
         if relative.is_absolute() or '..' in relative.parts:
             raise StackFailure('task yielded an unsafe staged blob path')
         return self.storage_dir / 'sync-temporal' / Path(*relative.parts)
-
-    def fair_use_meter_ms(self, uid: str) -> int:
-        values = redis.Redis(host='127.0.0.1', port=self.redis_port).hgetall(f'fair_use:v2:bucket:sync_fresh:{uid}')
-        return sum(int(value) for value in values.values())
 
 
 def _pcm16_upload_bytes() -> bytes:
@@ -530,7 +520,7 @@ def _assert_task_contract(stack: Stack, job_id: str, uid: str, conversation_id: 
         or body.get('lane') != 'fresh'
         or body.get('capture_time_trust') != 'device_bound'
         or body.get('ledger_fence_mode') != 'active'
-        or body.get('should_lock') is not False
+        or 'should_lock' in body
         or not isinstance(raw_paths, list)
         or len(raw_paths) != 1
         or not isinstance(raw_paths[0], str)
@@ -671,16 +661,6 @@ def _stt_invocation_count(stack: Stack, job_id: str) -> int:
     )
 
 
-def _assert_metered_once(stack: Stack, uid: str) -> None:
-    if stack.fair_use_meter_ms(uid) != 1000:
-        raise StackFailure('fresh Sync task did not meter exactly one second once')
-
-
-def _assert_not_metered(stack: Stack, uid: str) -> None:
-    if stack.fair_use_meter_ms(uid) != 0:
-        raise StackFailure('worker failure before pipeline execution unexpectedly recorded speech usage')
-
-
 def _happy_path_and_terminal_duplicate(stack: Stack) -> None:
     uid = stack.scenario_uid('duplicate')
     job_id, task = _submit_and_capture_task(stack, uid)
@@ -688,13 +668,11 @@ def _happy_path_and_terminal_duplicate(stack: Stack) -> None:
     if first.status_code != 200 or first.json().get('status') != 'done':
         raise StackFailure('first worker delivery did not complete through the separate worker route')
     _assert_durable_success(stack, uid, job_id)
-    _assert_metered_once(stack, uid)
     if _stt_invocation_count(stack, job_id) != 1:
         raise StackFailure('first completed worker delivery did not invoke STT exactly once')
     duplicate = _deliver_task(task, retry_count=1)
     if duplicate.status_code != 200 or duplicate.json().get('status') != 'acked':
         raise StackFailure('terminal duplicate was not ACKed by the separate worker route')
-    _assert_metered_once(stack, uid)
     if _stt_invocation_count(stack, job_id) != 1:
         raise StackFailure('terminal duplicate re-ran the provider pipeline')
 
@@ -708,7 +686,6 @@ def _cleanup_retry_preserves_terminal_work(stack: Stack) -> None:
     if first.status_code != 500:
         raise StackFailure('controlled terminal cleanup failure did not request Cloud Tasks retry')
     _assert_durable_success(stack, uid, job_id)
-    _assert_metered_once(stack, uid)
     if not staged_path.is_file() or _stt_invocation_count(stack, job_id) != 1:
         raise StackFailure('terminal cleanup retry did not preserve staged material and one STT invocation')
     retry = _deliver_task(task, retry_count=1)
@@ -716,7 +693,6 @@ def _cleanup_retry_preserves_terminal_work(stack: Stack) -> None:
         raise StackFailure('terminal cleanup retry was not ACKed')
     if staged_path.exists() or _stt_invocation_count(stack, job_id) != 1:
         raise StackFailure('terminal cleanup retry did not clean exact material without reprocessing')
-    _assert_metered_once(stack, uid)
 
 
 def _content_ledger_data(stack: Stack, uid: str, task: dict[str, Any]) -> dict[str, Any]:
@@ -750,14 +726,12 @@ def _pre_ledger_failure_retries_once(stack: Stack) -> None:
     ledger_data = _content_ledger_data(stack, uid, task)
     if ledger_data.get('status') != 'processing' or len(ledger_data.get('processed_segment_ids') or []) != 1:
         raise StackFailure('pre-ledger retry did not preserve the durable processed-segment checkpoint')
-    _assert_metered_once(stack, uid)
     if _stt_invocation_count(stack, job_id) != 1:
         raise StackFailure('pre-ledger failure did not execute the initial provider pipeline exactly once')
     retry = _deliver_task(task, retry_count=1)
     if retry.status_code != 200 or retry.json().get('status') != 'done':
         raise StackFailure('pre-ledger retry did not complete the durable job')
     _assert_durable_success(stack, uid, job_id)
-    _assert_metered_once(stack, uid)
     if _stt_invocation_count(stack, job_id) != 1:
         raise StackFailure('pre-ledger retry re-ran a completed Sync segment')
 
@@ -774,14 +748,12 @@ def _post_ledger_failure_converges_once(stack: Stack) -> None:
         raise StackFailure('post-ledger worker failure deleted staged input')
     if _content_ledger_data(stack, uid, task).get('status') != 'completed':
         raise StackFailure('controlled retry did not fail after durable content-ledger completion')
-    _assert_metered_once(stack, uid)
     if _stt_invocation_count(stack, job_id) != 1:
         raise StackFailure('post-ledger failure did not execute the initial provider pipeline exactly once')
     retry = _deliver_task(task, retry_count=1)
     if retry.status_code != 200 or retry.json().get('status') != 'done' or retry.json().get('reconciled') is not True:
         raise StackFailure('post-ledger retry did not converge through the durable content ledger')
     _assert_durable_success(stack, uid, job_id)
-    _assert_metered_once(stack, uid)
     if _stt_invocation_count(stack, job_id) != 1:
         raise StackFailure('post-ledger retry re-ran a completed Sync segment')
 
@@ -795,7 +767,6 @@ def _final_attempt_post_ledger_failure_converges(stack: Stack) -> None:
         raise StackFailure('pre-pipeline first delivery did not request a durable retry')
     if _job_status(stack, uid, job_id).get('status') != 'queued':
         raise StackFailure('pre-pipeline first delivery did not return the job to queued')
-    _assert_not_metered(stack, uid)
     if _stt_invocation_count(stack, job_id) != 0:
         raise StackFailure('pre-pipeline first delivery unexpectedly invoked STT')
 
@@ -803,7 +774,6 @@ def _final_attempt_post_ledger_failure_converges(stack: Stack) -> None:
     if final.status_code != 200 or final.json().get('status') != 'done' or final.json().get('reconciled') is not True:
         raise StackFailure('final delivery did not converge its completed durable content ledger')
     _assert_durable_success(stack, uid, job_id)
-    _assert_metered_once(stack, uid)
     if _stt_invocation_count(stack, job_id) != 1:
         raise StackFailure('final durable-ledger convergence re-ran the provider pipeline')
     if stack.staged_blob_path(task['body']['raw_blob_paths'][0]).exists():
@@ -824,11 +794,9 @@ def _retry_budget_terminalizes_truthfully(stack: Stack) -> None:
         raise StackFailure('retry-budget exhaustion did not publish truthful failed job state')
     if stack.staged_blob_path(task['body']['raw_blob_paths'][0]).exists():
         raise StackFailure('terminal failure did not release staged material')
-    _assert_not_metered(stack, uid)
     duplicate = _deliver_task(task, retry_count=2)
     if duplicate.status_code != 200 or duplicate.json().get('status') != 'acked':
         raise StackFailure('terminal failed job was not safely ACKed on duplicate delivery')
-    _assert_not_metered(stack, uid)
 
 
 def _concurrent_delivery_is_lease_fenced(stack: Stack) -> None:
@@ -855,7 +823,6 @@ def _concurrent_delivery_is_lease_fenced(stack: Stack) -> None:
     if first.status_code != 200 or first.json().get('status') != 'done':
         raise StackFailure('lease-owning worker delivery did not finish successfully')
     _assert_durable_success(stack, uid, job_id)
-    _assert_metered_once(stack, uid)
     if _stt_invocation_count(stack, job_id) != 1:
         raise StackFailure('concurrent delivery ran the provider pipeline more than once')
 

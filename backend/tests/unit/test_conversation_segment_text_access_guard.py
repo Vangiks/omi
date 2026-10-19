@@ -1,6 +1,6 @@
 """Unit tests ensuring PATCH /v1/conversations/{conversation_id}/segments/text enforces
 
-access validation (_get_valid_conversation_by_id) against soft-deleted and paywalled conversations.
+access validation (_get_valid_conversation_by_id) against soft-deleted conversations.
 """
 
 from __future__ import annotations
@@ -16,7 +16,6 @@ from database import conversations as conversations_db
 from routers import conversations as routes
 
 UID = "test-user-segment-text-guard"
-CONV_LOCKED = "conv-locked-123"
 CONV_DELETED = "conv-deleted-456"
 CONV_VALID = "conv-valid-789"
 
@@ -32,21 +31,13 @@ def client():
 
 def _setup_mock_db(monkeypatch):
     mock_conversations = {
-        CONV_LOCKED: {
-            "id": CONV_LOCKED,
-            "is_locked": True,
-            "deleted": False,
-            "transcript_segments": [{"id": "seg-1", "text": "Original locked segment"}],
-        },
         CONV_DELETED: {
             "id": CONV_DELETED,
-            "is_locked": False,
             "deleted": True,
             "transcript_segments": [{"id": "seg-2", "text": "Original deleted segment"}],
         },
         CONV_VALID: {
             "id": CONV_VALID,
-            "is_locked": False,
             "deleted": False,
             "transcript_segments": [{"id": "seg-3", "text": "Original valid segment"}],
         },
@@ -82,19 +73,6 @@ def test_patch_conversation_segment_text_rejects_soft_deleted_conversation_with_
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Conversation not found"
-    assert updated_calls == []
-
-
-def test_patch_conversation_segment_text_rejects_locked_conversation_with_402(monkeypatch, client):
-    updated_calls = _setup_mock_db(monkeypatch)
-
-    response = client.patch(
-        f"/v1/conversations/{CONV_LOCKED}/segments/text",
-        json={"segment_id": "seg-1", "text": "Attempted edit on locked conversation"},
-    )
-
-    assert response.status_code == 402
-    assert response.json()["detail"] == "A paid plan is required to access this conversation."
     assert updated_calls == []
 
 

@@ -67,8 +67,6 @@ class SweepDispatchScope:
                 if reason not in {
                     'daily_sweep_summary_input_budget',
                     'daily_sweep_summary_agent',
-                    'source_locked_before_dispatch',
-                    'source_lock_check_unavailable',
                 }:
                     reason = 'daily_sweep_summary_agent'
                 certified = SweepPreDispatchError(reason)

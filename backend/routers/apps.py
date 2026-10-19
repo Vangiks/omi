@@ -98,9 +98,6 @@ from utils.apps import (
     is_tester,
     add_app_access_for_tester,
     remove_app_access_for_tester,
-    upsert_app_payment_link,
-    get_is_user_paid_app,
-    is_permit_payment_plan_get,
     generate_persona_prompt,
     generate_persona_desc,
     get_persona_by_uid,
@@ -125,7 +122,6 @@ from database.memories import migrate_memories
 from utils.llm.persona import generate_persona_intro_message
 from utils.llm.app_generator import generate_description, generate_description_and_emoji
 from utils.llm.app_generation_prompts import app_generation_prompts_from_llm_payload, app_generation_prompts_response
-from utils.subscription import enforce_chat_quota
 from utils.llm.usage_tracker import track_usage, Features
 from utils.notifications import send_notification, send_app_review_reply_notification, send_new_app_review_notification
 from utils.other import endpoints as auth
@@ -860,16 +856,6 @@ def create_app(app_data: str = Form(...), file: UploadFile = File(...), uid=Depe
         # author is required + non-null on AppCreate; display_name/email can both be null.
         data['author'] = user.get('display_name') or (email.split('@')[0] if email else None) or 'Anonymous'
         data['email'] = email
-    if not data.get('is_paid'):
-        data['is_paid'] = False
-    else:
-        if data['is_paid'] is True:
-            if data.get('price') is None:
-                raise HTTPException(status_code=422, detail='App price is required')
-            if data.get('price') < 0.0:
-                raise HTTPException(status_code=422, detail='Price cannot be a negative value')
-            if data.get('payment_plan') is None:
-                raise HTTPException(status_code=422, detail='Payment plan is required')
 
     if external_integration := data.get('external_integration'):
         if external_integration.get('triggers_on') is None and len(external_integration.get('actions', [])) == 0:
@@ -913,9 +899,6 @@ def create_app(app_data: str = Form(...), file: UploadFile = File(...), uid=Depe
         app_dict = _process_chat_tools_manifest(external_integration, app_dict)
 
     add_app_to_db(app_dict)
-
-    # payment link
-    upsert_app_payment_link(app.id, app.is_paid, app.price, app.payment_plan, app.uid)
 
     return {'status': 'ok', 'app_id': app.id}
 
@@ -1159,16 +1142,6 @@ def update_app(
 
     update_app_in_db(update_dict)
 
-    # payment link
-    upsert_app_payment_link(
-        app_id,
-        data.get('is_paid', False),
-        data.get('price'),
-        data.get('payment_plan'),
-        uid,
-        previous_price=app.get("price", 0),
-    )
-
     if app['approved'] and (app['private'] is None or app['private'] is False):
         invalidate_approved_apps_cache()
     delete_app_cache_by_id(app_id)
@@ -1260,13 +1233,6 @@ def get_app_details(app_id: str, uid: str = Depends(auth.get_current_user_uid)):
     if app.private is not None:
         if app.private and app.uid != uid:
             raise HTTPException(status_code=403, detail='You are not authorized to view this app')
-
-    # is user paid
-    app.is_user_paid = get_is_user_paid_app(app.id, uid)
-
-    # payment link
-    if app.payment_link:
-        app.payment_link = f'{app.payment_link}?client_reference_id=uid_{uid}'
 
     # Generate thumbnail URLs if thumbnails exist
     if app.thumbnails:
@@ -1511,31 +1477,12 @@ def get_app_capabilities():
     ]
 
 
-# @deprecated
-@router.get('/v1/app/payment-plans', tags=['v1'], response_model=List[AppSelectOption])
-def get_payment_plans_v1():
-    return [
-        {'title': 'Monthly Recurring', 'id': 'monthly_recurring'},
-    ]
-
-
-@router.get('/v1/app/plans', tags=['v1'], response_model=List[AppSelectOption])
-def get_payment_plans(uid: str = Depends(auth.get_current_user_uid)):
-    if not uid or len(uid) == 0 or not is_permit_payment_plan_get(uid):
-        return []
-    return [
-        {'title': 'Monthly Recurring', 'id': 'monthly_recurring'},
-    ]
-
-
 @router.post('/v1/app/generate-description', tags=['v1'], response_model=AppDescriptionGenerationResponse)
 def generate_description_endpoint(
     data: GenerateDescriptionRequest,
     uid: str = Depends(auth.get_current_user_uid),
     x_app_platform: Optional[str] = Header(None, alias='X-App-Platform'),
 ):
-    # User-initiated LLM generation — same free-tier gate as chat (402 past cap).
-    enforce_chat_quota(uid, platform=x_app_platform)
     if data.name == '':
         raise HTTPException(status_code=422, detail='App Name is required')
     if data.description == '':
@@ -1557,8 +1504,6 @@ def generate_description_and_emoji_endpoint(
     Generate an app description and representative emoji.
     Used by the quick template creator feature.
     """
-    # User-initiated LLM generation — same free-tier gate as chat (402 past cap).
-    enforce_chat_quota(uid, platform=x_app_platform)
     if not data.name:
         raise HTTPException(status_code=422, detail='App Name is required')
     if not data.prompt:
@@ -1585,9 +1530,6 @@ async def generate_sample_prompts_endpoint(
     """
     from utils.llm.clients import get_llm
     import json
-
-    # User-initiated LLM generation — same free-tier gate as chat (402 past cap).
-    await run_blocking(db_executor, enforce_chat_quota, uid, platform=x_app_platform)
 
     system_prompt = """Generate 5 creative and diverse ideas for apps that are either:
 1. Conversation summary based apps - analyze user's recorded conversations and extract/organize information
@@ -1641,9 +1583,6 @@ async def generate_app_endpoint(
     """
     from utils.llm.app_generator import generate_app_from_prompt
 
-    # User-initiated LLM generation — same free-tier gate as chat (402 past cap).
-    await run_blocking(db_executor, enforce_chat_quota, uid, platform=x_app_platform)
-
     prompt = data.prompt.strip()
     if not prompt:
         raise HTTPException(status_code=422, detail='Prompt is required')
@@ -1689,9 +1628,6 @@ async def generate_app_icon_endpoint(
     """
     from utils.llm.app_generator import generate_app_icon
     import base64
-
-    # User-initiated LLM generation — same free-tier gate as chat (402 past cap).
-    await run_blocking(db_executor, enforce_chat_quota, uid, platform=x_app_platform)
 
     app_name = data.name.strip()
     app_description = data.description.strip()
@@ -2264,13 +2200,6 @@ async def enable_app_endpoint(app_id: str, request: Request, uid: str = Depends(
         if app.private and app.uid != uid and not await run_blocking(db_executor, is_tester, uid):
             logger.warning('app_install_failure class=private_access')
             raise HTTPException(status_code=403, detail='You are not authorized to perform this action')
-    # Check payment status
-    if app.is_paid and not await run_blocking(db_executor, get_is_user_paid_app, app.id, uid):
-        logger.warning('app_install_failure class=payment_required')
-        raise HTTPException(
-            status_code=403,
-            detail='This app requires a paid subscription. Complete the purchase on the app page, then try again.',
-        )
     if app.works_externally():
         if app.external_integration is None:
             logger.warning('app_install_failure class=setup_configuration')

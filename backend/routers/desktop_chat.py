@@ -53,7 +53,6 @@ from utils.observability.journeys import ClientJourneyAttempt
 from utils.product_metrics import extract_app_build, record_product_event
 from utils.other import endpoints as auth
 from utils.retrieval.tools.perplexity_tools import WEB_SEARCH_RETRIEVAL_APPENDIX
-from utils.subscription import enforce_desktop_chat_quota
 
 _MAX_BODY_BYTES = 16 * 1024 * 1024
 _RATE_LIMIT_PER_MINUTE = 120
@@ -1780,7 +1779,6 @@ async def _chat_completions_unobserved(
                 web_search_authorization = await _web_search_authorized(uid)
             public_model, payload = _request(body, web_search_authorization=web_search_authorization)
             gateway_payload = {}
-        await run_blocking(db_executor, enforce_desktop_chat_quota, uid, platform=x_app_platform)
         await _meter_server_request(uid, request_id=request_id)
     except HTTPException:
         raise

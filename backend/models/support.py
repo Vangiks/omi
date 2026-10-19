@@ -13,13 +13,11 @@ class SupportLookupResponse(BaseModel):
 
     uid: str
     email: str
-    plan: str
     last_active_at: datetime | None = None
     last_active_platform: str | None = None
     transcription_seconds_used: float
     transcription_seconds_limit: int | None = None
     transcription_seconds_remaining: float | None = None
-    fair_use_stage: str
 
 
 class SupportTraceRow(BaseModel):

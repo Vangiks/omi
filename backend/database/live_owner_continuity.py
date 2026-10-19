@@ -74,14 +74,13 @@ def donor_authority(uid: str, conversation: str) -> Optional[dict]:
             field_paths=[
                 'deleted',
                 'discarded',
-                'is_locked',
                 'manual_speaker_assignments',
                 'manual_speaker_assignments_compressed',
             ]
         )
     )
     data = snapshot.to_dict() if snapshot.exists else None
-    if data is None or any(data.get(key) for key in ('deleted', 'discarded', 'is_locked')):
+    if data is None or any(data.get(key) for key in ('deleted', 'discarded')):
         return None
     return decode_manual_speaker_assignments(
         uid, data.get('manual_speaker_assignments'), bool(data.get('manual_speaker_assignments_compressed'))
@@ -111,7 +110,6 @@ def authority_snapshot(
                 field_paths=[
                     'deleted',
                     'discarded',
-                    'is_locked',
                     'manual_speaker_assignments',
                     'manual_speaker_assignments_compressed',
                 ],
@@ -121,7 +119,7 @@ def authority_snapshot(
                 decode_manual_speaker_assignments(
                     uid, data.get('manual_speaker_assignments'), bool(data.get('manual_speaker_assignments_compressed'))
                 )
-                if data is not None and not any(data.get(key) for key in ('deleted', 'discarded', 'is_locked'))
+                if data is not None and not any(data.get(key) for key in ('deleted', 'discarded'))
                 else None
             )
         return result

@@ -2,8 +2,8 @@
 
 Several simple getters did `user_ref.get().to_dict().get(field)`. When the user document does not
 exist, `.to_dict()` returns None, so `.get(field)` raised AttributeError, surfacing as a 500 on
-authenticated endpoints (store-recording permission, private-cloud-sync, the Stripe/PayPal/default
-payment-method getters, training-data opt-in) and in conversation post-processing. A UID can be
+authenticated endpoints (store-recording permission, private-cloud-sync,
+training-data opt-in) and in conversation post-processing. A UID can be
 valid in auth but missing from Firestore (new user before doc creation, mid-deletion, or a data
 race). These getters now use the file's existing `.to_dict() or {}` guard so a missing doc yields
 the same default as a missing field instead of crashing. These cover the pure getter behavior.
@@ -62,16 +62,11 @@ def users():
         ),
         "models.users": _module(
             "models.users",
-            Subscription=MagicMock(),
-            PlanLimits=MagicMock(),
-            PlanType=MagicMock(),
-            SubscriptionStatus=MagicMock(),
             LOCATION_CONTEXT_DISCLOSED_PROVIDERS=("Google Maps", "the configured AI chat provider"),
             LOCATION_CONTEXT_PURPOSE="chat_city_context",
             LocationContextConsent=MagicMock(),
             LocationContextConsentStatus=MagicMock(),
         ),
-        "utils.subscription": _module("utils.subscription", get_default_basic_subscription=MagicMock()),
         "models.other": _module("models.other", Person=MagicMock()),
     }
     with stub_modules(fakes):
@@ -91,9 +86,6 @@ def _db_for(to_dict_result):
 CASES = [
     ("get_user_store_recording_permission", "store_recording_permission", False, True),
     ("get_user_private_cloud_sync_enabled", "private_cloud_sync_enabled", True, False),
-    ("get_stripe_connect_account_id", "stripe_account_id", None, "acct_123"),
-    ("get_paypal_payment_details", "paypal_details", None, {"email": "x@y.z"}),
-    ("get_default_payment_method", "default_payment_method", None, "pm_123"),
     ("get_user_training_data_opt_in", "training_data_opt_in", None, {"opt_in": True}),
 ]
 

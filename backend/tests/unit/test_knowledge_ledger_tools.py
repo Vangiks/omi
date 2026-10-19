@@ -70,7 +70,6 @@ def test_search_current_knowledge_returns_only_requested_current_ledger_kinds(mo
         _memory("mem_doc", kind=MemoryKind.document, body="private body"),
         _memory("mem_trigger", kind=MemoryKind.trigger, trigger_condition={"keywords": ["release"]}),
         _memory("mem_legacy", kind=MemoryKind.fact, ledger_schema_version=None),
-        _memory("mem_locked", kind=MemoryKind.document, is_locked=True),
         _memory("mem_rejected", kind=MemoryKind.document, user_review=False),
         _memory("mem_closed", kind=MemoryKind.document, invalid_at=NOW),
         _memory("mem_passive", kind=MemoryKind.document, intent_backed=False),
@@ -141,7 +140,6 @@ def test_read_current_playbook_applies_chat_visibility_and_ledger_semantics(monk
         _playbook(kind=MemoryKind.fact, body=None),
         _playbook(subject_scope=MemorySubjectScope.third_party),
         _playbook(valid_to=NOW),
-        _playbook(promotion={"is_locked": True}),
         _playbook(promotion={"user_review": False}),
         _playbook(sensitivity_labels=["credential"]),
         _playbook(tier=MemoryLayer.archive),
@@ -220,13 +218,6 @@ def test_search_historical_facts_is_fact_only_owner_scoped_and_partial(monkeypat
         invalid_at=NOW,
         trigger_condition={"keywords": ["release"]},
     )
-    locked = _memory(
-        "historical-locked",
-        kind=MemoryKind.fact,
-        content="Private locked fact",
-        invalid_at=NOW,
-        is_locked=True,
-    )
     rejected = _memory(
         "historical-rejected",
         kind=MemoryKind.fact,
@@ -258,7 +249,6 @@ def test_search_historical_facts_is_fact_only_owner_scoped_and_partial(monkeypat
                     SimpleNamespace(memory=fact),
                     SimpleNamespace(memory=document),
                     SimpleNamespace(memory=trigger),
-                    SimpleNamespace(memory=locked),
                     SimpleNamespace(memory=rejected),
                     SimpleNamespace(memory=migrated_legacy),
                     SimpleNamespace(memory=passive),
@@ -281,7 +271,6 @@ def test_search_historical_facts_is_fact_only_owner_scoped_and_partial(monkeypat
     assert "historical-playbook" not in result
     assert "private workflow body" not in result
     assert "historical-trigger" not in result
-    assert "historical-locked" not in result
     assert "historical-rejected" not in result
     assert "historical-legacy" in result
     assert "fact/legacy-migrated" in result

@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { Apps } from './Apps'
 
 // PR1 (error surfacing): the app-enable/disable toggle used to swallow EVERY failure
-// (backend 400 "setup not completed", 403 paid/private, network) into a console.error,
+// (backend 400 "setup not completed", 403 private, network) into a console.error,
 // flipping the row to "Installed" then silently reverting. This suite pins the fix:
 // a failed enable/disable raises a real error toast, the row reverts to its prior
 // state, and the button is never left stuck busy/disabled.

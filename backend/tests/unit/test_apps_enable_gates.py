@@ -61,7 +61,6 @@ def _app_dict(**overrides):
         'deleted': False,
         'private': False,
         'disabled': False,
-        'is_paid': False,
         'external_integration': None,
     }
     data.update(overrides)
@@ -76,7 +75,7 @@ def _external_app(setup_url='https://provider.test/status', integration=None, **
     )
 
 
-def _enable(app, client=None, *, user_paid=False, tester=False):
+def _enable(app, client=None, *, tester=False):
     """POST /v1/apps/enable through TestClient; return (response, client, enable_calls)."""
     enable_calls = []
     client = client or _Client(response=_response(200))
@@ -102,7 +101,6 @@ def _enable(app, client=None, *, user_paid=False, tester=False):
         stack.enter_context(patch.object(apps_router, 'get_available_app_by_id', lambda _id, _uid: app))
         stack.enter_context(patch.object(apps_router, 'get_pinned_delivery_client', lambda: client))
         stack.enter_context(patch.object(apps_router, 'is_tester', lambda _uid: tester))
-        stack.enter_context(patch.object(apps_router, 'get_is_user_paid_app', lambda _id, _uid: user_paid))
         stack.enter_context(patch.object(apps_router, 'enable_app', lambda _uid, _id: enable_calls.append(_id) or True))
         stack.enter_context(patch.object(apps_router, 'increase_app_installs_count', lambda _id: None))
         response = TestClient(fastapi_app).post('/v1/apps/enable', params={'app_id': 'app-1'})
@@ -144,17 +142,8 @@ def test_private_app_unauthorized_returns_403():
     assert enable_calls == []
 
 
-def test_unpaid_paid_app_returns_403_without_setup_callback_or_enable():
-    client = _Client(response=_response(200))
-    response, client, enable_calls = _enable(_external_app(is_paid=True), client, user_paid=False)
-    assert response.status_code == 403
-    assert 'paid subscription' in response.json()['detail']
-    assert client.calls == 0
-    assert enable_calls == []
-
-
-def test_paid_user_with_completed_setup_enables():
-    response, client, enable_calls = _enable(_external_app(is_paid=True), user_paid=True)
+def test_app_flagged_as_paid_in_storage_enables_without_purchase():
+    response, client, enable_calls = _enable(_external_app(is_paid=True, price=4.99))
     assert response.status_code == 200
     assert client.calls == 1
     assert enable_calls == ['app-1']
@@ -268,7 +257,6 @@ def test_setup_probe_uses_the_pinned_target():
         stack.enter_context(patch.object(apps_router, 'get_pinned_delivery_client', lambda: _CaptureClient()))
         stack.enter_context(patch.object(apps_router, 'safe_request_targets', _pin))
         stack.enter_context(patch.object(apps_router, 'is_tester', lambda _uid: False))
-        stack.enter_context(patch.object(apps_router, 'get_is_user_paid_app', lambda _id, _uid: False))
         stack.enter_context(patch.object(apps_router, 'enable_app', lambda _uid, _id: True))
         stack.enter_context(patch.object(apps_router, 'increase_app_installs_count', lambda _id: None))
         response = TestClient(fastapi_app).post('/v1/apps/enable', params={'app_id': 'app-1'})
@@ -314,7 +302,6 @@ def test_setup_probe_tries_every_safe_address_before_reporting_unavailable():
         stack.enter_context(patch.object(apps_router, 'get_pinned_delivery_client', lambda: _FlakyClient()))
         stack.enter_context(patch.object(apps_router, 'safe_request_targets', _pin))
         stack.enter_context(patch.object(apps_router, 'is_tester', lambda _uid: False))
-        stack.enter_context(patch.object(apps_router, 'get_is_user_paid_app', lambda _id, _uid: False))
         stack.enter_context(patch.object(apps_router, 'enable_app', lambda _uid, _id: True))
         stack.enter_context(patch.object(apps_router, 'increase_app_installs_count', lambda _id: None))
         response = TestClient(fastapi_app).post('/v1/apps/enable', params={'app_id': 'app-1'})

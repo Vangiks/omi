@@ -27,7 +27,6 @@ from utils.llm.usage_tracker import Features, reset_usage_context, set_usage_con
 from utils.observability.fallback import record_fallback
 from utils.other import endpoints as auth
 from utils.retrieval.graph import execute_chat_stream
-from utils.subscription import enforce_chat_quota
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +52,6 @@ async def generate_reply(
     stream stages alongside ``callback_data['error']`` are never returned as reply
     text. A failed generation is an HTTP 502 with ``{'error': <reason>}``.
     """
-    await run_blocking(db_executor, enforce_chat_quota, uid, platform=x_app_platform)
-
     app_id = data.app_id if data.app_id not in ['null', ''] else None
     app_record = await run_blocking(db_executor, get_available_app_by_id, app_id, uid) if app_id else None
     # A malformed/legacy stored app doc is unusable, same as a missing one: 404, not a 500.

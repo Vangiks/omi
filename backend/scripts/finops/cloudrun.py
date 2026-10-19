@@ -46,7 +46,6 @@ def secrets_dir() -> pathlib.Path:
 # Secret file names this job understands. Values are never printed.
 SECRET_FILES = {
     "prometheus": "OMI_PROMETHEUS_TOKEN",
-    "stripe": "STRIPE_API_KEY",
     "openai": "OPENAI_ADMIN_KEY",
     "anthropic": "ANTHROPIC_ADMIN_API_KEY",
     "posthog": "MCP_POSTHOG_API_KEY",

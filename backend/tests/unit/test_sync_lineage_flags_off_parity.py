@@ -208,7 +208,6 @@ def test_overlap_targets_counts_and_log_bytes_match_main(frozen, stamp, caplog, 
             stamped_target=stamp,
             source='omi',
             client_device_id='pendant',
-            is_locked=False,
         )
         output.append(
             _bytes(
@@ -249,7 +248,6 @@ def test_resolver_read_calls_results_and_logs_match_main(frozen, monkeypatch, ca
                     stamped_target=None,
                     source='omi',
                     client_device_id='pendant',
-                    is_locked=False,
                     job_id='synthetic-job',
                 )
             probe.assert_not_called()
@@ -276,6 +274,8 @@ def test_process_segment_saved_rows_results_finish_and_log_bytes_match_main(
     for name in ('bounded_envelope', 'merge_track_receipts', 'sync_segment_receipt', 'unknown_envelope'):
         module.__dict__[name] = getattr(capture_evidence, name)
     module.OMI_CAPTURE_EVIDENCE_ENVELOPES_TOTAL = metrics.OMI_CAPTURE_EVIDENCE_ENVELOPES_TOTAL
+    # The frozen main source predates the plan-check removal; its candidate wrapper is now a plain dict.
+    module.PersonEmbeddingsCache = lambda named_allowed: {}
     original = module.process_segment
 
     def old_process(*args, lineage_binding=None, **kwargs):
@@ -322,7 +322,6 @@ async def test_audio_consumer_off_preserves_inputs_without_lookup_or_log(monkeyp
         result = await coverage.apply_sync_wal_audio_coverage(
             'u',
             'omi',
-            False,
             'pendant',
             ORIGIN,
             {'synthetic.bin': {}},

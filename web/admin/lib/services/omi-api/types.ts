@@ -33,12 +33,6 @@ export type OmiAppCapability =
 export type OmiAppStatus = 'approved' | 'pending' | 'rejected' | 'under-review' | (string & {});
 
 /**
- * App payment plan. The backend `App.payment_plan` is typed as `string`;
- * this union narrows to the known values the admin UI renders.
- */
-export type OmiPaymentPlan = 'free' | 'one-time' | 'monthly' | 'yearly' | (string & {});
-
-/**
  * Request-body builder for create/update app. Client-side shape derived from
  * the generated `App` response schema; the backend accepts a subset of fields.
  */
@@ -56,63 +50,8 @@ export type OmiAppInput = Partial<
     | 'deleted'
     | 'installs'
     | 'created_at'
-    | 'payment_product_id'
-    | 'payment_price_id'
-    | 'payment_link_id'
-    | 'payment_link'
-    | 'is_user_paid'
     | 'thumbnail_urls'
     | 'is_popular'
     | 'is_influencer'
   >
 >;
-
-// ---------------------------------------------------------------------------
-// Payout-related types. These describe Stripe payout data returned by the
-// admin backend, not the Omi App API. They remain hand-written because they
-// are not part of the Omi REST OpenAPI surface.
-// ---------------------------------------------------------------------------
-
-export interface StripePayout {
-  id: string;
-  object: 'payout';
-  amount: number;
-  arrival_date: number;
-  automatic: boolean;
-  balance_transaction: string;
-  created: number;
-  currency: string;
-  description: string;
-  destination: string;
-  failure_balance_transaction?: string;
-  failure_code?: string;
-  failure_message?: string;
-  livemode: boolean;
-  metadata: Record<string, string>;
-  method: string;
-  original_payout?: string;
-  reversed_by?: string;
-  source_type: string;
-  statement_descriptor?: string;
-  status: 'paid' | 'pending' | 'in_transit' | 'canceled' | 'failed';
-  type: 'bank_account' | 'card' | 'fpx';
-}
-
-export interface PayoutsResponse {
-  payouts: StripePayout[];
-  hasMore: boolean;
-  totalCount: number;
-}
-
-export interface UserWithStripeAccount {
-  userId: string;
-  stripeAccountId: string;
-  appName: string;
-  userName: string;
-}
-
-export interface PayoutWithAppInfo {
-  payout: StripePayout;
-  appName: string;
-  uid: string;
-}

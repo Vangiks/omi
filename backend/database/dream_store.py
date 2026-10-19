@@ -24,7 +24,6 @@ from config.dream_agent import (
     DRAIN_TIMEOUT_SECONDS,
     LEASE_RECLAIM_MARGIN_SECONDS,
 )
-from config.plan_catalog import PAID_PLAN_IDS
 from database.dream_history import review_id
 from database._client import get_firestore_client
 
@@ -93,8 +92,7 @@ def mark_dirty(uid, refs, *, canary=False, firestore_client=None):
     if not (canary_eligible(uid, user) if canary else eligible(uid, user)):
         return False
     state = state_ref(database, uid)
-    plan = (user.get('subscription') or {}).get('plan', user.get('plan', ''))
-    weight = 2 if plan in PAID_PLAN_IDS else 1
+    weight = 2
     refs = list(dict.fromkeys(refs))
     priority_state = state.get().to_dict() or {}
     from database.dream_scheduler import due_time

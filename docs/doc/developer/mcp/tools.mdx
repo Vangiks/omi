@@ -298,7 +298,6 @@ one of:
 |------|---------|
 | `invalid_arguments` | Bad parameter (bad date format, unknown category, malformed ID) |
 | `not_found` | Resource not found (memory or conversation doesn't exist) |
-| `paid_plan_required` | Locked content (paid plan required) |
 | `authorization_denied` | The OAuth grant is missing the tool's required scope, or policy denied the operation |
 | `rate_limited` | Per-user rate limit hit — retry after the current window |
 | `unavailable` | Temporarily unavailable (e.g. a search index still building) |
@@ -320,15 +319,6 @@ header/body mismatches (`-32020`) never reach the tool result.
 ```
 
 ---
-
-## Locked Content
-
-Memories and conversations behind the paid plan are handled gracefully:
-
-- **Memories:** Content is truncated to 70 characters with `...`
-- **Conversations:** Action items and events are hidden from the structured data
-- **Direct access:** Returns a tool result with `isError: true` and
-  `structuredContent.error.code` of `paid_plan_required`, with a clear message
 
 ## Read contracts
 

@@ -692,7 +692,7 @@ def test_empty_cleanup_publishes_nothing_when_it_refuses_to_delete(recording_sto
     assert captured == {}
 
 
-@pytest.mark.parametrize('field,value', [('is_locked', True), ('deleted', True), ('sync_content_revision', 1)])
+@pytest.mark.parametrize('field,value', [('deleted', True), ('sync_content_revision', 1)])
 def test_empty_cleanup_preserves_protected_or_sync_owned_rows(recording_store, field, value):
     path = ('users', 'uid', 'conversations', 'conversation')
     row = _stored_conversation([], level='standard')

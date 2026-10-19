@@ -346,12 +346,10 @@ def test_restore_of_non_jev_discard_writes_no_marker(monkeypatch, relevance_deci
 
 def test_restored_jev_discard_survives_reassessment_persist(monkeypatch):
     """Restore stamps the marker; reassessment rewrites the decision, not the marker."""
-    from types import SimpleNamespace
 
     from database import conversations
     from utils.conversations.processing_trigger import ProcessingTrigger
-    from utils.conversations.relevance import decide_relevance
-    from utils.conversations.relevance_io import apply_relevance
+    from utils.conversations.relevance import RELEVANCE_DECISION_FIELD, decide_relevance
 
     row = _review(
         id='restored',
@@ -376,9 +374,13 @@ def test_restored_jev_discard_survives_reassessment_persist(monkeypatch):
         model_discards=None,
         calendar_retains=lambda: False,
     )
-    conversation = SimpleNamespace(discarded=True)
-    payload = {'id': 'restored', 'status': 'completed', 'data_protection_level': 'standard'}
-    apply_relevance(conversation, payload, decision)
+    payload = {
+        'id': 'restored',
+        'status': 'completed',
+        'data_protection_level': 'standard',
+        'discarded': decision.discard,
+        RELEVANCE_DECISION_FIELD: decision.as_record(),
+    }
     assert 'jev_discard_restored' not in payload
 
     assert conversations.persist_processing_result_with_lifecycle('u', payload) is True

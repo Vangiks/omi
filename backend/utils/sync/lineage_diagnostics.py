@@ -19,17 +19,16 @@ EXCLUSION_PRECEDENCE = (
     'dropped_deleted',
     'dropped_source',
     'dropped_device',
-    'dropped_lock',
     'dropped_interval',
 )
 
 
 def classify_generation_row(
-    row: Mapping[str, Any], *, origin_id: str, source: Any, client_device_id: Any, is_locked: bool
+    row: Mapping[str, Any], *, origin_id: str, source: Any, client_device_id: Any
 ) -> Optional[str]:
     """The first lineage-filter stage that rejects ``row``, or None when it is a candidate.
 
-    ``source``/``client_device_id``/``is_locked`` are the already-normalized
+    ``source``/``client_device_id`` are the already-normalized
     upload values; the row is compared against them field by field.
     """
     row_id = clean_text(row.get('id'))
@@ -49,8 +48,6 @@ def classify_generation_row(
         return 'dropped_source'
     if clean_text(row.get('client_device_id')) != client_device_id:
         return 'dropped_device'
-    if bool(row.get('is_locked')) != is_locked:
-        return 'dropped_lock'
     start, end = unix_seconds(row.get('started_at')), unix_seconds(row.get('finished_at'))
     if start is None or end is None or end < start:
         return 'dropped_interval'
@@ -58,7 +55,7 @@ def classify_generation_row(
 
 
 def probe_token(
-    row: Optional[Mapping[str, Any]], *, origin_id: str, source: Any, client_device_id: Any, is_locked: bool
+    row: Optional[Mapping[str, Any]], *, origin_id: str, source: Any, client_device_id: Any
 ) -> str:
     """Classify the exact recording-id probe row into the fixed ``id_probe`` token set.
 
@@ -69,7 +66,7 @@ def probe_token(
     if not isinstance(row, Mapping):
         return 'missing'
     reason = classify_generation_row(
-        row, origin_id=origin_id, source=source, client_device_id=client_device_id, is_locked=is_locked
+        row, origin_id=origin_id, source=source, client_device_id=client_device_id
     )
     if reason is None:
         return 'compatible'

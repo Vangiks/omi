@@ -310,10 +310,6 @@ def test_fallback_recomputes_receipt_evidence_and_owner_retraction(world, monkey
     assert result[0]['_speaker_learning_queued'] is False
 
 
-def _lock(rows):
-    rows[CONV_PATH]['is_locked'] = True
-
-
 def _delete(rows):
     rows[CONV_PATH]['deleted'] = True
 
@@ -325,7 +321,6 @@ def _drop_person(rows):
 @pytest.mark.parametrize(
     'mutate,error',
     [
-        pytest.param(_lock, PermissionError, id='locked'),
         pytest.param(_delete, LookupError, id='deleted'),
         pytest.param(_drop_person, LookupError, id='person_missing'),
     ],

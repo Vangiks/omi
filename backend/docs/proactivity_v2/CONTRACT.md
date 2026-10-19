@@ -156,32 +156,12 @@ binding dollar cap specifically covers model attempts priced by the gateway.
 
 ### Cap policy
 
-Add a validated `proactivity_v2_budget` object to `backend/config/plan_catalog.json`
-and emit it into `plan_catalog_generated.py`. It contains `fraction_basis_points=1000`,
-`days_per_month=30`, and budget reference monthly price in cents per canonical
-plan. These are David's budget reference prices, not a new checkout price source
-(the catalog correctly makes Stripe authoritative for billed amounts).
-
-`daily_cap_micro_usd = floor(monthly_cents * 10000 * 1000 / 10000 / 30)`.
-Compute with integers (equivalently `monthly_cents * 1000 // 30`).
-
-| Canonical plan | Reference monthly cents | Daily cap (micro-USD) | USD/day |
-| --- | ---: | ---: | ---: |
-| `basic` (`free` alias) | 0 | 0 | 0 |
-| `operator` | 4900 | 163333 | 0.163333 |
-| `architect` | 19900 | 663333 | 0.663333 |
-| `unlimited_v2` | 2999 | 99966 | 0.099966 |
-| `unlimited` (Neo) | 2000 | 66666 | 0.066666 |
-| `plus` | 2000 | 66666 | 0.066666 |
-
-Future unpriced paid plans use the *computed minimum* known paid cap and emit
-`record_fallback(area='proactivity_v2', from_mode='plan_price',
-to_mode='lowest_known_paid_cap', reason='price_pending', outcome='recovered')`.
-No special allowance for developers, BYOK, trials, client-supplied plans or
-unknown entitlements. Unknown plan/store failure denies. Resolve active canonical
-plan server-side; expired plans use basic. A lower cap immediately stops new work
-if existing charges exceed it; it does not erase spend. Upgrades allow only the
-new cap minus the same day's existing charges. No separate per-device balance.
+Every user has the same daily cap, `DAILY_CAP_MICRO_USD = 663333`
+(0.663333 USD/day) in `backend/config/proactivity_v2.py`. It is the former
+`architect` cap, `19900 * 1000 // 30`; the fork has no plans (#3), so the cap
+does not depend on a subscription. No special allowance for developers, BYOK or
+client-supplied values. A lower cap immediately stops new work if existing
+charges exceed it; it does not erase spend. No separate per-device balance.
 
 Reset at **00:00 UTC**, not user timezone: stable across devices, travel, timezone
 edits and DST, aligns with gateway `date` and avoids balance-reset manipulation.
@@ -206,7 +186,7 @@ fingerprint. No caller-supplied dollar estimate. `Reservation` binds UID, accoun
 generation, item, producer, call ID, day, nonce and reserved micro-USD. Duplicate
 reserve returns an explicit already-reserved/terminal result without a capability
 to call the provider again. Typed denials: `disabled`, `producer_disabled`,
-`not_paid`, `budget_exhausted`, `call_limit`, `duplicate`, `unpriced`, `unavailable`.
+`budget_exhausted`, `call_limit`, `duplicate`, `unpriced`, `unavailable`.
 No public reserve, settle, plan, cost or producer-selection endpoint.
 
 ### Durable balance, Redis keys and races
@@ -223,9 +203,9 @@ not money authority. There is deliberately **no Redis-only dollar counter**.
 Use the shared connection but propagate failures rather than a fail-open wrapper.
 Redis loss/restart can only lose this optimization, never spent dollars.
 
-1. Gateway rechecks flag, registry health, user preference, paid plan and deletion
+1. Gateway rechecks flag, registry health, user preference and deletion
    fence. It acquires the Redis lease; errors deny before any provider call.
-2. Firestore transaction reads account/plan, day, item and producer control before
+2. Firestore transaction reads account, day, item and producer control before
    any writes. Checks identity, no existing call ID, per-item/day call ceilings,
    and `charged + worst_case <= current_cap`; writes hold to item and day together.
 3. Only the unique newly committed reservation authorizes the current execution

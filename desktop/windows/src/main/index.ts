@@ -16,7 +16,7 @@ import { defaultOzonePlatform } from './linuxCompositor'
 import { APP_BG_HEX, HOME_BG_HEX, WCO_SYMBOL_HEX } from '../shared/chrome'
 import iconPath from '../../resources/icon.png?asset'
 import { listCaptureSources } from './ipc/capture'
-import { isAllowedExternalScheme } from './externalUrl'
+import { isAllowedExternalScheme, registerExternalUrlIpc } from './externalUrl'
 import { localBackendCorsUrls } from './localBackendOrigins'
 import { installContextMenu } from './contextMenu'
 import { GPU_CONTEXT_LOST_CHANNEL } from '../shared/types'
@@ -73,7 +73,6 @@ import { registerRewindHandlers } from './ipc/rewind'
 import { registerScreenHandlers } from './ipc/screen'
 import { registerChatPrivacyHandlers } from './ipc/chatPrivacy'
 import { registerAssistantSettingsHandlers } from './ipc/assistantSettings'
-import { registerBillingIpc } from './billing/checkoutWindow'
 import { registerAppsIpc } from './apps/checkAppSetup'
 import { helperProcess } from './ocr/helperProcess'
 import { registerProactivityConsumer } from './proactivity/register'
@@ -911,7 +910,7 @@ app.whenReady().then(async () => {
   registerScreenHandlers()
   registerChatPrivacyHandlers()
   registerAssistantSettingsHandlers()
-  registerBillingIpc()
+  registerExternalUrlIpc()
   registerAppsIpc()
   // Cross-window conversations refresh: any renderer that writes a local
   // conversation (main window OR overlay) notifies here; rebroadcast to every
@@ -932,7 +931,7 @@ app.whenReady().then(async () => {
   // Onboarding mic-permission recovery: deep-link straight to Windows Settings →
   // Privacy & security → Microphone. The target is a fixed literal (never a
   // renderer-supplied URL), so no scheme allow-list is needed — unlike
-  // billing:openExternal, this cannot be steered at an arbitrary protocol handler.
+  // shell:openExternal, this cannot be steered at an arbitrary protocol handler.
   ipcMain.on(
     'settings:openMicPrivacy',
     () => void shell.openExternal('ms-settings:privacy-microphone')

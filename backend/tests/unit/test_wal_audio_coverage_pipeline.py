@@ -165,7 +165,7 @@ async def _run_batch(module, stubs, tmp_path, *, claims=True, session=ORIGIN, ra
         capture_evidence_claims={BIN_NAME: _claim()} if claims is True else claims,
     )
     await module._run_full_pipeline_background_async(
-        'job-coverage', 'uid', [f'/tmp/{raw_name}'], 'omi', False, str(tmp_path / 'job'), **kwargs
+        'job-coverage', 'uid', [f'/tmp/{raw_name}'], 'omi', str(tmp_path / 'job'), **kwargs
     )
 
 
@@ -309,8 +309,6 @@ def _wire_real(
     monkeypatch.setattr(pipeline, '_record_sync_segment_failure_async', AsyncMock())
     monkeypatch.setattr(pipeline, '_reprocess_merged_conversations', lambda *a, **k: None)
     monkeypatch.setattr(pipeline, 'schedule_person_voice_learning_retries', lambda *a, **k: None)
-    monkeypatch.setattr(pipeline, '_record_restricted_sync_dg_usage', AsyncMock())
-    monkeypatch.setattr(pipeline, 'FAIR_USE_ENABLED', False)
     monkeypatch.setattr(pipeline, 'try_mark_once', lambda *a, **k: True)
     monkeypatch.setattr(pipeline, 'record_usage', lambda *a, **k: None)
     monkeypatch.setattr(pipeline, 'plan_segment_targets', lambda *a, **k: {})
@@ -367,7 +365,6 @@ async def _run_real(pipeline, tmp_path, *, target_conversation_id=None, session=
         'u',
         [f'/tmp/{BIN_NAME}'],
         'omi',
-        False,
         str(tmp_path / 'job'),
         target_conversation_id=target_conversation_id,
         client_device_id='pendant',
@@ -725,7 +722,7 @@ async def test_clock_skewed_filename_still_preserves_receipt_only_audio(coordina
         capture_evidence_claims=claims,
     )
     await module._run_full_pipeline_background_async(
-        'job-coverage-skew', 'uid', [f'/tmp/{skewed}.bin'], 'omi', False, str(wav_dir / 'job'), **kwargs
+        'job-coverage-skew', 'uid', [f'/tmp/{skewed}.bin'], 'omi', str(wav_dir / 'job'), **kwargs
     )
     assert len(state.vad_seen) == 1
     assert _read_payload(state.vad_seen[0]) == b''.join(_frame_bytes(v, FRAME_SAMPLES) for v in range(10))
@@ -934,7 +931,6 @@ async def test_cancelled_coverage_preserves_inputs_and_adopts_nothing(tmp_path, 
             coverage_mod.apply_sync_wal_audio_coverage(
                 'uid',
                 'omi',
-                False,
                 'pendant',
                 ORIGIN,
                 {BIN_NAME: claim},
@@ -1011,7 +1007,6 @@ async def test_cleanup_and_logging_exceptions_never_lose_inputs(tmp_path, monkey
         paths, maps, suppressed = await coverage_mod.apply_sync_wal_audio_coverage(
             'uid',
             'omi',
-            False,
             'pendant',
             ORIGIN,
             {BIN_NAME: claim},
@@ -1097,7 +1092,6 @@ def test_saved_transcript_proof_live_words_once_then_new(real_pipeline, monkeypa
         ORIGIN,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
         wav_paths=[str(wav_path)],
         source_frame_maps={
             str(wav_path): {'claim': claim, 'offsets': [i * FRAME_SAMPLES for i in range(11)], 'incomplete': False}
@@ -1195,7 +1189,6 @@ def _short_tail_batch(monkeypatch, wav_path):
         ORIGIN,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
         wav_paths=[str(wav_path)],
         source_frame_maps={
             str(wav_path): {
@@ -1349,7 +1342,6 @@ def test_receipt_only_full_coverage_preserves_the_wal_untouched(real_pipeline, m
         ORIGIN,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
         wav_paths=[str(wav_path)],
         source_frame_maps={
             str(wav_path): {'claim': claim, 'offsets': [i * FRAME_SAMPLES for i in range(11)], 'incomplete': False}
@@ -1364,8 +1356,8 @@ def test_receipt_only_full_coverage_preserves_the_wal_untouched(real_pipeline, m
     assert _read_payload(str(wav_path)) == b''.join(_frame_bytes(v, FRAME_SAMPLES) for v in range(10))
 
 
-_WHOLE_BATCH_ARGS = ('uid', ORIGIN, 'omi', 'pendant', False, 1759999000.0, 1760000100.0)
-_WHOLE_BATCH_ARGS_REAL = ('u', ORIGIN, 'omi', 'pendant', False, 1759999000.0, 1760000100.0)
+_WHOLE_BATCH_ARGS = ('uid', ORIGIN, 'omi', 'pendant', 1759999000.0, 1760000100.0)
+_WHOLE_BATCH_ARGS_REAL = ('u', ORIGIN, 'omi', 'pendant', 1759999000.0, 1760000100.0)
 
 
 def _s1_spies(pipeline, monkeypatch):
@@ -1463,7 +1455,7 @@ async def test_s1_valid_claims_bind_each_segment_to_planned_target(coordinator, 
     fake_process = pipeline.process_segment
 
     def tracking_process(path, uid, response, lock, errors, *args, **kwargs):
-        bound_targets.append(args[4] if len(args) > 4 else None)
+        bound_targets.append(args[3] if len(args) > 3 else None)
         return fake_process(path, uid, response, lock, errors, *args, **kwargs)
 
     pipeline.process_segment = tracking_process

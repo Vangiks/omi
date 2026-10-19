@@ -137,8 +137,7 @@ async function handleRequest(request: Request) {
       const cacheHeaders: HeadersInit = {};
       if (
         path.includes('app-categories') ||
-        path.includes('app-capabilities') ||
-        path.includes('app/plans')
+        path.includes('app-capabilities')
       ) {
         // Static reference data - cache for 1 hour
         cacheHeaders['Cache-Control'] =

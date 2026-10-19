@@ -27,8 +27,6 @@ it("all source failures yield 502 with every metric null and a reason", async ()
   vi.mocked(wallPayload).mockResolvedValue(
     await computeWall({
       query: fail,
-      shopify: fail,
-      stripe: fail,
       billing: fail,
     })
   );
@@ -48,8 +46,6 @@ it("partial fixtures preserve source timestamps and return usable aggregates", a
   vi.mocked(verifyAdmin).mockResolvedValue({ uid: "test" });
   const p = await computeWall({
     query: async () => [[0, "macos", 3]],
-    shopify: fail,
-    stripe: fail,
     billing: fail,
   });
   const refreshed = p.metrics[0].sourceRefreshedAt;

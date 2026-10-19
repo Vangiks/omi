@@ -432,32 +432,17 @@ def record_jit_first_open(*, event: str, effect: str) -> None:
     JIT_FIRST_OPEN_TOTAL.labels(event=event, effect=effect).inc()
 
 
-# Lazy desktop deferral (the pre-JIT free-desktop cost path): a raw transcript is
-# stored at capture and the paid enrichment runs only when the user first opens
-# the conversation. `stored` vs `enrich_*` is the observed ever-opened fraction,
-# which the JIT first-open deferral for paid tiers is sized against. Bounded
-# label set; anything else collapses to `other` so a new call site cannot mint
-# an unbounded series.
+# Lazy desktop deferral: conversations stored with `deferred=True` before the
+# fork dropped the free tier (#17) are enriched when the user first opens them.
+# Nothing defers at capture any more, so only the first-open route emits these.
+# Bounded label set; anything else collapses to `other` so a new call site
+# cannot mint an unbounded series.
 #
-# Three constraints on reading the ratio (also carried in the HELP text, because
-# whoever writes the PromQL will not read this file):
-#  1. `stored` and `fenced` are emitted by EVERY job that runs the finalizer --
-#     the backend API and the pusher (`routers/pusher.py` ->
-#     `utils/pusher_finalization.py`) -- while `enrich_*` is emitted only by the
-#     backend first-open route. The ratio must therefore be
-#     `sum by (event) (lazy_desktop_deferral_total)` across every such job, and
-#     the pusher scrape target must be live or the denominator is truncated.
-#  2. `enrich_complete / stored` is an attempt-over-persist ratio, NOT a
-#     per-conversation one: a failed enrichment re-arms `deferred`, so the next
-#     open counts a second `enrich_started`, and a retried deferred persist can
-#     count `stored` (or `fenced`) more than once for a single conversation.
-#  3. The ratio is undefined while `FREE_TIER_LOCAL_PROCESSING` is on: the
-#     deferred-store path stops emitting `stored` while the already-stored
-#     backlog keeps emitting `enrich_*`, so the ratio drifts above 100%.
+# `enrich_complete / enrich_started` is an attempt ratio, NOT a per-conversation
+# one: a failed enrichment re-arms `deferred`, so the next open counts a second
+# `enrich_started`.
 LAZY_DESKTOP_DEFERRAL_EVENTS = frozenset(
     {
-        'stored',
-        'fenced',
         'enrich_started',
         'enrich_lost_ownership',
         'enrich_reacquire_error',
@@ -469,12 +454,9 @@ LAZY_DESKTOP_DEFERRAL_EVENTS = frozenset(
 LAZY_DESKTOP_DEFERRAL_TOTAL = Counter(
     'lazy_desktop_deferral_total',
     (
-        'Lazy desktop deferral lifecycle: store at capture and first-open enrichment outcomes; '
-        'never labeled by UID. Aggregate as sum by (event) across BOTH backend and pusher: '
-        'stored/fenced are emitted by every host running the finalizer, enrich_* only by the '
-        'backend first-open route. enrich_complete/stored is an attempt/persist ratio, not a '
-        'per-conversation one (a re-armed retry counts again). The ratio is undefined while '
-        'FREE_TIER_LOCAL_PROCESSING is on: stored stops while the enrich_* backlog drains.'
+        'First-open enrichment outcomes for conversations deferred before the free tier was removed; '
+        'never labeled by UID. enrich_complete/enrich_started is an attempt ratio, not a '
+        'per-conversation one (a re-armed retry counts again).'
     ),
     ['event'],
 )
@@ -1094,7 +1076,7 @@ OMI_LIVE_STT_ACCEPTED_TOTAL = Counter(
 
 # VAD-measured speech seconds for backend-provider live sessions, metered once
 # per speech-delta flush: speech sent to the provider, not wall-clock session
-# length and not fair-use transcription_seconds.
+# length and not transcription_seconds.
 OMI_LIVE_STT_AUDIO_SECONDS_TOTAL = Counter(
     'omi_live_stt_audio_seconds_total',
     'VAD speech seconds flushed for backend-provider live-STT sessions (speech sent, not wall-clock)',
@@ -1440,14 +1422,6 @@ AUTH_FLOW_DURATION_SECONDS = Histogram(
     'auth_flow_duration_seconds',
     'Auth flow duration in seconds by provider and terminal state',
     ['provider', 'terminal_state'],
-)
-
-OMI_SUBSCRIPTION_EVENTS = Counter(
-    'omi_subscription_events_total',
-    'Stripe subscription lifecycle events observed via webhook. Counts webhook '
-    'deliveries, which Stripe may retry, so treat these as an operational trend '
-    'signal rather than a billing-grade figure; Stripe remains source of truth.',
-    ['event', 'plan', 'interval', 'reason'],
 )
 
 

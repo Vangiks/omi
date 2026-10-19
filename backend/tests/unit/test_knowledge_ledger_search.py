@@ -114,7 +114,6 @@ def test_current_search_admits_open_unslotted_facts_documents_and_triggers():
         {"valid_to": "closed"},
         {"intent_backed": False, "write_reason": LedgerWriteReason.daily_reconciliation},
         {"promotion": {"user_review": False}},
-        {"promotion": {"is_locked": True}},
         {"sensitivity_labels": ["financial"]},
         {"source_state": SourceState.tombstoned},
         {"kind": MemoryKind.document, "subject_scope": "third_party"},

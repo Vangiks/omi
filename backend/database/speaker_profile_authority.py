@@ -14,9 +14,9 @@ def _current_source(
     from database.conversations import decode_transcript_segments_verified, decode_manual_speaker_assignments
 
     raw = user_ref.collection('conversations').document(conversation_id).get(transaction=transaction).to_dict()
-    # A conversation locked or discarded after extraction left the retry coordinator's
+    # A conversation discarded after extraction left the retry coordinator's
     # scope; its speech must not publish either.
-    if not raw or raw.get('deleted') or raw.get('discarded') or raw.get('is_locked'):
+    if not raw or raw.get('deleted') or raw.get('discarded'):
         return None
     receipt = decode_manual_speaker_assignments(
         uid, raw.get('manual_speaker_assignments'), bool(raw.get('manual_speaker_assignments_compressed'))

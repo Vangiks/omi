@@ -88,7 +88,6 @@ _TWO_TIER_MODEL_PROFILE: Dict[str, Tuple[str, str]] = {
     'chat_graph': (LUNA_MODEL, 'openai'),
     'goals': (LUNA_MODEL, 'openai'),
     'goals_advice': (LUNA_MODEL, 'openai'),
-    'notifications': (LUNA_MODEL, 'openai'),
     'proactive_notification': (LUNA_MODEL, 'openai'),
     'what_matters_now': (LUNA_MODEL, 'openai'),
     'openglass': (LUNA_MODEL, 'openai'),
@@ -154,9 +153,7 @@ MODEL_QOS_PROFILES: Dict[str, Dict[str, Tuple[str, str]]] = {
 }
 
 # Pinned features — (model, provider) fixed regardless of profile or env override.
-_PINNED_FEATURES: Dict[str, Tuple[str, str]] = {
-    'fair_use': (os.getenv('FAIR_USE_CLASSIFIER_MODEL', LUNA_MODEL).strip() or LUNA_MODEL, 'openai'),
-}
+_PINNED_FEATURES: Dict[str, Tuple[str, str]] = {}
 
 # BYOK QoS is request-scoped. It is selected only after a provider-scoped user
 # key is found and is never a valid managed profile.

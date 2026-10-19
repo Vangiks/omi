@@ -82,7 +82,7 @@ dashboards; do not rename its properties without a dashboard migration.
 | `outcome` | `success` or `error`. |
 | `authorization_outcome` | `allowed`, `denied`, or `not_applicable`. |
 | `error_category` | `none`, `authorization_denied`, `validation`, `unknown_tool`, or `internal`; rate-limited calls report `validation` with `error_code` `rate_limited`, and HTTP 5xx failures report `unavailable`/`internal`. |
-| `error_code` | Stable closed enum: `none`, `not_found`, `paid_plan_required`, `invalid_arguments`, `authorization_denied`, `rate_limited`, `unavailable`, `internal`, or `unknown_tool`. `internal` is the fallback for any unrecognized code. |
+| `error_code` | Stable closed enum: `none`, `not_found`, `invalid_arguments`, `authorization_denied`, `rate_limited`, `unavailable`, `internal`, or `unknown_tool`. `internal` is the fallback for any unrecognized code. |
 | `duration_ms` | Tool execution duration, capped at 60,000 ms; use it for p50/p95. |
 | `result_count` | Top-level result cardinality, capped at 1,000. |
 | `protocol_version` | Supported MCP protocol revision, otherwise `unknown`. |

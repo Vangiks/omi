@@ -16,7 +16,6 @@ def test_socket_owner_retries_and_audio_repair_have_total_ceilings(monkeypatch):
     repairs = []
     monkeypatch.setattr(speakers.user_db, 'get_user_speaker_embedding', read)
     monkeypatch.setattr(speakers.user_db, 'get_people', people)
-    monkeypatch.setattr(speakers, 'named_speaker_prompts_allowed', lambda uid: True)
     monkeypatch.setattr(speakers, 'load_owner_embedding', lambda *a, **kw: repairs.append(kw['allow_audio_repair']))
     matcher = speakers.SpeakerMatcher(
         SimpleNamespace(request=SimpleNamespace(uid='u'), persistence=_Persistence(), has_speech_profile=True)

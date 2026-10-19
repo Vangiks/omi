@@ -460,8 +460,8 @@ class Conversation(BaseModel):
 
     # True when this conversation was transcribed on a third-party (custom STT)
     # provider, so no Omi transcription credits were consumed. Provenance for
-    # the isolated fair-use lane and the conversation-processing credit gate:
-    # custom-STT still hits LLM/post-processing metering (#7690).
+    # the conversation-processing credit gate: custom-STT still hits
+    # LLM/post-processing metering (#7690).
     uses_custom_stt: bool = False
 
     structured: Structured
@@ -609,7 +609,6 @@ class Conversation(BaseModel):
     processing_conversation_id: Optional[str] = None
 
     status: Optional[ConversationStatus] = ConversationStatus.completed
-    is_locked: bool = False
     # Lazy processing (freemium cost cut): True when this desktop conversation was stored as a
     # raw transcript with no LLM enrichment yet — enrichment runs on first open
     # (get_conversation_by_id → process_conversation). Cleared once enriched.
@@ -771,7 +770,6 @@ class CreateConversation(BaseModel):
 
     processing_conversation_id: Optional[str] = None
     calendar_meeting_context: Optional[CalendarMeetingContext] = None
-    is_locked: bool = False
     private_cloud_sync_enabled: bool = False
 
     client_device_id: Optional[str] = None

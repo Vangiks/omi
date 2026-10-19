@@ -59,15 +59,12 @@ describe('item visibility', () => {
       }),
     ).toBeNull();
     expect(
-      itemListMemoryTitle({ content: 'Locked', is_locked: true, layer: 'long_term' }),
-    ).toBeNull();
-    expect(
       itemListMemoryTitle({ content: 'Gone', deleted: true, layer: 'long_term' }),
     ).toBeNull();
     expect(itemListMemoryTitle({ content: '   ', layer: 'long_term' })).toBeNull();
   });
 
-  it('opens live and completed tasks, not locked, cancelled, or superseded ones', () => {
+  it('opens live and completed tasks, not cancelled or superseded ones', () => {
     expect(
       itemListTaskPresentation({ description: 'Send the deck', completed: false }),
     ).toEqual({
@@ -86,9 +83,6 @@ describe('item visibility', () => {
     ).toBeNull();
     expect(
       itemListTaskPresentation({ description: 'Replaced', superseded_by: 't-2' }),
-    ).toBeNull();
-    expect(
-      itemListTaskPresentation({ description: 'Paywalled', is_locked: true }),
     ).toBeNull();
     expect(itemListTaskPresentation({ description: '   ' })).toBeNull();
   });

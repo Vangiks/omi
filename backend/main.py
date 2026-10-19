@@ -32,7 +32,6 @@ install_firebase_auth_mutation_guard()
 
 from routers import messaging
 from routers import (
-    budget_choice,
     candidate_integration_sweep,
     chat_receipts,
     dream_cohort,
@@ -57,8 +56,6 @@ from routers import (
     trends,
     sync,
     apps,
-    payment,
-    storefront,
     integration,
     conversations,
     conversation_mutations,
@@ -97,7 +94,6 @@ from routers import (
     agent_tools,
     tools,
     metrics,
-    fair_use_admin,
     feedback_admin,
     staged_tasks,
     focus_sessions,
@@ -113,7 +109,6 @@ from routers import (
     desktop_realtime,
     desktop_screen_crisp,
     frame_requests,
-    referrals,
     desktop_tts_updates,
     scores,
     stt,
@@ -137,10 +132,8 @@ from routers.listen.registry import proactive_message_dispatcher
 
 from utils.other.timeout import TimeoutMiddleware
 from utils.observability import log_langsmith_status
-from utils.subscription import validate_stripe_price_ids
 from utils.http_client import close_all_clients
 from utils.jit_rollout import close_posthog_control_plane
-from utils.free_tier_cohort import close_free_tier_control_plane
 from utils.metrics import start_metrics_sidecar_server, stop_metrics_sidecar_server
 from utils.observability.sync_phases import shutdown_sync_metrics
 from utils.executors import (
@@ -166,9 +159,6 @@ from utils.other.local_storage import local_storage_root_from_env
 
 # Log LangSmith tracing status at startup
 log_langsmith_status()
-
-# Validate Stripe price IDs so misconfigured plans fail loud
-validate_stripe_price_ids()
 
 _auth_emulator_host = os.environ.get("FIREBASE_AUTH_EMULATOR_HOST", "").strip()
 _firebase_admin_options = firebase_admin_options()
@@ -228,7 +218,6 @@ app.add_middleware(
     ],
 )
 
-app.include_router(budget_choice.router)
 app.include_router(messaging.router)
 app.include_router(proactivity.router)
 app.include_router(dream_cohort.router)
@@ -270,7 +259,6 @@ app.include_router(integration.router)
 app.include_router(agents.router)
 app.include_router(users.router)
 app.include_router(support.router)
-app.include_router(referrals.router)
 app.include_router(csat.router)
 app.include_router(feedback_admin.router)
 app.include_router(email_preferences.router)
@@ -295,8 +283,6 @@ app.include_router(oauth.router)  # Added oauth router (for Omi Apps)
 app.include_router(auth.router)  # Added auth router (for the main Omi App, this is the core auth router)
 
 
-app.include_router(payment.router)
-app.include_router(storefront.router)
 app.include_router(api_key_management.mcp_router)
 app.include_router(mcp.router)
 app.include_router(mcp_sse.router)
@@ -316,7 +302,6 @@ app.include_router(agent_tools.router)
 app.include_router(tools.router)
 app.include_router(metrics.router)
 app.include_router(client_telemetry.router)
-app.include_router(fair_use_admin.router)
 app.include_router(staged_tasks.router)
 app.include_router(focus_sessions.router)
 app.include_router(advice.router)
@@ -376,10 +361,6 @@ app.add_middleware(TimeoutMiddleware, methods_timeout=methods_timeout, paths_tim
 from utils.byok import BYOKMiddleware
 
 app.add_middleware(BYOKMiddleware)
-
-from database.firestore_tier_context import FirestoreTierMiddleware
-
-app.add_middleware(FirestoreTierMiddleware)
 
 
 @app.on_event("startup")  # type: ignore[reportDeprecated]  # FastAPI on_event still functional; lifespan migration would change app wiring
@@ -555,7 +536,6 @@ async def shutdown_event():
     await shutdown_sync_metrics()
     await close_all_clients()
     close_posthog_control_plane()
-    close_free_tier_control_plane()
     stop_metrics_sidecar_server()
 
 

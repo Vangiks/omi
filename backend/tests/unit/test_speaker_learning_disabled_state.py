@@ -134,7 +134,6 @@ def test_invalidated_profile_records_disabled_when_consent_off(world):
 
 def test_tag_prompt_person_answer_consent_false_schedules_nothing(world, monkeypatch):
     world.store.rows[USER_PATH]['save_other_voice_profiles'] = False
-    monkeypatch.setattr(service, 'named_speaker_prompts_allowed', lambda uid: True)
     monkeypatch.setattr(
         service.voice_profiles_db,
         'get_voice_profile_settings',

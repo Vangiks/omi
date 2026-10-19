@@ -7,7 +7,6 @@ import {
   Brain,
   Bot,
   AudioLines,
-  CreditCard,
   Keyboard,
   Bell,
   Info,
@@ -23,7 +22,6 @@ export type SettingsTabId =
   | 'notifications'
   | 'privacy'
   | 'account'
-  | 'plan-usage'
   | 'shortcuts'
   | 'advanced'
   | 'about'
@@ -37,7 +35,6 @@ export const SETTINGS_TABS: { id: SettingsTabId; label: string; Icon: LucideIcon
   { id: 'notifications', label: 'Notifications', Icon: Bell },
   { id: 'privacy', label: 'Privacy', Icon: ShieldCheck },
   { id: 'account', label: 'Account', Icon: CircleUserRound },
-  { id: 'plan-usage', label: 'Plan & Usage', Icon: CreditCard },
   { id: 'shortcuts', label: 'Shortcuts', Icon: Keyboard },
   { id: 'advanced', label: 'Advanced', Icon: SlidersHorizontal },
   { id: 'about', label: 'About', Icon: Info }

@@ -11,7 +11,6 @@ from typing import Any, Mapping
 
 from google.cloud import firestore
 from google.cloud.firestore_v1 import FieldFilter
-from config.plan_catalog import resolve_subscription_entitlements
 from config.rate_card import (
     budget_units,
     normalize_transcription_provider,
@@ -41,6 +40,8 @@ COVERAGE_GAPS = (
     'gateway_delivery_best_effort',
     'search_vendor_request_fees',
 )
+# The fork has no plans (#3), so a user's month has no unit budget.
+NO_BUDGET: Mapping[str, Any] = {'entitlement_version': 'legacy', 'budget': None}
 
 
 def feature_class(raw: Any) -> str:
@@ -210,9 +211,7 @@ def get_usage_units(
     client = firestore_client or get_customer_firestore_client()
     user = client.collection('users').document(uid)
     if entitlements is None:
-        snap = user.get(['subscription'])
-        data = snap.to_dict() or {}
-        entitlements = resolve_subscription_entitlements(data.get('subscription') or {})
+        entitlements = NO_BUDGET
     totals: dict[str, int] = {}
     statuses: dict[str, dict[str, int]] = {}
     funding_totals: dict[str, int] = {}

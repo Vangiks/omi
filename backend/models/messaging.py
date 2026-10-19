@@ -36,7 +36,7 @@ class ChannelAvailability(BaseModel):
     """Whether this user may link a channel now, and why not. Content-free."""
 
     available: bool
-    # channel_disabled | account_deletion | paid_plan | channel_plan | seat_cap | unavailable
+    # channel_disabled | account_deletion | seat_cap | unavailable
     reason: Optional[str] = None
     waitlisted: bool = False
 

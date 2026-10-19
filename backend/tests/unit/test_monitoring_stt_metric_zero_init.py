@@ -40,7 +40,7 @@ def _startup_inventory():
     # provider clients are started. Import executes their real zero-init paths.
     metrics = importlib.import_module('utils.metrics')
     gateway_metrics = importlib.import_module('llm_gateway.gateway.metrics')
-    for name in ('fallback', 'transcription', 'subscription_events'):
+    for name in ('fallback', 'transcription'):
         importlib.import_module(f'utils.observability.{name}')
     importlib.import_module('utils.stt.stream_close')
     connect = importlib.import_module('utils.stt.connect_metrics')

@@ -16,10 +16,9 @@ from fastapi.testclient import TestClient
 
 import desktop_backend
 from database import users as users_db
-from models.users import PlanType
 from routers import desktop_chat
 from tests.unit.test_desktop_backend_cors import _test_client
-from utils import byok, subscription
+from utils import byok
 from utils.byok import get_byok_key
 from utils.other import endpoints
 
@@ -64,7 +63,7 @@ def authenticated_anthropic_chat(monkeypatch):
         'last_seen_at': datetime.now(timezone.utc),
         'fingerprints': {'anthropic': hashlib.sha256(api_key.encode()).hexdigest()},
     }
-    calls = {'clients': [], 'messages': [], 'quota_reads': [], 'cost_exclusions': [], 'quota_questions': []}
+    calls = {'clients': [], 'messages': [], 'cost_exclusions': [], 'quota_questions': []}
     monkeypatch.setenv('ADMIN_KEY', admin_key)
     monkeypatch.setenv('ADMIN_KEY_AUTH_ENABLED', 'true')
     monkeypatch.setattr(byok, '_byok_state_cache', TTLCache(maxsize=1, ttl=30))
@@ -74,21 +73,7 @@ def authenticated_anthropic_chat(monkeypatch):
     monkeypatch.setattr(endpoints, '_enforce_cutover_http_if_request', lambda *_args: None)
     monkeypatch.setattr(endpoints, 'record_user_platform', lambda *_args: None)
     monkeypatch.setattr(endpoints, 'record_client_device', lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(subscription, 'is_trial_paywalled', lambda *_args, **_kwargs: False)
-    monkeypatch.setattr(subscription, 'get_customer_firestore_client', lambda: None)
 
-    def exhausted_managed_quota(*_args, **_kwargs):
-        calls['quota_reads'].append(get_byok_key('anthropic'))
-        return {
-            'allowed': False,
-            'plan': PlanType.basic,
-            'unit': 'questions',
-            'used': 30,
-            'limit': 30,
-            'reset_at': '2030-01-01T00:00:00Z',
-        }
-
-    monkeypatch.setattr(subscription, 'get_chat_quota_snapshot', exhausted_managed_quota)
     monkeypatch.setattr(desktop_chat, 'llm_stub_enabled', lambda: False)
     monkeypatch.setattr(desktop_chat, 'should_route_chat_agent_through_gateway', lambda: True)
     monkeypatch.setattr(desktop_chat, 'get_customer_firestore_client', lambda: None)
@@ -158,7 +143,7 @@ def authenticated_anthropic_chat(monkeypatch):
 
 
 @pytest.mark.parametrize('streaming', [False, True])
-def test_authenticated_enrolled_anthropic_uses_customer_key_with_exhausted_managed_quota(
+def test_authenticated_enrolled_anthropic_uses_customer_key(
     authenticated_anthropic_chat, streaming
 ):
     app, headers, calls = authenticated_anthropic_chat
@@ -171,18 +156,11 @@ def test_authenticated_enrolled_anthropic_uses_customer_key_with_exhausted_manag
     assert 'Synthetic BYOK response' in response.text
     assert calls['clients'] == [headers['X-BYOK-Anthropic']]
     assert calls['messages'][0]['model'] == 'claude-sonnet-4-6'
-    assert calls['quota_reads'] == []
     assert calls['quota_questions'] == ['desktop-anthropic-byok-fixture']
     assert [entry['cost_exclusion'] for entry in calls['cost_exclusions']] == ['byok_provider_cost']
 
-    without_key = {name: value for name, value in headers.items() if name != 'X-BYOK-Anthropic'}
-    next_response = client.post('/v2/chat/completions', headers=without_key, json=body)
-    assert next_response.status_code == 402
-    assert calls['quota_reads'] == [None]
-    assert len(calls['clients']) == 1
 
-
-def test_missing_desktop_byok_middleware_reproduces_managed_quota_failure(authenticated_anthropic_chat):
+def test_missing_desktop_byok_middleware_never_uses_the_customer_key(authenticated_anthropic_chat):
     app, headers, calls = authenticated_anthropic_chat
     # Reproduce the desktop serving app before #20931 without modifying source.
     app.user_middleware = [item for item in app.user_middleware if item.cls is not byok.BYOKMiddleware]
@@ -192,9 +170,7 @@ def test_missing_desktop_byok_middleware_reproduces_managed_quota_failure(authen
         json={'model': 'omi-sonnet', 'messages': [{'role': 'user', 'content': 'hello'}]},
     )
 
-    assert response.status_code == 402
-    assert response.json()['detail']['error'] == 'quota_exceeded'
-    assert calls['quota_reads'] == [None]
+    assert response.status_code != 200
     assert calls['clients'] == []
     assert calls['messages'] == []
     assert calls['cost_exclusions'] == []
@@ -211,5 +187,4 @@ def test_authenticated_anthropic_fingerprint_mismatch_never_calls_provider(authe
 
     assert response.status_code == 403
     assert response.json()['detail'] == 'BYOK key fingerprint mismatch for provider: anthropic'
-    assert calls['quota_reads'] == []
     assert calls['clients'] == []

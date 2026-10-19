@@ -34,7 +34,6 @@ def world(monkeypatch):
             'firebase_admin.auth': AutoMockModule('firebase_admin.auth'),
             'utils.executors': AutoMockModule('utils.executors'),
             'utils.llm': llm,
-            'utils.llm.notifications': AutoMockModule('utils.llm.notifications'),
             'utils.metrics': AutoMockModule('utils.metrics'),
             'utils.task_sync': AutoMockModule('utils.task_sync'),
         }

@@ -828,9 +828,9 @@ class TranscriptProcessor:
         delivered = await self._deliver_segments(client_segments)
         if delivered and client_segments:
             self.host.complete_live_transcription()
-        if self.host.transcript_send is not None and self.host.user_has_credits:
+        if self.host.transcript_send is not None:
             self.host.transcript_send([transcript_segment_for_client(segment.model_dump()) for segment in new_segments])
-        elif not self.host.pusher_enabled and self.host.user_has_credits:
+        elif not self.host.pusher_enabled:
             try:
                 await trigger_realtime_integrations(
                     self.host.request.uid,
@@ -1554,8 +1554,6 @@ class TranscriptProcessor:
                     _observe_refusal(speaker, 'queue_full', segment.speaker_id_scope)
             detection = detect_speaker_introduction(segment.text, language=self.host.language)
             if not detection:
-                continue
-            if not await speaker.named_speakers_allowed():
                 continue
             name = detection.name
             # The owner is identified by voice, never by hearing their own name: minting

@@ -24,13 +24,11 @@ from config.desktop_gemini_attribution_generated import (
     GEMINI_LANE_WIRE_VALUES,
     GEMINI_WORKLOADS,
 )
-from config.plan_catalog import PlanType
 from routers import desktop_proxy
 from scripts import generate_desktop_gemini_attribution as generator
 from utils.llm import desktop_gemini_gateway
 from utils.llm import desktop_gemini_telemetry
 from utils.llm import vertex_pt_routing as ptr
-from utils.managed_compute import Decision
 from utils.other.endpoints import get_current_user_uid
 
 CANONICAL_PATH = BACKEND_DIR / 'config' / 'desktop_gemini_attribution.json'
@@ -246,17 +244,6 @@ def test_no_raw_proxy_url_or_attribution_headers_outside_transport_owners(chunk)
     assert offenders == []
 
 
-def _decision(*, allowed: bool, reason: str, plan: PlanType | None = PlanType.basic) -> Decision:
-    return Decision(
-        allowed=allowed,
-        reason=reason,
-        feature=desktop_proxy._PLAN_GATED_PROXY_FEATURE,
-        funding_owner='omi',
-        plan=plan,
-        plan_resolved=plan is not None,
-    )
-
-
 async def _passthrough_run_blocking(_, function, *args, **kwargs):
     return function(*args, **kwargs)
 
@@ -275,12 +262,6 @@ def client_app(monkeypatch):
     app.include_router(desktop_proxy.router)
     app.dependency_overrides[get_current_user_uid] = lambda: 'uid-test'
     monkeypatch.setattr(desktop_proxy, 'run_blocking', _passthrough_run_blocking)
-    monkeypatch.setattr(desktop_proxy, 'is_desktop_trial_paywalled', lambda *a, **k: False)
-    monkeypatch.setattr(
-        desktop_proxy,
-        'authorize_managed_compute',
-        lambda *a, **k: _decision(allowed=True, reason='plan_paid', plan=PlanType.plus),
-    )
     monkeypatch.setattr(desktop_proxy, 'get_byok_key', lambda *a, **k: None)
     monkeypatch.setattr(desktop_proxy, 'llm_stub_enabled', lambda: False)
     monkeypatch.setattr(desktop_proxy, '_meter_server_request', lambda uid, path, m, a: _return(path))
@@ -412,9 +393,6 @@ def _metering_failure(retryable: bool):
 @pytest.mark.parametrize(
     'scenario',
     [
-        'plan_gated',
-        'trial_expired',
-        'authorization_unavailable',
         'rate_limited_retryable',
         'rate_limited_terminal',
         'oversized_body',
@@ -432,27 +410,7 @@ def test_rejection_emits_one_fully_attributed_terminal(no_dispatch, capsys, monk
     expected_model = 'gemini-2.5-flash'
     expected_action = action
 
-    if scenario == 'plan_gated':
-        monkeypatch.setattr(
-            desktop_proxy,
-            'authorize_managed_compute',
-            lambda *a, **k: _decision(allowed=False, reason='basic_not_entitled'),
-        )
-        expected_status = 402
-        expected_outcome = 'plan_gated'
-    elif scenario == 'trial_expired':
-        monkeypatch.setattr(desktop_proxy, 'is_desktop_trial_paywalled', lambda *a, **k: True)
-        expected_status = 402
-        expected_outcome = 'trial_expired'
-    elif scenario == 'authorization_unavailable':
-        monkeypatch.setattr(
-            desktop_proxy,
-            'authorize_managed_compute',
-            lambda *a, **k: _decision(allowed=False, reason='authorization_unavailable', plan=None),
-        )
-        expected_status = 503
-        expected_outcome = 'authorization_unavailable'
-    elif scenario.startswith('rate_limited'):
+    if scenario.startswith('rate_limited'):
         retryable = scenario == 'rate_limited_retryable'
         monkeypatch.setattr(desktop_proxy, '_meter_server_request', _metering_failure(retryable))
         expected_status = 429
@@ -470,10 +428,6 @@ def test_rejection_emits_one_fully_attributed_terminal(no_dispatch, capsys, monk
 
     response = TestClient(no_dispatch).post(f'{route}/{path}', content=_body(), headers=headers)
     assert response.status_code == expected_status
-    if scenario == 'plan_gated':
-        assert response.json()['detail']['error'] == 'plan_gated'
-    elif scenario == 'trial_expired':
-        assert response.json()['detail'] == 'trial_expired'
 
     events = _events(capsys)
     assert len(events) == 1

@@ -4,8 +4,7 @@ This fixture models document-reference ``get(transaction=...)`` plus transaction
 ``create``, ``set``, and ``update``. It enforces Firestore's rule that every
 transactional read must occur before the first transactional write.
 
-It also supports the direct-document is_locked projection used at dispatch,
-and equality-only, document-id projections with a positive limit,
+It also supports equality-only, document-id projections with a positive limit,
 proven by daily_memory_sweep_emulator_test.py for legacy window fence admission.
 Projected client BatchGet of folder membership is covered by
 test_folder_delete_concurrency_emulator.py; all of its reads obey the same
@@ -91,19 +90,17 @@ class StrictFirestoreDocument:
         data = self._database.rows.get(self.path)
         if field_paths is not None and data is not None:
             if field_paths not in (
-                ["is_locked"],
                 ["folder_id"],
                 ['manual_speaker_assignments', 'manual_speaker_assignments_compressed'],
                 [
                     'deleted',
                     'discarded',
-                    'is_locked',
                     'manual_speaker_assignments',
                     'manual_speaker_assignments_compressed',
                 ],
             ):
                 raise UnsupportedFirestoreOperationError(
-                    "only privacy, folder membership and speaker-receipt projections are supported"
+                    "only folder membership and speaker-receipt projections are supported"
                 )
             data = {key: value for key, value in data.items() if key in field_paths}
         return StrictFirestoreSnapshot(data)

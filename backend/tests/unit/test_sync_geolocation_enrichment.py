@@ -76,7 +76,6 @@ def _build_pipeline_fakes() -> dict:
         'utils.dream_vocabulary',
         'utils.sync.bridge',
         'utils.executors',
-        'utils.fair_use',
         'utils.http_client',
         'utils.metrics',
         'utils.observability.fallback',
@@ -128,7 +127,6 @@ def _prepare(pipeline, wav_paths):
     pipeline.bind_or_converge_sync_ledger_completion = MagicMock(return_value=None)
     pipeline._reprocess_merged_conversations = MagicMock()
     pipeline._load_sync_segment_context = _fake_load_segment_context
-    pipeline.FAIR_USE_ENABLED = False
 
     captured = []
 
@@ -160,7 +158,7 @@ async def test_coordinator_enriches_geolocation_once_before_segments(pipeline):
     pipeline.async_resolve_geolocation = _fake_resolver
 
     await pipeline._run_full_pipeline_background_async(
-        'job-geo-1', 'uid', ['/tmp/a.opus', '/tmp/b.opus'], 'omi', False, '/tmp/job-geo-1', geolocation=raw
+        'job-geo-1', 'uid', ['/tmp/a.opus', '/tmp/b.opus'], 'omi', '/tmp/job-geo-1', geolocation=raw
     )
 
     # One geocode per job, not per segment.
@@ -181,7 +179,7 @@ async def test_coordinator_keeps_raw_geolocation_when_geocode_fails(pipeline):
     pipeline.async_resolve_geolocation = _failing_resolver
 
     await pipeline._run_full_pipeline_background_async(
-        'job-geo-2', 'uid', ['/tmp/a.opus'], 'omi', False, '/tmp/job-geo-2', geolocation=raw
+        'job-geo-2', 'uid', ['/tmp/a.opus'], 'omi', '/tmp/job-geo-2', geolocation=raw
     )
 
     # The pin survives without an address — never dropped to None.
@@ -211,9 +209,7 @@ async def test_coordinator_without_geolocation_never_attempts_a_geocode(pipeline
 
     pipeline.async_resolve_geolocation = _resolver
 
-    await pipeline._run_full_pipeline_background_async(
-        'job-geo-3', 'uid', ['/tmp/a.opus'], 'omi', False, '/tmp/job-geo-3'
-    )
+    await pipeline._run_full_pipeline_background_async('job-geo-3', 'uid', ['/tmp/a.opus'], 'omi', '/tmp/job-geo-3')
 
     assert resolver_calls == [None]  # called exactly once, with None
     assert geocode_attempts == []  # zero geocode attempts
@@ -254,7 +250,7 @@ async def test_partial_batch_carries_one_strike_and_keeps_the_healthy_sibling(pi
             retryable=False,
         )
         # The real process_segment releases the assignment slot in finally.
-        args[5].complete(path)
+        args[4].complete(path)
         if path.endswith('a.wav'):
             errors.append('sync_persistence_failed')
             kwargs['deferred_outcome'].update(
@@ -271,7 +267,6 @@ async def test_partial_batch_carries_one_strike_and_keeps_the_healthy_sibling(pi
         'uid',
         ['/tmp/a.opus'],
         'omi',
-        False,
         '/tmp/job-partial-strike',
         content_id='batch',
         content_run_bound=True,

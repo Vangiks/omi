@@ -36,7 +36,7 @@ from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
 
-from utils.llm.model_config import LUNA_MODEL
+from utils.llm.model_config import LUNA_MODEL, _PINNED_FEATURES
 from utils.llm.clients import (
     MODEL_QOS_PROFILES,
     _STRUCTURED_OUTPUT_FEATURES,
@@ -413,5 +413,6 @@ class TestP13_QosInfo:
 
     def test_pinned_features_included(self):
         info = get_qos_info()
-        assert 'fair_use' in info
-        assert info['fair_use']['model'] == LUNA_MODEL
+        for feature, (model, provider) in _PINNED_FEATURES.items():
+            assert info[feature]['model'] == model
+            assert info[feature]['provider'] == provider

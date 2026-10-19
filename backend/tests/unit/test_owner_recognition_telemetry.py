@@ -279,12 +279,6 @@ def test_process_conversation_observes_every_successful_persist():
     assert isinstance(fence_node.body[-1], ast.Return)
     assert isinstance(fence_node.body[-1].value, ast.Name)
     assert fence_node.body[-1].value.id == 'conversation'
-    for marker in (
-        'report_persistence(\n                persisted,',
-        'if plan.mode == \'store_projection\'',
-        'eager_basic_deny',
-    ):
-        assert marker in body
     assert 'prior_completed' not in body
 
 
@@ -622,7 +616,6 @@ def _stub_sync_enrichment(monkeypatch, store):
 
     monkeypatch.setattr(module.conversations_db, 'update_conversation', _update)
     monkeypatch.setattr(module.users_db, 'get_user_speaker_embedding', lambda _uid: [0.2, 0.3])
-    monkeypatch.setattr(module, 'is_trial_paywalled', lambda *args, **kwargs: False)
 
 
 def test_sync_intake_then_first_enrichment_counts_once(monkeypatch):
@@ -715,59 +708,12 @@ def _desktop_projection() -> ClientProcessing:
     )
 
 
-def _stub_desktop_terminal(monkeypatch):
+def _stub_desktop_persist(monkeypatch):
     module = process_conversation_mod
-    monkeypatch.setattr(module, 'is_trial_paywalled', lambda *args, **kwargs: False)
     monkeypatch.setattr(module, 'link_duplicate_captures', lambda *args, **kwargs: None)
     monkeypatch.setattr(module.lifecycle_service, 'create_completed_conversation', lambda *args, **kwargs: True)
     monkeypatch.setattr(module.lifecycle_service, 'persist_processed_conversation', lambda *args, **kwargs: True)
     monkeypatch.setattr(module.users_db, 'get_user_speaker_embedding', lambda _uid: [0.2])
-
-
-@pytest.mark.parametrize('mode', ['store_projection', 'deterministic_minimum', 'eager_denial'])
-def test_desktop_terminal_paths_count_once(monkeypatch, mode):
-    module = process_conversation_mod
-    _stub_desktop_terminal(monkeypatch)
-    before = _count(
-        OWNER_RECOGNITION_CONVERSATIONS,
-        surface='desktop',
-        source='desktop',
-        outcome='single_speaker_all_owner',
-    )
-    if mode == 'eager_denial':
-        monkeypatch.setattr(module, 'free_tier_local_processing_enabled', lambda uid: False)
-        monkeypatch.setattr(module, 'basic_plan_gate_eager_extraction_enabled', lambda: True)
-        monkeypatch.setattr(
-            module,
-            '_flag_off_identified_basic_deny',
-            lambda *args, **kwargs: module.FreeTierProcessingPlan(
-                mode='deterministic_minimum', reason='basic_not_entitled', decision=None
-            ),
-        )
-        stored = module.process_conversation('uid', 'en', _desktop_capture(), trigger=ProcessingTrigger.FIRST_OPEN)
-    else:
-        monkeypatch.setattr(module, 'free_tier_local_processing_enabled', lambda uid: True)
-        monkeypatch.setattr(
-            module,
-            'resolve_free_tier_processing_plan',
-            lambda **kwargs: module.FreeTierProcessingPlan(mode=mode, reason='basic_not_entitled', decision=None),
-        )
-        stored = module.process_conversation(
-            'uid',
-            'en',
-            _desktop_capture(),
-            client_projection=_desktop_projection() if mode == 'store_projection' else None,
-        )
-    assert stored.status == ConversationStatus.completed
-    assert _count(
-        OWNER_RECOGNITION_CONVERSATIONS,
-        surface='desktop',
-        source='desktop',
-        outcome='single_speaker_all_owner',
-    ) == pytest.approx(before + 1)
-    total = _conversation_total()
-    module.process_conversation('uid', 'en', stored, trigger=ProcessingTrigger.USER_REPROCESS)
-    assert _conversation_total() == pytest.approx(total)
 
 
 def _stub_completed_reprocess(monkeypatch):
@@ -790,24 +736,20 @@ def _stub_completed_reprocess(monkeypatch):
 
 
 def test_deferred_desktop_projection_counts_on_first_completed_reprocess(monkeypatch):
+    """A conversation deferred before #17 is observed once, on its first-open reprocess."""
     module = process_conversation_mod
-    _stub_desktop_terminal(monkeypatch)
+    _stub_desktop_persist(monkeypatch)
     _stub_completed_reprocess(monkeypatch)
-    monkeypatch.setattr(module, 'free_tier_local_processing_enabled', lambda uid: False)
-    monkeypatch.setattr(module, 'should_defer_desktop_processing', lambda uid: True)
-    monkeypatch.setattr(module, 'basic_plan_gate_eager_extraction_enabled', lambda: False)
-    monkeypatch.setattr(module.lifecycle_service, 'create_processing_conversation', lambda *args, **kwargs: True)
-    before = _conversation_total()
-    deferred = module.process_conversation(
-        'uid',
-        'en',
-        _desktop_capture(),
-        client_projection=_desktop_projection(),
+    capture = _desktop_capture()
+    deferred = Conversation(
+        id='deferred-1',
+        created_at=capture.started_at,
+        structured=build_deterministic_minimum_structured(capture),
+        **capture.model_dump(),
     )
-    assert deferred.status == ConversationStatus.processing
-    assert deferred.deferred is True
-    assert deferred.client_processing is not None
-    assert deferred.processing_state is None
+    deferred.status = ConversationStatus.processing
+    deferred.deferred = True
+    deferred.client_processing = _desktop_projection()
     assert structured_is_rich(deferred.structured) is False
     assert (
         owner_recognition_already_observed(
@@ -817,7 +759,7 @@ def test_deferred_desktop_projection_counts_on_first_completed_reprocess(monkeyp
         )
         is False
     )
-    assert _conversation_total() == pytest.approx(before)
+    before = _conversation_total()
     stored = module.process_conversation('uid', 'en', deferred, trigger=ProcessingTrigger.USER_REPROCESS)
     assert stored.status == ConversationStatus.completed
     assert _conversation_total() == pytest.approx(before + 1)
@@ -827,15 +769,10 @@ def test_deferred_desktop_projection_counts_on_first_completed_reprocess(monkeyp
 
 def test_observer_failure_cannot_skip_persistence_callbacks(monkeypatch):
     module = process_conversation_mod
-    _stub_desktop_terminal(monkeypatch)
-    monkeypatch.setattr(module, 'free_tier_local_processing_enabled', lambda uid: True)
-    monkeypatch.setattr(
-        module,
-        'resolve_free_tier_processing_plan',
-        lambda **kwargs: module.FreeTierProcessingPlan(
-            mode='store_projection', reason='basic_not_entitled', decision=None
-        ),
-    )
+    _stub_desktop_persist(monkeypatch)
+    _stub_completed_reprocess(monkeypatch)
+    monkeypatch.setattr(module.folders_db, 'get_folders', lambda _uid: [])
+    monkeypatch.setattr(module.folders_db, 'initialize_system_folders', lambda _uid: [])
 
     def _boom(*args, **kwargs):
         raise RuntimeError('emit failed')
@@ -858,13 +795,9 @@ def test_observer_failure_cannot_skip_persistence_callbacks(monkeypatch):
             _desktop_capture(),
             client_projection=_desktop_projection(),
             persistence_observer=lambda current: seen.append(('persist', current)),
-            derived_effects_disposition_observer=lambda disposition: seen.append(('disposition', disposition)),
         )
     finally:
         module.logger.removeHandler(handler)
         module.logger.setLevel(previous_level)
     assert stored.status == ConversationStatus.completed
-    assert seen == [
-        ('persist', True),
-        ('disposition', module.DerivedEffectsDisposition.TERMINAL_NO_DERIVED_EFFECTS),
-    ]
+    assert seen == [('persist', True)]

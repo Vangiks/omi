@@ -132,7 +132,7 @@ def world(monkeypatch):
     def write(descriptions, trigger=Trigger.SMART_MERGE, cid='survivor'):
         items = [SimpleNamespace(**item(desc)) for desc in descriptions]
         conversation = SimpleNamespace(
-            id=cid, is_locked=False, sync_content_revision=1, structured=SimpleNamespace(action_items=items)
+            id=cid, sync_content_revision=1, structured=SimpleNamespace(action_items=items)
         )
         pc._write_action_items(UID, conversation, trigger)
 

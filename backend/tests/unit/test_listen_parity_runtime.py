@@ -137,11 +137,7 @@ def _install_runtime_fakes(monkeypatch, runtime, stt_sockets, blocking_calls):
     async def load_base(*_args, **_kwargs):
         return ListenConnectBase(
             user_exists=True,
-            user_has_credits=True,
             transcription_prefs={'single_language_mode': False, 'uses_custom_stt': False},
-            fair_use_init_stage=None,
-            fair_use_track_dg_usage=False,
-            fair_use_dg_budget_exhausted=False,
         )
 
     async def create_stt_socket(_receiver, callback, _sample_rate, modulate_callback=None, epoch=None):
@@ -168,7 +164,6 @@ def _install_runtime_fakes(monkeypatch, runtime, stt_sockets, blocking_calls):
         'get_stt_service_for_language',
         lambda *_args, **_kwargs: (STTService.parakeet, 'en', 'parakeet_streaming'),
     )
-    monkeypatch.setattr(runtime_module, 'FAIR_USE_ENABLED', False)
     monkeypatch.setattr(runtime_module, 'PUSHER_ENABLED', False)
     monkeypatch.setattr(runtime_module, 'should_load_speech_profile', lambda **_kwargs: False)
     monkeypatch.setattr(runtime_module, 'should_enable_speaker_identification', lambda **_kwargs: False)

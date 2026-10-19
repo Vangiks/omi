@@ -34,7 +34,6 @@ from fastapi import HTTPException
 _stub_modules = [
     'database._client',
     'database.redis_db',
-    'database.fair_use',
     'database.users',
     'database.user_usage',
     'database.conversations',
@@ -62,8 +61,6 @@ _stub_modules = [
     'utils.speaker_assignment',
     'utils.speaker_identification',
     'utils.stt.speaker_embedding',
-    'utils.fair_use',
-    'utils.subscription',
     'utils.log_sanitizer',
     'utils.executors',
     'pydub',
@@ -190,28 +187,12 @@ _ensure_attrs(
 )
 _ensure_attrs('utils.stt.pre_recorded', ['postprocess_words', 'prerecorded'])
 _ensure_attrs('utils.stt.vad', ['vad_is_empty'])
-_ensure_attrs(
-    'utils.fair_use',
-    [
-        'record_speech_ms',
-        'get_rolling_speech_ms',
-        'check_soft_caps',
-        'is_hard_restricted',
-        'trigger_classifier_if_needed',
-        'is_dg_budget_exhausted',
-        'get_enforcement_stage',
-        'record_dg_usage_ms',
-        'FAIR_USE_ENABLED',
-        'FAIR_USE_RESTRICT_DAILY_DG_MS',
-    ],
-)
 _ensure_attrs('utils.speaker_assignment', ['process_speaker_assigned_segments'])
 _ensure_attrs('utils.speaker_identification', ['detect_speaker_from_text'])
 _ensure_attrs(
     'utils.stt.speaker_embedding',
     ['extract_embedding_from_bytes', 'compare_embeddings', 'speaker_embedding_configured', 'SPEAKER_MATCH_THRESHOLD'],
 )
-_ensure_attrs('utils.subscription', ['has_transcription_credits'])
 _ensure_attrs('pydub', ['AudioSegment'])
 _ensure_attrs('models.conversation_enums', ['CategoryEnum'])
 

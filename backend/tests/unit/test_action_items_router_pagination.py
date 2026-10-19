@@ -17,12 +17,11 @@ def _disable_list_cache(monkeypatch):
     monkeypatch.setattr(action_items_router, 'list_cache_ttl_seconds', lambda: 0)
 
 
-def _item(item_id: str, *, locked: bool = False, description: str = 'Do a thing') -> dict:
+def _item(item_id: str, *, description: str = 'Do a thing') -> dict:
     return {
         'id': item_id,
         'description': description,
         'completed': False,
-        'is_locked': locked,
     }
 
 
@@ -66,15 +65,3 @@ def test_page_uses_one_row_lookahead(rows, expected_ids, expected_has_more):
     )
     assert [item.id for item in response['action_items']] == expected_ids
     assert response['has_more'] is expected_has_more
-
-
-def test_lookahead_row_is_trimmed_before_locked_item_redaction():
-    extra_description = 'x' * 80
-    rows = [_item('one'), _item('two'), _item('lookahead', locked=True, description=extra_description)]
-
-    with patch.object(action_items_router.action_items_db, 'get_action_items', return_value=rows):
-        response = _call(limit=2)
-
-    assert [item.id for item in response['action_items']] == ['one', 'two']
-    assert response['has_more'] is True
-    assert rows[2]['description'] == extra_description

@@ -370,7 +370,6 @@ def test_speaker_resolution_reuses_its_full_list_without_an_extra_query(monkeypa
     stage = resolution_module
     monkeypatch.delenv('CONVERSATION_KNOWN_SPELLINGS', raising=False)
     monkeypatch.setattr(stage, 'load_owner_embedding', lambda *args, **kwargs: None)
-    monkeypatch.setattr(stage, 'named_speaker_prompts_allowed', lambda uid: True)
     original_read = MagicMock(return_value=people)
     monkeypatch.setattr(stage.users_db, 'get_people', original_read)
     extra_read = MagicMock(side_effect=AssertionError('unexpected second People query'))

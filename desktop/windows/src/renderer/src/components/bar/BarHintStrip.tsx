@@ -3,7 +3,7 @@
 // "Transcription failed…". It sits just BELOW the collapsed pill (the bar window
 // is oversized and mostly transparent, so there is room), because during a
 // summon-hotkey hold the bar is a pill, not the expanded panel — the panel's
-// limit-notice strip is invisible then.
+// notice strip is invisible then.
 //
 // Mac parity: macOS renders the same text INLINE in the notch
 // (FloatingControlBarView `Text(state.pttHintText)`, set by

@@ -9,7 +9,6 @@ Design:
 - Single Redis sorted set per UID with minute-granularity buckets.
 - Atomic Lua script: prune stale entries → sum consumed → reject or record.
 - Fail-open on Redis errors (consistent with existing rate limiting).
-- Separate namespace from fair_use.py DG budget (different purpose/scope).
 - WebSocket PTT sessions atomically reserve up to MAX_SESSION_DURATION_S at
   connect (force=2), then settle to actual duration at end (refund unused).
   Probe-only admission + force-record at end is unsafe under concurrency.

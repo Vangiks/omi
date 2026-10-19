@@ -57,6 +57,4 @@ Tests: `web/admin/lib/__tests__/replacement-reliability.test.tsx` and
 ## Warehouse
 
 `lib/services/gcp-billing.ts` still reads the direct BigQuery billing export.
-`lib/services/plan-economics.ts` still reads `omi_finops.unit_cost_daily`,
-`plan_revenue_daily`, and `unit_cost_reconciliation`. Net remains gross plus
-credits. No day/project/service/SKU warehouse was added.
+Net remains gross plus credits. No day/project/service/SKU warehouse was added.

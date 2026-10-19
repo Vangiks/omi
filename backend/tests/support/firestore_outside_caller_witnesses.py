@@ -15,7 +15,6 @@ import pytest
 
 import routers.desktop_prompts as desktop_prompts_router
 import routers.desktop_tts_updates as desktop_tts_updates_router
-import routers.fair_use_admin as fair_use_admin_router
 import utils.task_intelligence.chat_first_materialization_health as health
 from tests.support.firestore_caller_witnesses import (
     CallerWitness,
@@ -28,7 +27,6 @@ TARGETS = frozenset(
     {
         'database.serving_query_reads.list_active_desktop_prompt_snapshots',
         'database.serving_query_reads.list_desktop_release_snapshots',
-        'database.serving_query_reads.find_fair_use_case_snapshots',
         'utils.task_intelligence.chat_first_materialization_health._documents',
     }
 )
@@ -40,14 +38,6 @@ def _run_desktop_prompts(monkeypatch: pytest.MonkeyPatch, capture: HelperCapture
 
 def _run_release_models(monkeypatch: pytest.MonkeyPatch, capture: HelperCapture) -> None:
     trial(capture, desktop_tts_updates_router._release_models)
-
-
-def _run_lookup_case(monkeypatch: pytest.MonkeyPatch, capture: HelperCapture) -> None:
-    trial(capture, fair_use_admin_router.lookup_case, 'case-1', admin_id='admin-1')
-
-
-def _run_public_case_status(monkeypatch: pytest.MonkeyPatch, capture: HelperCapture) -> None:
-    trial(capture, fair_use_admin_router.get_public_case_status, 'case-1')
 
 
 def _run_health_collect(monkeypatch: pytest.MonkeyPatch, capture: HelperCapture) -> None:
@@ -100,22 +90,6 @@ WITNESSES: dict[str, CallerWitness] = {
             ('request',),
             1,
             _run_release_models,
-        ),
-        CallerWitness(
-            'routers/fair_use_admin.py:lookup_case:database.serving_query_reads.find_fair_use_case_snapshots',
-            'database.serving_query_reads.find_fair_use_case_snapshots',
-            'routers.fair_use_admin.find_fair_use_case_snapshots',
-            ('request',),
-            1,
-            _run_lookup_case,
-        ),
-        CallerWitness(
-            'routers/fair_use_admin.py:get_public_case_status:database.serving_query_reads.find_fair_use_case_snapshots',
-            'database.serving_query_reads.find_fair_use_case_snapshots',
-            'routers.fair_use_admin.find_fair_use_case_snapshots',
-            ('request',),
-            1,
-            _run_public_case_status,
         ),
         CallerWitness(
             'utils/task_intelligence/chat_first_materialization_health.py:collect:utils.task_intelligence.chat_first_materialization_health._documents',

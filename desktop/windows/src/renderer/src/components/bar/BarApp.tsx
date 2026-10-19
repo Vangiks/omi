@@ -26,7 +26,7 @@ import { BarChatSurface } from './BarChatSurface'
 import { AgentPillView } from './AgentPillView'
 import type { AgentPill } from './agentPills'
 import { BarHintStrip } from './BarHintStrip'
-import { createBarSender } from './barSend'
+import { sendFromBar } from './barSend'
 import {
   constantLevelWaveformSource,
   deriveOrbState,
@@ -139,28 +139,7 @@ export function BarApp(): React.JSX.Element {
   }, [])
 
   // --- chat viewport (projected from the main window) -------------------------
-  // Every bar send — typed submit AND PTT commit — goes through the usage-limit
-  // gate (barSend.ts). A refused send never reaches the engine; it returns the
-  // limit line, which the bar shows inline while the main window raises the
-  // shared popup (and speaks it back for a voice turn). The quota is a cached
-  // snapshot, refreshed on mount + each reveal, so the send path stays off the
-  // network.
-  const [sender] = useState(() => createBarSender())
-  const [limitNotice, setLimitNotice] = useState<string | null>(null)
-  // Resolves to the blocked-limit notice (null when the send went out) so the
-  // typed surface can put the user's words back in the input instead of eating
-  // them — a refused send never lands in the transcript.
-  const sendFromBar = useCallback(
-    async (text: string, fromVoice: boolean): Promise<string | null> => {
-      const notice = await sender.send(text, fromVoice)
-      setLimitNotice(notice)
-      return notice
-    },
-    [sender]
-  )
-  useEffect(() => {
-    void sender.sync()
-  }, [sender])
+  // Every bar send — typed submit AND PTT commit — goes through barSend.ts.
   useEffect(() => window.omiBar.onChatState((s) => setChat(s)), [])
   // Pull the current thread on mount (in case we missed prior broadcasts).
   useEffect(() => window.omiBar.requestChatState(), [])
@@ -171,16 +150,7 @@ export function BarApp(): React.JSX.Element {
   // aborts to it). See useVoicePlaneSupervisor.
   const voiceSupNoteCancelRef = useRef<() => void>(() => {})
   const ptt = usePushToTalk({
-    // A blocked voice turn involves no draft — the main window speaks the line.
-    onCommit: (text) => void sendFromBar(text, true),
-    // Pre-capture usage veto (macOS PushToTalkManager.isBlockedByUsageLimit): refuse
-    // a PTT hold BEFORE the mic opens when the user is over their monthly chat cap,
-    // instead of recording + transcribing a whole turn only to refuse it at send.
-    // sender.checkSync reads the already-synced local snapshot — synchronous and
-    // fail-open, so the press never awaits. On a block we raise the shared popup on
-    // the main window (spoken:false — the gesture veto is visual only, matching Mac).
-    checkUsageLimit: () => sender.checkSync(),
-    onUsageLimitBlocked: (message) => window.omiBar.notifyUsageLimit({ message, spoken: false }),
+    onCommit: (text) => sendFromBar(text, true),
     // Barge-in: a new PTT hold cuts off Omi's still-playing spoken reply. The
     // reply plays in the MAIN window (useChat → voiceController), so hop over the
     // bar→main bridge; ChatBridgeHost calls interruptCurrentResponse there.
@@ -341,17 +311,10 @@ export function BarApp(): React.JSX.Element {
   }, [ready])
 
   // --- main → renderer lifecycle ---------------------------------------------
-  const senderRef = useRef(sender)
-  // eslint-disable-next-line react-hooks/refs -- latest-ref for the once-registered IPC listener
-  senderRef.current = sender
   useEffect(() => {
     return window.omiBar.onShow((p: BarShowPayload) => {
       setMode(p.mode)
       setSliding('in')
-      // A fresh reveal drops a stale limit notice and re-reads the quota, so the
-      // next send checks a current snapshot without touching the network itself.
-      setLimitNotice(null)
-      void senderRef.current.sync()
       // Each fresh reveal starts at the list (a summon is a pill; expanding lands
       // on the list, not a stale conversation).
       setView('list')
@@ -689,7 +652,6 @@ export function BarApp(): React.JSX.Element {
                     draft={draft}
                     setDraft={setDraft}
                     onSubmit={(text) => sendFromBar(text, typedVoice)}
-                    limitNotice={limitNotice}
                     pttNotice={voiceSup.chip || ptt.hint || ptt.error || hubOrb.hint || null}
                     pttKeyDown={ptt.onKeyDown}
                     pttKeyUp={ptt.onKeyUp}

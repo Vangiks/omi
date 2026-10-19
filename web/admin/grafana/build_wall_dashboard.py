@@ -14,23 +14,17 @@ URL = "http://127.0.0.1:8899/api/omi/stats/wall"
 # Hero first in each column. The lower rows are supporting diagnostics.
 COLUMNS = [
     ("Growth", ["growth.wau", "growth.true_new_7d", "engagement.dau", "engagement.mau"]),
-    ("Activation", ["activation.rate", "activation.capture_week1_share", "engagement.saved_creators", "engagement.assistant_success", "revenue.activated_paid_30d"]),
+    ("Activation", ["activation.rate", "activation.capture_week1_share", "engagement.saved_creators", "engagement.assistant_success"]),
     ("Retention", ["retention.if_activated", "retention.recovery", "retention.day1_return", "retention.established_week"]),
-    ("Revenue", ["revenue.arpmau", "revenue.mrr", "revenue.hardware_usd_week", "revenue.plan_prepay_usd_week", "revenue.payer_churn", "cost.gross_margin_pct"]),
     ("Health", ["health.crash_free", "cost.net_day", "cost.per_mau_month", "health.thumbs_positive"]),
 ]
 # One native Canvas panel is one complete visual card. SVG is data-only and
 # passes through Canvas's built-in SanitizedSVG icon renderer. No HTML setting,
 # external resource, custom JavaScript, or additional panel plugin is required.
-HERO_IDS = {"growth.wau", "activation.rate", "retention.if_activated", "revenue.arpmau", "health.crash_free"}
-SMALL_IDS = {"revenue.plan_prepay_usd_week", "revenue.payer_churn", "cost.gross_margin_pct"}
+HERO_IDS = {"growth.wau", "activation.rate", "retention.if_activated", "health.crash_free"}
 
 
 def geometry(mid):
-    if mid in SMALL_IDS:
-        return 3, 102
-    if mid == "revenue.arpmau":
-        return 5, 174
     if mid in HERO_IDS:
         return 6, 210
     return 4, 144
@@ -39,8 +33,8 @@ def geometry(mid):
 def build_wall_board():
     panels = []
     x = 0
-    for col, (heading, ids) in enumerate(COLUMNS):
-        width = 5 if col < 4 else 4
+    for heading, ids in COLUMNS:
+        width = 6
         panels.append({"id":len(panels)+1,"type":"text","title":"","transparent":True,
                        "gridPos":{"x":x,"y":0,"w":width,"h":2},
                        "options":{"mode":"markdown","content":f"## {heading}"}})

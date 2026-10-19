@@ -452,14 +452,10 @@ async def extract_memory_log(
     Does not write Firestore. Desktop onboarding/import should call this instead of inventing
     memories via Anthropic Haiku chat completions, then persist via the normal memory write APIs.
     """
-    # Deferred with the LLM helper: this router is covered by a module-isolation test
-    # that stubs a minimal dependency graph, and utils.subscription pulls database.users
-    # in at import time.
+    # Deferred: this router is covered by a module-isolation test that stubs a minimal
+    # dependency graph.
     from utils.llm import memories as memories_llm
-    from utils.subscription import is_trial_paywalled
 
-    if await run_blocking(db_executor, is_trial_paywalled, uid, 'desktop'):
-        raise HTTPException(status_code=402, detail='trial_expired')
     source = (body.text_source or "memory_log").strip() or "memory_log"
     existing = [m.strip()[:MAX_EXISTING_MEMORY_CHARS] for m in body.existing_memories if m.strip()][:200]
     extraction = await run_blocking(
@@ -1074,8 +1070,7 @@ def delete_memories_batch(
     Authorization parity with DELETE /v3/memories/{memory_id}: every requested id is
     validated with the SAME business rules as the single-delete path. Validation is
     all-or-nothing — if any id fails, nothing is deleted, so the batch route can never
-    bypass the single-delete guardrails (missing/not-owned -> 404, locked paid-plan
-    memory -> 402).
+    bypass the single-delete guardrails (missing/not-owned -> 404).
     """
     # Deduplicate while preserving first-seen order so repeated ids cannot inflate
     # counts or trigger redundant Firestore/Pinecone ops.
@@ -1089,7 +1084,7 @@ def delete_memories_batch(
         # canonical write, preserving the released all-or-nothing contract.
         service.delete_batch(uid, memory_ids)
     except HTTPException:
-        # Preserve service-owned 402/404/413 mappings and observability details.
+        # Preserve service-owned 404/413 mappings and observability details.
         raise
     except (DestructiveGateTakeover, DestructiveOperationInProgress, LegalHoldAuthorityUnavailable) as exc:
         raise account_gate_busy_http_exception() from exc

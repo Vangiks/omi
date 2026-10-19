@@ -15,7 +15,6 @@ from database import llm_usage as llm_usage_db
 from utils.executors import db_executor, run_blocking
 from utils.llm.realtime_usage import client_reported_cost_usd, client_reported_turn
 from utils.other.endpoints import get_current_user_uid
-from utils.subscription import enforce_desktop_chat_quota
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -146,9 +145,6 @@ async def _persist_session(uid: str, token: str, provider: str, model: str, expi
 
 @router.post("/v2/realtime/session")
 async def mint_session(request: MintRequest, uid: str = Depends(get_current_user_uid)) -> JSONResponse:
-    # The hub only ever mints Omi's own provider token, so a user's BYOK key
-    # (Anthropic, for desktop chat) must not exempt them from the cap here.
-    await run_blocking(db_executor, enforce_desktop_chat_quota, uid, "desktop", byok_exempt=False)
     if request.provider == "openai":
         key = os.getenv("OPENAI_API_KEY", "").strip()
         if not key:
@@ -276,7 +272,6 @@ def _usage_cost(report: UsageReport) -> float:
 
 @router.post("/v2/realtime/usage", status_code=204)
 async def report_usage(report: UsageReport, uid: str = Depends(get_current_user_uid)) -> Response:
-    await run_blocking(db_executor, enforce_desktop_chat_quota, uid, "desktop", byok_exempt=False)
     input_tokens = max(report.input_text_tokens, 0) + max(report.input_audio_tokens, 0)
     output_tokens = max(report.output_text_tokens, 0) + max(report.output_audio_tokens, 0)
     cached_tokens = max(report.input_cached_tokens, 0)

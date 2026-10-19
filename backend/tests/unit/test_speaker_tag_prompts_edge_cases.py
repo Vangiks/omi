@@ -39,9 +39,7 @@ def test_select_prompts_accepts_iso_string_timestamps_and_skips_empty_text_and_b
         ],
         started_at='2026-09-24T11:00:00Z',
     )
-    prompts = selection.select_prompts(
-        [conv], now=now, owner_has_voice=False, named_allowed=True, answered=set(), people={}
-    )
+    prompts = selection.select_prompts([conv], now=now, owner_has_voice=False, answered=set(), people={})
     assert len(prompts) == 1
     assert prompts[0].speaker_id == 3
     assert prompts[0].excerpt == 'Valid speech from speaker three.'

@@ -110,10 +110,6 @@ def _memory(service_mod, memory_id, *, content=None):
     return service_mod.MemoryDB.model_validate(payload)
 
 
-def _locked_memory(service_mod, memory_id="locked", *, content="LOCKED_SECRET_CONTENT"):
-    return _memory(service_mod, memory_id, content=content).model_copy(update={"is_locked": True})
-
-
 def _historical(service_mod, memory_id, *, content=None):
     return service_mod.HistoricalMemoryRecord(
         memory=_memory(service_mod, memory_id, content=content),
@@ -398,22 +394,6 @@ def test_ledger_history_page_sentinel_row_is_not_skipped_by_continuation(service
     assert second.truncated is False
 
 
-def test_ledger_history_excludes_locked_rows(service_mod, monkeypatch):
-    now = datetime(2026, 8, 23, tzinfo=timezone.utc)
-    locked = _ledger_item(service_mod, "locked", updated_at=now, user_review=False)
-    locked = locked.model_copy(update={"promotion": {"is_locked": True, "user_review": False}})
-    monkeypatch.setattr(
-        service_mod,
-        "iter_authoritative_product_memory_items_newest_first",
-        lambda *args, **kwargs: iter([locked]),
-    )
-
-    page = service_mod.MemoryService(db_client=_Db()).read_ledger_history_page("uid-test", limit=10)
-
-    assert page.memories == ()
-    assert page.truncated is False
-
-
 def test_historical_ledger_search_is_deterministic_and_does_not_fallback_to_legacy(service_mod, monkeypatch):
     now = datetime(2026, 8, 23, tzinfo=timezone.utc)
     older = _ledger_item(
@@ -598,113 +578,6 @@ def test_mixed_read_does_not_hydrate_canonical_identity_from_historical_stub(ser
     assert {item.id for item in result} == {"same", "legacy"}
     assert next(item for item in result if item.id == "same").content == "canonical"
     assert next(item for item in result if item.id == "legacy").content == "legacy-full"
-
-
-def test_canonical_read_preserves_lock_and_returns_only_a_preview(service_mod, monkeypatch):
-    backend = service_mod.CanonicalMemoryBackend(db_client=_Db())
-    secret = "LOCKED_SECRET_CONTENT_" * 10
-    locked = _locked_memory(service_mod, content=secret)
-
-    def _forbid_full_fetch(*_args, **_kwargs):
-        raise AssertionError("offset read must not full-fetch canonical memories")
-
-    monkeypatch.setattr(service_mod, "read_canonical_memories", _forbid_full_fetch)
-    monkeypatch.setattr(
-        service_mod,
-        "read_canonical_scan_page",
-        lambda *args, **kwargs: ([(locked, (locked.updated_at, locked.id))], True),
-    )
-
-    result = backend.read("uid-test")
-
-    assert len(result) == 1
-    assert result[0].is_locked is True
-    assert result[0].content != secret
-    assert len(result[0].content) < len(secret)
-    assert result[0].content.endswith("...")
-
-
-def test_canonical_search_excludes_locked_rows(service_mod, monkeypatch):
-    backend = service_mod.CanonicalMemoryBackend(db_client=_Db())
-    monkeypatch.setattr(
-        service_mod,
-        "search_canonical_memories",
-        lambda *args, **kwargs: [
-            {
-                "memory_id": "locked",
-                "content": "LOCKED_SEARCH_SECRET",
-                "tier": "short_term",
-                "is_locked": True,
-            },
-            {
-                "memory_id": "visible",
-                "content": "VISIBLE_SEARCH_CONTENT",
-                "tier": "short_term",
-                "is_locked": False,
-            },
-        ],
-    )
-
-    result = backend.search("uid-test", "search")
-
-    assert [match.memory.id for match in result] == ["visible"]
-    assert all("LOCKED_SEARCH_SECRET" not in match.memory.content for match in result)
-
-
-def test_fetch_rejects_a_locked_canonical_memory(service_mod, monkeypatch):
-    service = service_mod.MemoryService(db_client=_Db())
-    monkeypatch.setattr(service_mod, "read_canonical_memory_item", lambda *args, **kwargs: object())
-    monkeypatch.setattr(
-        service_mod,
-        "memory_item_to_memorydb",
-        lambda _item: _locked_memory(service_mod),
-    )
-
-    with pytest.raises(service_mod.HTTPException) as exc_info:
-        service.fetch("uid-test", "locked")
-
-    assert exc_info.value.status_code == 402
-
-
-@pytest.mark.parametrize("operation", ["update", "delete", "delete_batch", "external_delete"])
-def test_locked_canonical_memory_rejects_every_mutation(service_mod, monkeypatch, operation):
-    service = service_mod.MemoryService(db_client=_Db())
-    canonical_item = object()
-    monkeypatch.setattr(service_mod, "read_canonical_memory_item", lambda *args, **kwargs: canonical_item)
-    monkeypatch.setattr(
-        service_mod,
-        "memory_item_to_memorydb",
-        lambda _item: _locked_memory(service_mod),
-    )
-    service._canonical.update_content = MagicMock()
-    service._canonical.delete = MagicMock()
-    service._canonical.delete_batch = MagicMock()
-    service._write_historical_override = MagicMock()
-    service._write_historical_overrides = MagicMock()
-
-    with pytest.raises(service_mod.HTTPException) as exc_info:
-        if operation == "update":
-            service.update_content("uid-test", "locked", "changed")
-        elif operation == "delete":
-            service.delete("uid-test", "locked")
-        elif operation == "delete_batch":
-            service.delete_batch("uid-test", ["locked"])
-        else:
-            service.delete_external_memory(
-                "uid-test",
-                "locked",
-                memory_system=service_mod.MemorySystem.CANONICAL,
-                consumer="developer_api",
-                operation="delete",
-                delete_vector=False,
-            )
-
-    assert exc_info.value.status_code == 402
-    service._canonical.update_content.assert_not_called()
-    service._canonical.delete.assert_not_called()
-    service._canonical.delete_batch.assert_not_called()
-    service._write_historical_override.assert_not_called()
-    service._write_historical_overrides.assert_not_called()
 
 
 def test_delete_batch_limit_error_sanitizes_detail_and_preserves_413(service_mod, monkeypatch):
@@ -1417,63 +1290,6 @@ def test_superseded_ledger_fact_revert_retry_returns_its_current_append(service_
     amend.assert_not_called()
 
 
-def test_superseded_ledger_fact_revert_retry_rejects_a_now_locked_append(service_mod, monkeypatch):
-    now = datetime(2026, 8, 23, tzinfo=timezone.utc)
-    operation_id = "ac532c6f-a9e0-47ec-9c4b-d402dc66544a"
-    selected = _ledger_item(
-        service_mod,
-        "selected",
-        updated_at=now,
-        status=MemoryItemStatus.superseded,
-        valid_to=now,
-        superseded_by="tail",
-    ).model_copy(update={"content": "LOCKED_SECRET_CONTENT", "item_revision": 2})
-    tail = _ledger_item(
-        service_mod,
-        "tail",
-        updated_at=now + timedelta(seconds=1),
-        status=MemoryItemStatus.superseded,
-        valid_to=now + timedelta(seconds=2),
-        superseded_by="restored",
-    )
-    provenance = service_mod.LedgerProvenance(
-        source_id="selected",
-        source_type="explicit_user_revert",
-        source_version="item_revision:2",
-        action_id=f"memory_ui_revert:{operation_id}",
-        artifact_ref={
-            "artifact_id": f"memory-history-revert:{operation_id}",
-            "preservation": "preserved",
-        },
-    )
-    evidence = MemoryEvidence(
-        evidence_id=service_mod.evidence_id_for_ledger_provenance("uid-test", provenance),
-        source_type="explicit_user_revert",
-        source_id="selected",
-        source_version="item_revision:2",
-        artifact_preservation=ArtifactPreservationState.preserved,
-    )
-    restored = _ledger_item(service_mod, "restored", updated_at=now + timedelta(seconds=2)).model_copy(
-        update={
-            "content": "LOCKED_SECRET_CONTENT",
-            "write_reason": LedgerWriteReason.direct_user_statement,
-            "evidence": [evidence],
-            "promotion": {"is_locked": True},
-        }
-    )
-    service = service_mod.MemoryService(db_client=_Db())
-    monkeypatch.setattr(service, "_canonical_item_for_lineage", MagicMock(side_effect=[selected, tail, restored]))
-    monkeypatch.setattr(service_mod, "amend_fact", MagicMock())
-    invalidate = MagicMock()
-    monkeypatch.setattr(service, "_invalidate_prompt_cache", invalidate)
-
-    with pytest.raises(service_mod.HTTPException) as exc_info:
-        service.revert_superseded_ledger_fact("uid-test", "selected", operation_id)
-
-    assert exc_info.value.status_code == 402
-    invalidate.assert_not_called()
-
-
 def test_superseded_ledger_fact_revert_rejects_when_terminal_content_already_matches(service_mod, monkeypatch):
     now = datetime(2026, 8, 23, tzinfo=timezone.utc)
     selected = _ledger_item(
@@ -1733,35 +1549,6 @@ def test_ledger_revert_rejects_broken_or_unbounded_lineage(service_mod, monkeypa
     amend.assert_not_called()
 
 
-def test_ledger_revert_rejects_locked_tail_before_append(service_mod, monkeypatch):
-    now = datetime(2026, 8, 23, tzinfo=timezone.utc)
-    selected = _ledger_item(
-        service_mod,
-        "selected",
-        updated_at=now,
-        status=MemoryItemStatus.superseded,
-        valid_to=now,
-        superseded_by="tail",
-    )
-    locked_tail = _ledger_item(service_mod, "tail", updated_at=now + timedelta(seconds=1)).model_copy(
-        update={"promotion": {"is_locked": True}}
-    )
-    service = service_mod.MemoryService(db_client=_Db())
-    monkeypatch.setattr(service, "_canonical_item_for_lineage", MagicMock(side_effect=[selected, locked_tail]))
-    amend = MagicMock()
-    monkeypatch.setattr(service_mod, "amend_fact", amend)
-
-    with pytest.raises(service_mod.HTTPException) as exc_info:
-        service.revert_superseded_ledger_fact(
-            "uid-test",
-            "selected",
-            "5f95a7a1-10c6-4ec3-946d-e76a0a2f7cc5",
-        )
-
-    assert exc_info.value.status_code == 402
-    amend.assert_not_called()
-
-
 @pytest.mark.parametrize("conflict", [RuntimeError("stale tail"), ValueError("invalid transaction")])
 def test_ledger_revert_maps_append_conflict_without_readback_or_cache_change(service_mod, monkeypatch, conflict):
     now = datetime(2026, 8, 23, tzinfo=timezone.utc)
@@ -1913,29 +1700,6 @@ def test_export_includes_active_restricted_user_owned_canonical_memory(service_m
     service.history.iter_all_live = MagicMock(return_value=iter([]))
 
     assert service.export_memories("uid-test") == [expected]
-
-
-def test_export_preserves_full_locked_historical_content(service_mod, monkeypatch):
-    service = service_mod.MemoryService(db_client=_Db())
-    raw = _sample_memory_dict("locked-export")
-    raw["is_locked"] = True
-    raw["content"] = "locked content " * 20
-
-    record = service_mod.HistoricalMemoryRecord(
-        memory=service_mod.HistoricalMemoryAdapter._historical_memory(raw, include_locked_content=True),
-        locator=service_mod.MemoryLocator("uid-test", "legacy", "locked-export"),
-    )
-    service.history.iter_all_live = MagicMock(return_value=iter([record]))
-    monkeypatch.setattr(
-        service_mod,
-        "iter_authoritative_product_memory_items",
-        lambda **_kwargs: iter(()),
-    )
-
-    exported = service.export_memories("uid-test")
-
-    assert len(exported) == 1
-    assert exported[0].content == raw["content"]
 
 
 def test_export_honors_historical_tombstone_override(service_mod, monkeypatch):
@@ -2264,25 +2028,14 @@ def test_fetch_applies_device_scope_to_canonical_items(service_mod, monkeypatch)
 
 
 def test_delete_batch_validates_every_id_before_any_write(service_mod, monkeypatch):
-    """A later missing/locked id cannot leave an earlier valid id deleted."""
+    """A later missing id cannot leave an earlier valid id deleted."""
     db = _Db()
     service = service_mod.MemoryService(db_client=db)
     valid = _historical(service_mod, "valid")
-    locked = _historical(service_mod, "locked")
-    locked = locked.memory.model_copy(update={"is_locked": True})
     monkeypatch.setattr(
         service.history,
         "get",
-        MagicMock(
-            side_effect=lambda _uid, memory_id: (
-                valid
-                if memory_id == "valid"
-                else service_mod.HistoricalMemoryRecord(
-                    memory=locked,
-                    locator=service_mod.MemoryLocator("uid-test", "legacy", "locked"),
-                )
-            )
-        ),
+        MagicMock(side_effect=lambda _uid, memory_id: valid if memory_id == "valid" else None),
     )
     monkeypatch.setattr(service_mod, "read_canonical_memory_item", lambda *args, **kwargs: None)
     service._canonical.write = MagicMock()
@@ -2290,9 +2043,9 @@ def test_delete_batch_validates_every_id_before_any_write(service_mod, monkeypat
     monkeypatch.setattr(service, "_canonical_status", MagicMock(return_value=None))
 
     with pytest.raises(service_mod.HTTPException) as exc_info:
-        service.delete_batch("uid-test", ["valid", "locked"])
+        service.delete_batch("uid-test", ["valid", "missing"])
 
-    assert exc_info.value.status_code == 402
+    assert exc_info.value.status_code == 404
     service._canonical.write.assert_not_called()
     service._canonical.delete_batch.assert_not_called()
 

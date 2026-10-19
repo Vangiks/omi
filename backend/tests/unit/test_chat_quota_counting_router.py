@@ -99,31 +99,6 @@ def test_v2_messages_records_quota_question_after_human_message_persisted(chat_e
         _cleanup(saved)
 
 
-def test_v2_messages_quota_exceeded_reply_does_not_record_quota_question(chat_environment):
-    client, module, saved = chat_environment
-    try:
-        quota_detail = {
-            'error': 'quota_exceeded',
-            'plan': 'Free',
-            'unit': 'questions',
-            'used': 30,
-            'limit': 30,
-        }
-        module.enforce_chat_quota.side_effect = module.HTTPException(status_code=402, detail=quota_detail)
-
-        response = client.post(
-            '/v2/messages',
-            json={'text': 'hello', 'file_ids': []},
-            headers={'X-App-Platform': 'ios'},
-        )
-
-        assert response.status_code == 200
-        assert 'done: ' in response.text
-        module.llm_usage_db.record_chat_quota_question.assert_not_called()
-    finally:
-        _cleanup(saved)
-
-
 def test_v2_messages_fails_closed_when_quota_accounting_write_fails(chat_environment):
     """A Firestore/outage failure recording the Free-plan counter must not start the LLM,
     must not persist the human turn (retry would otherwise orphan copies), and must emit an
@@ -370,15 +345,6 @@ def test_voice_message_sse_decode_failure_is_typed_and_cleans_staged_input(chat_
         _cleanup(saved)
 
 
-_QUOTA_DETAIL = {
-    'error': 'quota_exceeded',
-    'plan': 'Free',
-    'unit': 'questions',
-    'used': 30,
-    'limit': 30,
-}
-
-_QUOTA_ERROR_FRAME = 'error: {"error":"quota_exceeded","message":"quota_exceeded"}'
 _ACCOUNTING_ERROR_FRAME = 'error: {"error":"server_error","message":"quota_accounting_unavailable"}'
 _PROTOCOL_HEADER = {'X-Omi-Chat-Failure-Protocol': '1'}
 
@@ -389,42 +355,6 @@ def _post_message(client, **headers):
         json={'text': 'hello', 'file_ids': []},
         headers={'X-App-Platform': 'ios', **headers},
     )
-
-
-def test_quota_exceeded_emits_typed_error_frame_before_done_for_protocol_clients(chat_environment):
-    client, module, saved = chat_environment
-    try:
-        module.enforce_chat_quota.side_effect = module.HTTPException(status_code=402, detail=dict(_QUOTA_DETAIL))
-        sys.modules['utils.chat_turn'].execute_chat_stream = MagicMock()
-
-        response = _post_message(client, **_PROTOCOL_HEADER)
-
-        assert response.status_code == 200
-        assert _QUOTA_ERROR_FRAME in response.text
-        assert 'done: ' in response.text
-        assert response.text.index(_QUOTA_ERROR_FRAME) < response.text.index('done: ')
-        module.llm_usage_db.record_chat_quota_question.assert_not_called()
-        sys.modules['utils.chat_turn'].execute_chat_stream.assert_not_called()
-    finally:
-        _cleanup(saved)
-
-
-def test_quota_exceeded_keeps_legacy_done_only_contract_without_protocol(chat_environment):
-    client, module, saved = chat_environment
-    try:
-        module.enforce_chat_quota.side_effect = module.HTTPException(status_code=402, detail=dict(_QUOTA_DETAIL))
-        sys.modules['utils.chat_turn'].execute_chat_stream = MagicMock()
-
-        for headers in ({}, {'X-Omi-Chat-Failure-Protocol': '2'}):
-            response = _post_message(client, **headers)
-
-            assert response.status_code == 200, headers
-            assert 'error: ' not in response.text
-            assert response.text.count('done: ') == 1
-        module.llm_usage_db.record_chat_quota_question.assert_not_called()
-        sys.modules['utils.chat_turn'].execute_chat_stream.assert_not_called()
-    finally:
-        _cleanup(saved)
 
 
 def test_quota_accounting_unavailable_emits_typed_error_frame_before_done_for_protocol_clients(chat_environment):

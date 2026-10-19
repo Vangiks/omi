@@ -75,7 +75,6 @@ _STUB = (
     'langchain',
     'langchain_core',
     'av',
-    'stripe',
     'openai',
     'anthropic',
     'redis',
@@ -157,7 +156,6 @@ def _make_memory(memory_id='good'):
     return {
         'id': memory_id,
         'uid': 'test-uid',
-        'is_locked': False,
         'content': 'a memory',
         'category': 'interesting',
         'created_at': '2024-01-01T00:00:00',
@@ -173,7 +171,6 @@ def _memory_record(payload):
             self._value = dict(value)
             self.id = self._value.get('id')
             self.content = self._value.get('content')
-            self.is_locked = self._value.get('is_locked', False)
 
         def model_dump(self, **_kwargs):
             return dict(self._value)
@@ -187,8 +184,8 @@ def _memory_record(payload):
 
 
 def test_get_tasks_skips_malformed_record():
-    valid = {'id': 'good', 'description': 'do x', 'completed': False, 'is_locked': False}
-    malformed = {'id': 'bad', 'is_locked': False}  # missing required description/completed
+    valid = {'id': 'good', 'description': 'do x', 'completed': False}
+    malformed = {'id': 'bad'}  # missing required description/completed
     integ.action_items_db.get_action_items = MagicMock(return_value=[valid, malformed])
     _setup_gates()
 
@@ -198,22 +195,6 @@ def test_get_tasks_skips_malformed_record():
 
     assert len(result['tasks']) == 1
     assert result['tasks'][0]['id'] == 'good'
-
-
-def test_get_tasks_locked_null_description_does_not_crash():
-    valid = {'id': 'good', 'description': 'do x', 'completed': False, 'is_locked': False}
-    locked_null = {'id': 'locked-1', 'description': None, 'is_locked': True, 'completed': False}
-    integ.action_items_db.get_action_items = MagicMock(return_value=[valid, locked_null])
-    _setup_gates()
-
-    with patch.object(integ, 'verify_api_key', return_value=True), patch.object(integ, 'apps_utils') as au:
-        au.app_can_read_tasks.return_value = True
-        result = _call_tasks()
-
-    assert len(result['tasks']) == 2
-    assert result['tasks'][0]['id'] == 'good'
-    assert result['tasks'][1]['id'] == 'locked-1'
-    assert result['tasks'][1]['description'] == ''
 
 
 def test_get_tasks_all_malformed_returns_empty():
@@ -229,14 +210,13 @@ def test_get_tasks_all_malformed_returns_empty():
 
 def test_get_memories_skips_malformed_record():
     valid = _make_memory('good')
-    malformed = {'id': 'bad', 'is_locked': False}  # missing required uid/created_at/content
+    malformed = {'id': 'bad'}  # missing required uid/created_at/content
     _setup_gates()
 
     with (
         patch.object(integ, 'verify_api_key', return_value=True),
         patch.object(integ, 'apps_utils') as au,
         patch.object(integ, 'MemoryService') as memory_service,
-        patch.object(integ, 'truncate_locked_memory_preview', side_effect=lambda memory: memory),
     ):
         au.app_can_read_memories.return_value = True
         memory_service.return_value.read.return_value = [_memory_record(valid), _memory_record(malformed)]
@@ -271,7 +251,6 @@ def test_get_memories_all_malformed_returns_empty():
         patch.object(integ, 'verify_api_key', return_value=True),
         patch.object(integ, 'apps_utils') as au,
         patch.object(integ, 'MemoryService') as memory_service,
-        patch.object(integ, 'truncate_locked_memory_preview', side_effect=lambda memory: memory),
     ):
         au.app_can_read_memories.return_value = True
         memory_service.return_value.read.return_value = [

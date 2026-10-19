@@ -123,7 +123,6 @@ def _patch_sync_pipeline(
             transcript_segments=segments,
             discarded=False,
             status=ConversationStatus.completed,
-            is_locked=incoming["is_locked"],
             sync_relevance="keep",
             sync_content_revision=1,
         )
@@ -154,7 +153,6 @@ def _patch_sync_pipeline(
     monkeypatch.setattr(sync_pipeline, "decode_files_to_wav", fake_decode_files_to_wav)
     monkeypatch.setattr(sync_pipeline, "retrieve_vad_segments", fake_retrieve_vad_segments)
     monkeypatch.setattr(sync_pipeline, "get_wav_duration", lambda path: 1.25)
-    monkeypatch.setattr(sync_router, "has_transcription_credits", lambda uid: True)
     monkeypatch.setattr(sync_pipeline, "build_person_embeddings_cache", lambda uid: {})
     monkeypatch.setattr(sync_pipeline, "get_syncing_file_temporal_signed_url", lambda path: path)
     monkeypatch.setattr(sync_pipeline, "schedule_syncing_temporal_file_deletion", lambda path: None)
@@ -163,7 +161,6 @@ def _patch_sync_pipeline(
     monkeypatch.setattr("utils.conversations.lifecycle.ingest_sync_conversation", fake_ingest_sync_conversation)
     monkeypatch.setattr(sync_pipeline, "_reprocess_conversation_after_update", fake_reprocess_after_update)
     monkeypatch.setattr(sync_router, "start_background_task", capture_background_task)
-    monkeypatch.setattr(sync_pipeline, "FAIR_USE_ENABLED", False)
     return pending_coroutines
 
 
@@ -253,7 +250,6 @@ def test_sync_v2_merges_into_target_conversation_and_reprocesses_once(client, au
             ),
             "discarded": False,
             "status": "completed",
-            "is_locked": False,
             "data_protection_level": "standard",
         },
     )

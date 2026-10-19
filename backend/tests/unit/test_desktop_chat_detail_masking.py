@@ -4,7 +4,7 @@ Verifies that ValueError and RuntimeError raised in the desktop_chat
 endpoint handlers are sanitized and do not leak internal details.
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 import routers.desktop_chat as dc_routes
@@ -12,15 +12,15 @@ from fastapi import HTTPException
 
 
 @pytest.mark.asyncio
-async def test_quota_runtime_error_is_masked(monkeypatch):
+async def test_preparation_runtime_error_is_masked(monkeypatch):
     """RuntimeError in the request preparation path must return static 503 without internal details."""
     leak_text = "upstream redis cluster connection refused host=prod-cache-01:6379"
 
     monkeypatch.setattr(dc_routes, "llm_stub_enabled", lambda: False)
     monkeypatch.setattr(
         dc_routes,
-        "enforce_desktop_chat_quota",
-        MagicMock(side_effect=RuntimeError(leak_text)),
+        "_meter_server_request",
+        AsyncMock(side_effect=RuntimeError(leak_text)),
     )
 
     with pytest.raises(HTTPException) as exc_info:
@@ -40,15 +40,15 @@ async def test_quota_runtime_error_is_masked(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_quota_value_error_is_masked(monkeypatch):
+async def test_preparation_value_error_is_masked(monkeypatch):
     """ValueError in the request preparation path must return static 400 without internal details."""
-    leak_text = "internal quota budget calc failed for user_id=secret-123"
+    leak_text = "internal metering calc failed for user_id=secret-123"
 
     monkeypatch.setattr(dc_routes, "llm_stub_enabled", lambda: False)
     monkeypatch.setattr(
         dc_routes,
-        "enforce_desktop_chat_quota",
-        MagicMock(side_effect=ValueError(leak_text)),
+        "_meter_server_request",
+        AsyncMock(side_effect=ValueError(leak_text)),
     )
 
     with pytest.raises(HTTPException) as exc_info:

@@ -314,9 +314,6 @@ def _build_conversation_webhook_payload_sync(uid: str, memory: Conversation) -> 
 
 
 async def conversation_created_webhook(uid, memory: Conversation):
-    if memory.is_locked:
-        return
-
     toggled = await run_blocking(db_executor, user_webhook_status_db, uid, WebhookType.memory_created)
 
     if toggled:

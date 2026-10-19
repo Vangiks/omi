@@ -349,17 +349,6 @@ def test_mutation_response_contract_carries_canonical_revision_and_state():
     assert result.conversation.starred is True
 
 
-def _segment_snapshot(segments, *, is_locked=False, exists=True):
-    return _Snapshot(
-        {
-            'data_protection_level': 'standard',
-            'is_locked': is_locked,
-            'transcript_segments': segments,
-        },
-        exists=exists,
-    )
-
-
 def test_segment_text_edit_reads_and_writes_inside_a_transaction(monkeypatch):
     segments = [{'id': 's1', 'text': 'old'}, {'id': 's2', 'text': 'keep'}]
     database = install_store(monkeypatch, 'user-1', 'conv-1', {'transcript_segments': segments})
@@ -377,14 +366,6 @@ def test_segment_text_edit_reads_and_writes_inside_a_transaction(monkeypatch):
 def test_segment_text_edit_missing_segment_does_not_write(monkeypatch):
     database = install_store(monkeypatch, 'user-1', 'conv-1', {'transcript_segments': [{'id': 's1', 'text': 'old'}]})
     assert conversations_db.update_conversation_segment_text('user-1', 'conv-1', 'missing', 'x') == 'segment_not_found'
-    assert not database.transactions
-
-
-def test_segment_text_edit_rejects_locked_conversation(monkeypatch):
-    database = install_store(
-        monkeypatch, 'user-1', 'conv-1', {'is_locked': True, 'transcript_segments': [{'id': 's1', 'text': 'old'}]}
-    )
-    assert conversations_db.update_conversation_segment_text('user-1', 'conv-1', 's1', 'x') == 'locked'
     assert not database.transactions
 
 

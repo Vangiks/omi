@@ -352,7 +352,6 @@ class TestModelQosProfiles:
             'chat_graph',
             'goals',
             'goals_advice',
-            'notifications',
             'proactive_notification',
             'what_matters_now',
             'openglass',
@@ -448,8 +447,9 @@ class TestGetModel:
         with pytest.raises(UnknownLLMFeature):
             get_model('totally_unknown_feature')
 
-    def test_pinned_feature_ignores_profile(self):
-        assert get_model('fair_use') == LUNA_MODEL
+    def test_pinned_feature_ignores_profile(self, monkeypatch):
+        monkeypatch.setitem(_PINNED_FEATURES, 'conv_action_items', ('pinned-model', 'openai'))
+        assert get_model('conv_action_items') == 'pinned-model'
 
     def test_chat_agent_returns_luna(self):
         model = get_model('chat_agent')
@@ -708,12 +708,13 @@ class TestGetQosInfo:
 class TestPinnedFeatures:
     """Verify pinned features are immutable."""
 
-    def test_fair_use_pinned_to_luna(self):
-        assert _PINNED_FEATURES['fair_use'] == (LUNA_MODEL, 'openai')
+    def test_no_features_pinned_by_default(self):
+        assert _PINNED_FEATURES == {}
 
-    def test_pinned_survives_profile_switch(self):
-        # Even if profile doesn't list fair_use, it should resolve to pinned value
-        assert get_model('fair_use') == LUNA_MODEL
+    def test_pinned_survives_profile_switch(self, monkeypatch):
+        # Even if the profile doesn't list a feature, it should resolve to the pinned value
+        monkeypatch.setitem(_PINNED_FEATURES, 'pinned_only_feature', (LUNA_MODEL, 'openai'))
+        assert get_model('pinned_only_feature') == LUNA_MODEL
 
 
 class TestProviderClassification:
@@ -917,13 +918,6 @@ class TestExpandedCallsiteCoverage:
         assert 'goals' in calls, "Missing get_llm('goals') in goals.py"
         assert 'goals_advice' in calls, "Missing get_llm('goals_advice') in goals.py"
 
-    def test_notifications_py_key(self):
-        import re
-
-        source = self._read_source("utils/llm/notifications.py")
-        calls = re.findall(r"get_llm\(\s*'(\w+)'", source)
-        assert 'notifications' in calls
-
     def test_app_generator_py_all_keys(self):
         import re
 
@@ -998,7 +992,6 @@ class TestExpandedCallsiteCoverage:
             "utils/llm/proactive_notification.py",
             "utils/llm/external_integrations.py",
             "utils/llm/goals.py",
-            "utils/llm/notifications.py",
             "utils/llm/persona.py",
             "utils/llm/followup.py",
             "utils/llm/app_generator.py",
@@ -1451,7 +1444,9 @@ def test_company_paid_profiles_and_pins_never_resolve_pro_or_image_gemini():
         model_config.validate_no_prohibited_company_paid_models(bad_profiles, {})
 
     with pytest.raises(RuntimeError, match='SCA-481'):
-        model_config.validate_no_prohibited_company_paid_models({}, {'fair_use': ('imagen-4.0-generate-001', 'gemini')})
+        model_config.validate_no_prohibited_company_paid_models(
+            {}, {'pinned_feature': ('imagen-4.0-generate-001', 'gemini')}
+        )
 
     # BYOK pays for what it asks: a Pro pin on the byok profile stays legal.
     byok_pro = {

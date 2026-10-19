@@ -17,12 +17,10 @@ from database import conversation_tombstones
 from database.firestore_read_metrics import FirestoreReadSite
 from database.live_language_profile import get_live_language_sessions
 from models.message_event import (
-    FREEMIUM_ACTION_SETUP_ON_DEVICE_STT,
-    FreemiumThresholdReachedEvent,
     MessageEvent,
     MessageServiceStatusEvent,
 )
-from models.users import PlanType, WebhookType
+from models.users import WebhookType
 from database.redis_db import user_webhook_status_db
 from utils.analytics import billable_transcription_seconds, record_usage
 from utils.usage_provenance import live_usage_metadata
@@ -33,25 +31,11 @@ from utils.async_tasks import WebSocketTaskSupervisor, drain_tasks, wait_for_eve
 from utils.byok import get_byok_keys
 from utils.client_device import resolve_client_device_from_headers
 from utils.journey_metrics_contract import resolve_client_kind_from_headers
-from utils.executors import db_executor, run_blocking, start_background_task, storage_executor
-from utils.fair_use import (
-    FAIR_USE_CHECK_INTERVAL_SECONDS,
-    FAIR_USE_ENABLED,
-    FAIR_USE_RESTRICT_DAILY_DG_MS,
-    check_soft_caps,
-    get_enforcement_stage,
-    get_rolling_speech_ms,
-    is_daily_audio_ceiling_exceeded,
-    is_dg_budget_exhausted,
-    record_dg_usage_ms,
-    record_speech_ms,
-    trigger_classifier_if_needed,
-)
+from utils.executors import db_executor, run_blocking, storage_executor
 from utils.listen_pusher_session import ListenPusherSession, ListenPusherSessionConfig, ListenPusherSessionDeps
 from utils.listen_session_bootstrap import finalize_listen_connect_context, load_listen_connect_base
 from utils.listen_reconnect_budget import listen_reconnect_budget
 from utils.metrics import BACKEND_LISTEN_ACTIVE_WS_CONNECTIONS
-from utils.notifications import send_credit_limit_notification, send_silent_user_notification
 from utils.onboarding import OnboardingHandler
 from utils.observability.journeys import ClientJourneyAttempt
 from utils.observability.routing_cohort import RoutingCohort, current_routing_cohort
@@ -78,7 +62,6 @@ from utils.stt.live_metrics import (
 from config.live_stt_registry import routing_on
 from config.live_stt_recovery import current_recovery_enabled, recovery_enabled, session_recovery_enabled
 from utils.stt.language_policy import LiveLanguageObservations, LiveLanguageProfile
-from utils.subscription import get_remaining_transcription_seconds, is_trial_paywalled
 from utils.transcribe_decisions import (
     effective_conversation_timeout,
     normalize_codec_frame,
@@ -89,7 +72,7 @@ from utils.transcribe_decisions import (
     should_load_speech_profile,
     validate_audio_format,
 )
-from utils.transcribe_store import check_credits_invalidation, conversations_db, redis_db, user_db
+from utils.transcribe_store import conversations_db, redis_db, user_db
 from database.account_deletion_policy import account_deletion_blocks_access
 from utils.webhooks import get_audio_bytes_webhook_seconds
 from utils.audio import AudioRingBuffer
@@ -111,16 +94,6 @@ from utils.observability.transcription import record_listen_no_audio_teardown, r
 logger = logging.getLogger(__name__)
 
 PUSHER_ENABLED = bool(os.getenv('HOSTED_PUSHER_API_URL'))
-FREEMIUM_THRESHOLD_SECONDS = 180
-
-
-def should_emit_plus_meter_warning(subscription: Any) -> bool:
-    """S18: the listen threshold event is the Plus (1,500-min) meter warning only.
-
-    Basic no longer enters on-device through this event (S17). Inactive or
-    missing subscriptions must not emit it.
-    """
-    return getattr(subscription, 'plan', None) == PlanType.plus
 
 
 def _account_deletion_blocks_owner_persistence(uid: str) -> bool:
@@ -167,7 +140,6 @@ class ListenSessionRuntime:
         self.language_observations: LiveLanguageObservations | None = None
         self.vocabulary: List[str] = []
         self.translation_language: Optional[str] = None
-        self.user_has_credits = True
         self.private_cloud_sync_enabled = False
         self.has_speech_profile = False
         self.conversation_creation_timeout = request.conversation_timeout
@@ -469,13 +441,6 @@ class ListenSessionRuntime:
             # A create already past this point can still race a deletion commit.
             await self.request.websocket.close(code=1008, reason='Conversation was deleted')
             return False
-        if await run_blocking(db_executor, is_trial_paywalled, self.request.uid, self.request.source):
-            await self.request.websocket.send_json(
-                FreemiumThresholdReachedEvent(remaining_seconds=0, action=FREEMIUM_ACTION_SETUP_ON_DEVICE_STT).to_json()
-            )
-            await self.wait(0.5)
-            await self.request.websocket.close(code=1008, reason='trial_expired')
-            return False
         error = validate_audio_format(self.request.codec, self.request.sample_rate)
         if error:
             await self.request.websocket.close(code=1003, reason=error)
@@ -484,7 +449,7 @@ class ListenSessionRuntime:
 
     async def _bootstrap(self) -> bool:
         request = self.request
-        base = await load_listen_connect_base(request.uid, source=request.source, use_custom_stt=self.use_custom_stt)
+        base = await load_listen_connect_base(request.uid)
         if not base.user_exists:
             await request.websocket.close(code=1008, reason='Bad user')
             return False
@@ -533,7 +498,6 @@ class ListenSessionRuntime:
                 else None
             )
             self.onboarding_admitted = isinstance(self.onboarding_session_id, str)
-        self.user_has_credits = base.user_has_credits
         self.language = normalize_language(request.language)
         single_language_mode = should_force_single_language(
             request.onboarding_mode,
@@ -651,22 +615,6 @@ class ListenSessionRuntime:
         self.request = replace(request, codec=decision.codec)
         self.lc3_frame_duration_us = decision.lc3_frame_duration_us
         self._build_components()
-        if not self.user_has_credits:
-            try:
-                subscription = await self.persistence.call(user_db.get_user_valid_subscription, request.uid)
-                if should_emit_plus_meter_warning(subscription):
-                    await send_credit_limit_notification(request.uid)
-                    await request.websocket.send_json(
-                        FreemiumThresholdReachedEvent(
-                            remaining_seconds=0, action=FREEMIUM_ACTION_SETUP_ON_DEVICE_STT
-                        ).to_json()
-                    )
-                    self.state.freemium_threshold_sent = True
-            except Exception as error:
-                logger.error('Credit-limit notification failed type=%s', type(error).__name__)
-        if FAIR_USE_ENABLED:
-            self.state.fair_use_track_dg_usage = context.fair_use_track_dg_usage
-            self.state.fair_use_dg_budget_exhausted = context.fair_use_dg_budget_exhausted
         if request.onboarding_mode and self.onboarding_admitted:
 
             async def send_onboarding(event: Dict[str, Any]) -> None:
@@ -726,117 +674,17 @@ class ListenSessionRuntime:
         while self.state.active:
             if await self.wait(60):
                 break
-            transcription_seconds = await self._flush_usage(final=False)
-            if self.use_custom_stt:
-                continue
-            now = time.time()
-            if FAIR_USE_ENABLED and now - self.state.fair_use_last_check_ts >= FAIR_USE_CHECK_INTERVAL_SECONDS:
-                self.state.fair_use_last_check_ts = now
-                try:
-                    if self.state.fair_use_plan is None:
-                        sub = await self.persistence.call(user_db.get_user_valid_subscription, self.request.uid)
-                        self.state.fair_use_plan = sub.plan if sub else None
-                    totals = await self.persistence.call(get_rolling_speech_ms, self.request.uid)
-                    caps = await self.persistence.call(
-                        check_soft_caps, self.request.uid, speech_totals=totals, plan=self.state.fair_use_plan
-                    )
-                    if caps:
-                        start_background_task(
-                            trigger_classifier_if_needed(self.request.uid, caps, self.session_id),
-                            name=f'fair_use_classifier:{self.request.uid}:{self.session_id}',
-                        )
-                        if FAIR_USE_RESTRICT_DAILY_DG_MS > 0:
-                            self.state.fair_use_track_dg_usage = True
-                    stage = await self.persistence.call(get_enforcement_stage, self.request.uid)
-                    if stage == 'restrict' and FAIR_USE_RESTRICT_DAILY_DG_MS > 0:
-                        self.state.fair_use_track_dg_usage = True
-                        was_exhausted = self.state.fair_use_dg_budget_exhausted
-                        self.state.fair_use_dg_budget_exhausted = await self.persistence.call(
-                            is_dg_budget_exhausted, self.request.uid
-                        )
-                        if self.state.fair_use_dg_budget_exhausted and not was_exhausted:
-                            logger.info('Fair-use DG budget exhausted')
-                    elif caps and FAIR_USE_RESTRICT_DAILY_DG_MS > 0:
-                        # Meter while the classifier decides whether this cap hit should escalate.
-                        self.state.fair_use_dg_budget_exhausted = False
-                    else:
-                        self.state.fair_use_track_dg_usage = False
-                        self.state.fair_use_dg_budget_exhausted = False
-                    # Hard anti-abuse daily audio ceiling (all plans): once over the ceiling,
-                    # stop forwarding audio to STT for the rest of the day. Reuses the same
-                    # gate the restrict stage uses, so no socket close / reconnect loop.
-                    if is_daily_audio_ceiling_exceeded(self.request.uid, speech_totals=totals):
-                        if not self.state.fair_use_dg_budget_exhausted:
-                            logger.info('Fair-use daily audio ceiling reached uid=%s', self.request.uid)
-                        self.state.fair_use_dg_budget_exhausted = True
-                except Exception as error:
-                    logger.error('Fair-use listen check failed type=%s', type(error).__name__)
-            await self._refresh_credits(transcription_seconds=transcription_seconds)
-
-    async def _refresh_credits(self, *, transcription_seconds: int = 0) -> None:
-        now = time.time()
-        invalidated = await self.persistence.call(check_credits_invalidation, self.request.uid)
-        needs_refresh = (
-            not self.state.remaining_seconds_cache_initialized
-            or invalidated
-            or now - self.state.remaining_seconds_cache_ts >= self.limits.credits_refresh_seconds
-            or (
-                self.state.remaining_seconds_cache is not None
-                and self.state.remaining_seconds_cache <= 0
-                and now - self.state.remaining_seconds_cache_ts >= 60
-            )
-        )
-        if needs_refresh:
-            self.state.remaining_seconds_cache = await self.persistence.call(
-                get_remaining_transcription_seconds, self.request.uid, source=self.request.source
-            )
-            self.state.remaining_seconds_cache_ts = now
-            self.state.remaining_seconds_cache_initialized = True
-        elif self.state.remaining_seconds_cache is not None and transcription_seconds > 0:
-            self.state.remaining_seconds_cache = max(0, self.state.remaining_seconds_cache - transcription_seconds)
-        remaining = self.state.remaining_seconds_cache
-        subscription = await self.persistence.call(user_db.get_user_valid_subscription, self.request.uid)
-        if remaining is not None and remaining <= FREEMIUM_THRESHOLD_SECONDS and not self.state.freemium_threshold_sent:
-            if should_emit_plus_meter_warning(subscription):
-                await self.asend_event(
-                    FreemiumThresholdReachedEvent(
-                        remaining_seconds=remaining, action=FREEMIUM_ACTION_SETUP_ON_DEVICE_STT
-                    )
-                )
-                self.state.freemium_threshold_sent = True
-                try:
-                    await send_credit_limit_notification(self.request.uid)
-                except Exception as error:
-                    logger.error('Credit-limit notification refresh failed type=%s', type(error).__name__)
-        self.user_has_credits = remaining is None or remaining > 0
-        if self.user_has_credits and (remaining is None or remaining > FREEMIUM_THRESHOLD_SECONDS):
-            self.state.freemium_threshold_sent = False
-        if not subscription or subscription.plan == PlanType.basic:
-            last_words = self.state.last_transcript_time or self.state.first_audio_byte_timestamp
-            if (
-                self.state.last_audio_received_time
-                and last_words
-                and self.state.last_audio_received_time - last_words > 15 * 60
-            ):
-                try:
-                    await send_silent_user_notification(self.request.uid)
-                except Exception as error:
-                    logger.error('Silent-user notification refresh failed type=%s', type(error).__name__)
+            await self._flush_usage(final=False)
 
     async def _flush_usage(self, *, final: bool) -> int:
-        if self.state.fair_use_track_dg_usage and self.state.dg_usage_ms_pending:
-            await self.persistence.call(record_dg_usage_ms, self.request.uid, self.state.dg_usage_ms_pending)
-            self.state.dg_usage_ms_pending = 0
         if self.use_custom_stt:
             # Exempt from transcription billing and live STT caps. Speech still
-            # drives Omi-paid LLM post-processing: meter the isolated fair-use
-            # lane and record speech_seconds (never transcription_seconds) so
-            # the processing budget can cap enrichment (#7690).
+            # drives Omi-paid LLM post-processing: record speech_seconds
+            # (never transcription_seconds) so the processing budget can cap
+            # enrichment (#7690).
             custom_speech_ms = 0
             if self.receiver.vad_gate is not None:
                 custom_speech_ms = self.receiver.vad_gate.consume_speech_ms_delta()
-                if FAIR_USE_ENABLED and custom_speech_ms:
-                    await self.persistence.call(record_speech_ms, self.request.uid, custom_speech_ms, 'custom_stt')
             if custom_speech_ms:
                 await self.persistence.call(
                     record_usage,
@@ -853,7 +701,7 @@ class ListenSessionRuntime:
             speech_seconds = speech_ms // 1000
             if speech_ms and not managed_chain_enabled(self):
                 # Live provider minutes: VAD speech seconds actually sent for
-                # STT (not wall-clock, not fair-use transcription_seconds),
+                # STT (not wall-clock, not transcription_seconds),
                 # attributed to the provider serving at flush time — failover
                 # can switch it mid-session, same read-at-use rule as
                 # _serving_provider(). The consumed delta makes each
@@ -866,8 +714,6 @@ class ListenSessionRuntime:
                     platform=getattr(getattr(self, 'client_device_context', None), 'platform', None),
                     seconds=speech_ms / 1000,
                 )
-            if FAIR_USE_ENABLED and speech_ms:
-                await self.persistence.call(record_speech_ms, self.request.uid, speech_ms)
         now = time.time()
         seconds = billable_transcription_seconds(
             self.state.last_usage_record_timestamp,

@@ -421,7 +421,7 @@ def eligibility(row: dict[str, Any] | None, job_id: str, job: dict[str, Any]) ->
     if row.get('sync_relevance_user_kept'):
         return 'user_kept'
     # Extra conservative fence: manual curation is evidence of user intent.
-    if is_user_curated(row) or row.get('is_locked') or row.get('folder_id'):
+    if is_user_curated(row) or row.get('folder_id'):
         return 'user_curated'
     return None
 

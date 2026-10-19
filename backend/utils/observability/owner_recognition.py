@@ -396,7 +396,7 @@ def _enriched_or_terminal(conversation: Any) -> bool:
 
     The deterministic minimum leaves overview, sections, action items, and events
     empty, so ``structured_is_rich`` is false until enrichment. A bare minimum
-    sets ``processing_state``. ``client_processing`` is not that evidence:
+    stored before #17 sets ``processing_state``. ``client_processing`` is not that evidence:
     ingress can attach a projection to a deferred, still-processing row whose
     capture never emitted.
     """

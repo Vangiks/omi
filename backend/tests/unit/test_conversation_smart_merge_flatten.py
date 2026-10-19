@@ -152,7 +152,7 @@ def _assign(world, incoming, *, candidate_id=None, target_id=None):
 def _index_row(world, cid):
     """Sync-assignment day-bucket entries for a row (what a real intake wrote)."""
     row = _decoded(world, cid)
-    return {key: row.get(key) for key in ('id', 'started_at', 'finished_at', 'source', 'client_device_id', 'is_locked')}
+    return {key: row.get(key) for key in ('id', 'started_at', 'finished_at', 'source', 'client_device_id')}
 
 
 def _seed_index(world, *cids):
@@ -291,7 +291,6 @@ def test_flatten_updates_rejects_each_invalid_ancestor(row):
         ('folder_user_set', True),
         ('sync_relevance_user_kept', True),
         ('has_photos', True),
-        ('is_locked', True),
         ('manual_speaker_assignments', {'x': 1}),
         ('capture_group', 'g'),
         ('visibility', 'shared'),
@@ -894,7 +893,6 @@ def test_lineage_donor_only_match_returns_donor_then_redirects(world):
         stamped_target=None,
         source='omi',
         client_device_id='pendant-1',
-        is_locked=False,
     )
     assert plan.targets['seg-1'] == 'n'
     incoming = _sync_chunk('seg-1', 15)
@@ -966,7 +964,6 @@ def test_flatten_cleanup_transfers_donor_and_ancestor_tasks(world, monkeypatch):
         ]
         conversation = SimpleNamespace(
             id='p',
-            is_locked=False,
             sync_content_revision=row['sync_content_revision'],
             structured=SimpleNamespace(action_items=items),
         )

@@ -106,8 +106,6 @@ def persistence_hook(record):
     namespace = {
         'record_capture_loss': record,
         'persistence_observer': None,
-        'derived_effects_disposition_observer': None,
-        'DerivedEffectsDisposition': SimpleNamespace(RUN='run'),
         'defer_derived_effects': True,
         # Owner-recognition observation is a separate counter. This hook only
         # proves capture-loss accounting still runs on an accepted persist.

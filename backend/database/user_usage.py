@@ -41,8 +41,7 @@ def _current_month_llm_usage_docs(llm_usage_ref: Any, now: datetime) -> Iterable
     Bounded by document id, so the read stays at "days elapsed this month"
     regardless of how long the account has existed. Listing the whole
     collection and fetching the in-month days one at a time grew both the read
-    count and the round-trips with account age, on the path every chat request
-    takes through ``enforce_chat_quota``.
+    count and the round-trips with account age.
     """
     next_year, next_month = _next_month(now)
     start = llm_usage_ref.document(f'{now.year}-{now.month:02d}-01')

@@ -20,7 +20,6 @@ from routers.listen import speakers
 from utils.audio import AudioRingBuffer
 from models.transcript_segment import TranscriptSegment
 from utils.sync import pipeline
-from utils.sync import speaker_identity
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from models.conversation import Conversation
@@ -342,8 +341,6 @@ def test_mobile_bulk_endpoint_teaches_corrects_and_rejects_foreign_person(world,
         conversations.conversations_db, '_prepare_conversation_for_write', lambda data, *args, **kwargs: data
     )
     monkeypatch.setattr(conversations, 'deserialize_conversation', deserialize)
-    # Free plan: naming a person in your own transcript must still work and teach.
-    monkeypatch.setattr('utils.speaker_permissions.users_db.get_user_valid_subscription', lambda uid, **kwargs: None)
     monkeypatch.setattr(conversations, '_emit_speaker_identity_confirmed', lambda **kwargs: None)
     monkeypatch.setattr(teaching_tasks, 'delete_speech_profile_blob', lambda path: world.deleted.append(path))
     app = FastAPI()
@@ -363,15 +360,6 @@ def test_mobile_bulk_endpoint_teaches_corrects_and_rejects_foreign_person(world,
         corrected = world.store.rows[('users', 'account-a', 'people', 'person-2')]
         assert corrected['speaker_embedding'] == [1.0, 0.0, 0.0]
         assert world.store.rows[world.conversation_path]['transcript_segments'][0]['person_id'] == 'person-2'
-        # Free plan end-to-end: manual assignment and teaching above still worked,
-        # but a later live session must not auto-identify the non-owner voice, and
-        # the sync cache stays owner-only (this fixture has no owner embedding).
-        monkeypatch.setattr(speakers, 'named_speaker_prompts_allowed', lambda uid: False)
-        monkeypatch.setattr(speaker_identity, 'named_speaker_prompts_allowed', lambda uid: False)
-        matcher, suggestions = asyncio.run(fresh_live_match(monkeypatch, 'account-a', world.vector))
-        assert 7 not in matcher.speaker_to_person
-        assert suggestions == []
-        assert set(pipeline.build_person_embeddings_cache('account-a')) == set()
 
 
 def test_next_conversation_refreshes_profiles_but_same_conversation_keeps_locked_matches(world, monkeypatch):
@@ -395,9 +383,3 @@ def test_next_conversation_refreshes_profiles_but_same_conversation_keeps_locked
         assert matcher.speaker_to_person[7][0] == 'person-1'
 
     asyncio.run(exercise())
-
-
-@pytest.fixture(autouse=True)
-def paid_named_speaker_entitlement(monkeypatch):
-    monkeypatch.setattr(speaker_identity, 'named_speaker_prompts_allowed', lambda uid: True)
-    monkeypatch.setattr(speakers, 'named_speaker_prompts_allowed', lambda uid: True)

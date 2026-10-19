@@ -37,7 +37,6 @@ def eligible_record(item: MemoryItem) -> bool:
         and item.processing_state == ProcessingState.processed
         and item.source_state == SourceState.active
         and not set(item.sensitivity_labels).intersection(RESTRICTED_SENSITIVITY_LABELS)
-        and not promotion.get("is_locked", False)
         and promotion.get("user_review") is not False
         and not (isinstance(use, dict) and use.get("suppressed") is True)
         and any(usable_evidence(evidence) for evidence in item.evidence)

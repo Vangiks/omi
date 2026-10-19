@@ -58,27 +58,7 @@ def _loaded_notifications() -> Iterator[ModuleType]:
         get_all_tokens=lambda _uid: ['device-token'],
         remove_bulk_tokens=lambda _tokens: None,
     )
-    redis_db = _module(
-        'database.redis_db',
-        has_credit_limit_notification_been_sent=lambda _uid: False,
-        set_credit_limit_notification_sent=lambda _uid: None,
-        has_silent_user_notification_been_sent=lambda _uid: False,
-        set_silent_user_notification_sent=lambda _uid: None,
-    )
     database_auth = _module('database.auth', get_user_from_uid=lambda _uid: None)
-
-    async def generate_notification_message(_uid: str, _name: str, _plan: str) -> tuple[str, str]:
-        return 'Welcome', 'Subscription active'
-
-    async def generate_credit_limit_notification(_uid: str, _name: str) -> tuple[str, str]:
-        return 'Limit reached', 'Upgrade to continue'
-
-    llm_notifications = _module(
-        'utils.llm.notifications',
-        generate_notification_message=generate_notification_message,
-        generate_credit_limit_notification=generate_credit_limit_notification,
-        generate_silent_user_notification=lambda _name: ('We miss you', 'Capture something today'),
-    )
 
     with stub_modules(
         {
@@ -86,9 +66,7 @@ def _loaded_notifications() -> Iterator[ModuleType]:
             'firebase_admin.messaging': messaging,
             'firebase_admin.auth': auth,
             'database.notifications': notification_db,
-            'database.redis_db': redis_db,
             'database.auth': database_auth,
-            'utils.llm.notifications': llm_notifications,
         }
     ):
         yield load_module_fresh(

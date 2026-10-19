@@ -273,7 +273,7 @@ def _conversation_signals(uid: str, signup_at: Optional[datetime], *, client: An
     ``last_active_at`` as the eligibility signal.
 
     **Too strict.** ``status == 'completed'`` looks like the obvious tightening
-    and silently deletes real output: ``_store_deferred_conversation`` persists
+    and silently deletes real output: the former lazy desktop deferral persisted
     a desktop conversation for a freemium/Neo user with ``deferred = True`` and
     ``status = processing``, and it stays there until the user opens it. Those
     are recorded conversations that are permanently not ``completed``, and they

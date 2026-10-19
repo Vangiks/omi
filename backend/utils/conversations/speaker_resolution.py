@@ -89,7 +89,6 @@ from utils.stt.conversation_speakers import (
 from utils.stt.owner_profile import load_owner_embedding, validated_embedding
 from utils.stt.speaker_embedding import extract_embedding_from_bytes, speaker_embedding_configured
 from utils.stt.speaker_identity import OMI_SPEAKER_ID_SENTINEL
-from utils.speaker_permissions import named_speaker_prompts_allowed
 from utils.stt.voiceprints import usable_person_voiceprint
 
 logger = logging.getLogger(__name__)
@@ -206,15 +205,6 @@ def load_voiceprints_for_resolution(uid: str, *, allow_audio_repair: bool = True
             prints[OWNER_IDENTITY] = owner.reshape(-1)
     except Exception as error:
         logger.warning('event=speaker_resolution_owner_profile outcome=failed exception_type=%s', type(error).__name__)
-    # Owner recognition is plan-independent: an entitlement read failure fails
-    # closed for person prints only, never for the owner's own voiceprint.
-    try:
-        named_allowed = named_speaker_prompts_allowed(uid)
-    except Exception as error:
-        logger.warning('event=speaker_resolution_entitlement outcome=failed exception_type=%s', type(error).__name__)
-        return prints
-    if not named_allowed:
-        return prints
     try:
         people = users_db.get_people(uid)
         reuse_people_for_spellings(uid, people)
@@ -1014,7 +1004,7 @@ def completed_identity_retry_skip_reason(raw: Optional[Mapping[str, Any]]) -> Op
         return 'missing'
     if raw.get('status') != 'completed':
         return 'not_completed'
-    for key, reason in (('deleted', 'deleted'), ('discarded', 'discarded'), ('is_locked', 'locked')):
+    for key, reason in (('deleted', 'deleted'), ('discarded', 'discarded')):
         if raw.get(key):
             return reason
     if raw.get('source') in ('desktop', 'phone', 'phone_call'):

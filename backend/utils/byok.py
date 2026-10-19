@@ -109,15 +109,7 @@ BYOK_HEADERS = {
 _byok_ctx: ContextVar[Optional[Dict[str, str]]] = ContextVar('byok_keys', default=None)
 _byok_uid_ctx: ContextVar[Optional[str]] = ContextVar('byok_uid', default=None)
 _byok_validated_ctx: ContextVar[bool] = ContextVar('byok_validated', default=False)
-_BYOK_RECOVERY_PATHS = frozenset(
-    {
-        '/v1/payments/available-plans',
-        '/v1/users/budget-choice',
-        '/v1/payments/overage-info',
-        '/v1/users/me/byok-active',
-        '/v1/users/me/subscription',
-    }
-)
+_BYOK_RECOVERY_PATHS = frozenset({'/v1/users/me/byok-active'})
 
 
 def get_byok_keys() -> Dict[str, str]:

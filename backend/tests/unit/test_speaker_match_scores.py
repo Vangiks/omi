@@ -155,7 +155,6 @@ def test_sync_records_actual_evidence_without_extra_work(monkeypatch, score_fail
     import models.transcript_segment as models
     import utils.sync.speaker_identity as sync
 
-    monkeypatch.setattr(sync, 'named_speaker_prompts_allowed', lambda uid: False)
     calls = []
     dependencies = dataclasses.replace(
         sync._DEFAULT_DEPS,

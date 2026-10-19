@@ -146,7 +146,6 @@ def test_pusher_lock_covers_mentor_v2_lazy_imports():
         'pytz': 'pytz',
         'redis': 'redis',
         'starlette': 'starlette',
-        'stripe': 'stripe',
         'tiktoken': 'tiktoken',
         'typesense': 'typesense',
         'ulid': 'python-ulid',

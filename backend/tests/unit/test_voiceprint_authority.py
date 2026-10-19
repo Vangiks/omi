@@ -1,4 +1,4 @@
-"""Offline authority contracts: entitlement snapshots, consent races, retraction and deletion."""
+"""Offline authority contracts: candidate loading, consent races, retraction and deletion."""
 
 import asyncio
 from datetime import datetime, timezone
@@ -17,7 +17,7 @@ from utils.manual_speaker_assignments import apply_manual_assignments
 from utils.speaker_learning_policy import authorized_teaching_segments
 from utils.speaker_tag_prompts import service
 from utils.sync import speaker_identity
-from utils import speaker_permissions, executors
+from utils import executors
 
 USER = ('users', 'u')
 CONV = (*USER, 'conversations', 'c')
@@ -40,8 +40,7 @@ def source(training=True, generation=1):
 
 
 @pytest.mark.parametrize('surface', ['live', 'sync', 'resolution'])
-@pytest.mark.parametrize('paid', [False, True])
-def test_candidates_are_gated_before_nonowner_reads(monkeypatch, surface, paid):
+def test_candidates_load_owner_and_people(monkeypatch, surface):
     person = {
         'id': 'p',
         'name': 'Synthetic',
@@ -50,13 +49,8 @@ def test_candidates_are_gated_before_nonowner_reads(monkeypatch, surface, paid):
         'speech_samples_version': 3,
     }
     load = Mock(return_value=[person])
-    permission = Mock(return_value=paid)
     monkeypatch.setattr(users, 'get_people', load)
     monkeypatch.setattr(users, 'get_user_speaker_embedding', lambda uid: [1.0, 0.0])
-    monkeypatch.setattr(speakers, 'named_speaker_prompts_allowed', permission)
-    monkeypatch.setattr(speaker_identity, 'named_speaker_prompts_allowed', permission)
-    monkeypatch.setattr(speaker_permissions, 'named_speaker_prompts_allowed', permission)
-    monkeypatch.setattr(speaker_resolution, 'named_speaker_prompts_allowed', permission)
     monkeypatch.setattr(speaker_identity, 'get_user_name', lambda uid: 'Owner')
     monkeypatch.setattr(speakers, 'get_user_name', lambda *a: 'Owner')
 
@@ -81,56 +75,20 @@ def test_candidates_are_gated_before_nonowner_reads(monkeypatch, surface, paid):
         cache = speaker_identity.build_person_embeddings_cache('u', dependencies=dependencies)
     else:
         cache = speaker_resolution.load_voiceprints_for_resolution('u')
-    assert set(cache) == ({'user', 'p'} if paid else {'user'})
-    assert load.call_count == int(paid)
-    assert permission.call_count == 1
+    assert set(cache) == {'user', 'p'}
+    assert load.call_count == 1
 
 
-def test_live_plan_changes_are_observed_on_rotation_once(monkeypatch):
-    # Rotation loads owner profiles even when capture had no speech profile.
-    # This entitlement test must not enter Firestore/recovery SDK retries.
-    monkeypatch.setattr(users, 'get_user_speaker_embedding', lambda uid: None)
-    monkeypatch.setattr(speakers, 'load_owner_embedding', lambda *_a, **_kw: None)
-    permission = Mock(side_effect=[True, False, True])
-    monkeypatch.setattr(speakers, 'named_speaker_prompts_allowed', permission)
-    monkeypatch.setattr(users, 'get_people', lambda uid: [])
-
-    async def call(fn, *a, **kw):
-        return fn(*a, **kw)
-
-    matcher = speakers.SpeakerMatcher(
-        SimpleNamespace(
-            request=SimpleNamespace(uid='u'),
-            persistence=SimpleNamespace(call=call),
-            has_speech_profile=False,
-            state=SimpleNamespace(speaker_id_enabled=True),
-        )
-    )
-
-    async def run():
-        for index, expected in enumerate([True, False, True]):
-            await matcher.refresh_for_conversation(str(index))
-            assert await matcher.named_speakers_allowed() is expected
-            assert await matcher.named_speakers_allowed() is expected
-        assert permission.call_count == 3
-
-    asyncio.run(run())
-
-
-def test_sync_empty_paid_cache_keeps_text_permission_without_rereading(monkeypatch):
-    monkeypatch.setattr(speaker_identity, 'named_speaker_prompts_allowed', lambda uid: pytest.fail('batch re-read'))
+def test_sync_empty_cache_still_matches_text_introductions():
     detect = Mock(return_value='Synthetic')
     lookup = Mock(return_value={'id': 'p', 'name': 'Synthetic'})
     deps = speaker_identity.SpeakerIdentityDependencies(
         detect_speaker_from_text=detect,
         users_db=SimpleNamespace(get_person_by_name=lookup),
     )
-    for paid in [False, True]:
-        segment = TranscriptSegment(id='s', text='My name is Synthetic', speaker_id=1, start=0, end=2, is_user=False)
-        speaker_identity.identify_speakers_for_segments(
-            [segment], None, speaker_identity.PersonEmbeddingsCache(paid), 'u', dependencies=deps
-        )
-        assert segment.person_id == ('p' if paid else None)
+    segment = TranscriptSegment(id='s', text='My name is Synthetic', speaker_id=1, start=0, end=2, is_user=False)
+    speaker_identity.identify_speakers_for_segments([segment], None, {}, 'u', dependencies=deps)
+    assert segment.person_id == 'p'
     assert detect.call_count == lookup.call_count == 1
 
 
@@ -281,40 +239,6 @@ def test_inflight_owner_publication_cannot_cross_a_correction():
         == 0
     )
     assert not store.rows[USER].get('speaker_embedding')
-
-
-def test_live_entitlement_read_cannot_restore_old_conversation_permission():
-    async def call(fn, *a, **kw):
-        matcher.clear()
-        return True
-
-    matcher = speakers.SpeakerMatcher(
-        SimpleNamespace(request=SimpleNamespace(uid='u'), persistence=SimpleNamespace(call=call))
-    )
-    assert asyncio.run(matcher.named_speakers_allowed()) is False
-    assert matcher._named_speakers_allowed is None
-
-
-def test_live_entitlement_read_failure_stays_closed_and_is_retried():
-    calls = []
-
-    async def call(fn, *a, **kw):
-        calls.append(fn)
-        if len(calls) == 1:
-            raise RuntimeError('subscription read failed')
-        return True
-
-    matcher = speakers.SpeakerMatcher(
-        SimpleNamespace(request=SimpleNamespace(uid='u'), persistence=SimpleNamespace(call=call))
-    )
-
-    async def run():
-        assert await matcher.named_speakers_allowed() is False
-        assert matcher._named_speakers_allowed is None
-        assert await matcher.named_speakers_allowed() is True
-
-    asyncio.run(run())
-    assert len(calls) == 2
 
 
 @pytest.mark.parametrize('segment_scope, teaches', [('scope-a', True), ('scope-b', False)])

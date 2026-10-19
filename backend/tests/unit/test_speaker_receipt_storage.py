@@ -115,13 +115,12 @@ def test_automatic_review_is_emitted_after_commit_and_not_on_retry(world, monkey
     assert observed == ['sync_embedding', None]
 
 
-@pytest.mark.parametrize('field,error', [('is_locked', PermissionError), ('deleted', LookupError)])
-def test_blocked_manual_write_never_emits_review(world, monkeypatch, field, error):
+def test_blocked_manual_write_never_emits_review(world, monkeypatch):
     store, path, _ = world
-    store.rows[path][field] = True
+    store.rows[path]['deleted'] = True
     observed = []
     monkeypatch.setattr(db, 'record_speaker_review', lambda *args: observed.append(args))
-    with pytest.raises(error):
+    with pytest.raises(LookupError):
         db.assign_conversation_speaker('u', 'c', person_id='new', segment_ids=['s1'])
     assert observed == []
 

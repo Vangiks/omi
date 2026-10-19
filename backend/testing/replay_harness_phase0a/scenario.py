@@ -89,9 +89,6 @@ def _seed_user(firestore_client: firestore.Client, uid: str) -> None:
             "subscription": {"plan": "basic", "status": "active"},
         }
     )
-    firestore_client.collection("users").document(uid).collection("fair_use_state").document("current").set(
-        {"stage": "none"}
-    )
 
 
 def _seed_capture_provenance(harness: Harness, uid: str, conversation_id: str) -> None:

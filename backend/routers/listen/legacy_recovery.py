@@ -196,18 +196,8 @@ async def flush_stt_buffer(self: Any, buffer: bytearray, *, force: bool = False)
             force=force,
             socket_dead=socket_dead,
             socket_available=self.stt_socket is not None,
-            fair_use_dg_budget_exhausted=self.host.state.fair_use_dg_budget_exhausted,
-            fair_use_track_dg_usage=self.host.state.fair_use_track_dg_usage,
-            sample_rate=request.sample_rate,
         )
         if not decision.should_flush:
-            return
-        if self.host.state.fair_use_dg_budget_exhausted:
-            buffer.clear()
-            # Fair use cleared queued STT bytes: the capture samples they
-            # carried were never sent, so the next buffer starts at the
-            # cursor and those samples simply have no provider mapping.
-            self._stt_buffer_start_sample = None
             return
         outbound_audio = bytes(buffer)
         outbound_start_sample = self._stt_buffer_start_sample
@@ -234,7 +224,6 @@ async def flush_stt_buffer(self: Any, buffer: bytearray, *, force: bool = False)
             if (ring := self._window_ring()) is not None:
                 ring.append(outbound_audio, outbound_start_sample)
             self._capture('capture_outbound_stt', outbound_audio)
-            self.host.state.dg_usage_ms_pending += decision.dg_usage_ms
             self._stt_buffer_start_sample = None
             return
         if self.host.state.stt_terminal_failure:

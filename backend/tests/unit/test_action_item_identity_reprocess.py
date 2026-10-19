@@ -198,7 +198,7 @@ def _item(description, due_at=None):
 
 def _conversation(conversation_id, items):
     return SimpleNamespace(
-        id=conversation_id, is_locked=False, source='omi', structured=SimpleNamespace(action_items=list(items))
+        id=conversation_id, source='omi', structured=SimpleNamespace(action_items=list(items))
     )
 
 

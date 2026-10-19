@@ -52,18 +52,6 @@ xcrun swift test --package-path desktop/macos/Desktop --filter 'ConversationProj
 These hermetic tests exercise decode, reconciliation, and production SQLite storage. Named-bundle
 end-to-end acceptance remains a separate check.
 
-## Restoring access to already-transcribed content
-
-Subscription upgrades restore access by clearing lock metadata on stored
-conversations, memories, and action items. The optional reset recovery path uses
-the same updates in bounded pages after authenticated HTTP requests while the
-current plan allowance is available. Unfinished UTC quota months retry on later
-requests until recovery completes. Initial enablement starts draining the current
-month’s already-locked backlog without waiting for a month boundary. Once that
-month is complete, content locked later waits until the next UTC quota month.
-Recovery does not retranscribe audio or debit transcription usage; clients continue
-using the existing `is_locked` field.
-
 ## Architecture Diagram
 
 ```mermaid
@@ -120,7 +108,6 @@ users/
 │   │       ├── apps_results
 │   │       ├── discarded
 │   │       ├── visibility
-│   │       ├── is_locked
 │   │       └── data_protection_level
 │   │
 │   ├── memories/                         # SECONDARY - Extracted facts
@@ -193,7 +180,6 @@ users/
 | `external_data` | object | Data from external integrations |
 | `discarded` | boolean | Whether conversation was marked as low-quality |
 | `visibility` | enum | `private`, `shared`, or `public` |
-| `is_locked` | boolean | Whether conversation is locked from editing |
 | `data_protection_level` | string | `standard` or `enhanced` (encrypted) |
 
 ### Structured Information
@@ -287,7 +273,6 @@ During `process_conversation()`, the system:
 | `edited` | boolean | Whether user edited the content |
 | `scoring` | string | Ranking score for retrieval |
 | `manually_added` | boolean | Whether user created manually |
-| `is_locked` | boolean | Prevent automatic deletion |
 | `app_id` | string | Source app (if from integration) |
 | `data_protection_level` | string | Encryption level |
 

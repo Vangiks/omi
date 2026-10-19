@@ -4,7 +4,7 @@ The cache in ``database.people_stats_cache`` serves only the aggregate
 person_id -> stats map behind ``GET /v1/users/people?include_stats=true``.
 Everything here is hermetic: ``_FakeRedis`` models value+TTL with an injected
 clock, and ``_Store`` is a path-keyed Firestore double exposing the
-transaction/batch surface ``@firestore.transactional`` and
+transaction surface ``@firestore.transactional`` and
 ``run_transactional`` drive.
 """
 
@@ -563,35 +563,11 @@ class _TestTransaction(StrictFirestoreTransaction):
         self._database.rows[ref.path] = payload
 
 
-class _TestBatch:
-    """Non-transactional write batch for the direct-CRUD unlock writer."""
-
-    def __init__(self, database):
-        self._database = database
-        self._ops = []
-
-    def update(self, ref, data):
-        self._ops.append(lambda: ref.update(data))
-
-    def set(self, ref, data, merge=False):
-        self._ops.append(lambda: ref.set(data, merge=merge))
-
-    def delete(self, ref):
-        self._ops.append(ref.delete)
-
-    def commit(self):
-        ops, self._ops = self._ops, []
-        for op in ops:
-            op()
-        self._database.batch_commits += 1
-
-
 class _TestStore(StrictFirestore):
-    """Strict read-before-write store plus direct-CRUD, batch, and equality-scan adapters."""
+    """Strict read-before-write store plus direct-CRUD and equality-scan adapters."""
 
     def __init__(self, rows: Optional[Dict[tuple, dict]] = None, **kwargs):
         super().__init__(rows, **kwargs)
-        self.batch_commits = 0
 
     def collection(self, name):
         return _TestCollection(self, (name,))
@@ -604,9 +580,6 @@ class _TestStore(StrictFirestore):
         transaction = _TestTransaction(self, allow_reads_after_writes=self._allow_reads_after_writes)
         self.transactions.append(transaction)
         return transaction
-
-    def batch(self):
-        return _TestBatch(self)
 
     def conv_path(self, uid, cid):
         return ('users', uid, 'conversations', cid)
@@ -877,26 +850,6 @@ def test_assign_sync_conversation_invalidates_once_after_size_limit_retry(writer
     assert invalidated == ['u1']
 
 
-def _allow_unlocked_data_plane(monkeypatch):
-    import database.account_deletion_marker as marker
-
-    miss = SimpleNamespace(exists=False, to_dict=lambda: None)
-    monkeypatch.setattr(
-        marker,
-        'get_data_plane_firestore_client',
-        lambda: SimpleNamespace(document=lambda path: SimpleNamespace(get=lambda *args, **kwargs: miss)),
-    )
-
-
-def test_unlock_all_conversations_invalidates_after_every_batch_commit(writer_env, monkeypatch):
-    _allow_unlocked_data_plane(monkeypatch)
-    store, invalidated = writer_env
-    for index in range(600):
-        store.seed_conv('u1', f'l{index}', status='completed', is_locked=True)
-    conversations_db.unlock_all_conversations('u1')
-    assert invalidated == ['u1', 'u1']
-
-
 def test_smart_merge_absorb_invalidates_after_absorbed_commit(writer_env, monkeypatch):
     store, invalidated = writer_env
     monkeypatch.setattr(smart_merge_db, 'invalidate_people_stats_cache', lambda uid: invalidated.append(uid))
@@ -1053,15 +1006,3 @@ def test_unconfigured_redis_disables_the_cache_without_error(monkeypatch):
     people_stats_cache.write_people_stats_cache('u1', 'g1', 1000, {})
     people_stats_cache.invalidate_people_stats_cache('u1')
 
-
-def test_reset_unlock_conversations_is_bounded_and_repairs_cache_on_empty_retry(writer_env, monkeypatch):
-    _allow_unlocked_data_plane(monkeypatch)
-    store, invalidated = writer_env
-    for index in range(101):
-        store.seed_conv('u1', f'l{index}', status='completed', is_locked=True)
-    assert conversations_db.unlock_all_conversations('u1', limit=100) == 100
-    assert sum(row.get('is_locked', False) for row in store.rows.values()) == 1
-    assert conversations_db.unlock_all_conversations('u1', limit=100) == 1
-    invalidated.clear()
-    assert conversations_db.unlock_all_conversations('u1', limit=100) == 0
-    assert invalidated == ['u1']

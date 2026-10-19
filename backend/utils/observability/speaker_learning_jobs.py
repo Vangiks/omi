@@ -32,7 +32,6 @@ _OUTCOMES = frozenset(
         'exhausted',
         'superseded',
         'deleted',
-        'locked',
         'discarded',
         'disabled',
         'capacity_exhausted',

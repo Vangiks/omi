@@ -199,7 +199,6 @@ export function normalizeKnowledgeLedgerMemory(value: unknown): Memory | null {
     'edited',
     'reviewed',
     'is_baseline',
-    'is_locked',
     'is_read',
     'is_dismissed',
     'deleted',

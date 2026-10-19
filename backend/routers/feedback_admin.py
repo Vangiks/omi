@@ -1,7 +1,7 @@
 """Admin endpoints for the daily thumbs-down report.
 
 Access is deliberately narrow. Every route here requires the `X-Admin-Key`
-header to match the backend `ADMIN_KEY`, the same gate `fair_use_admin` uses.
+header to match the backend `ADMIN_KEY`.
 The only caller is admin.omi.me, whose route handlers add the key server-side
 after checking the browser's Firebase token against `adminData/{uid}` — so
 reaching this data needs both an admin account on admin.omi.me and a key that

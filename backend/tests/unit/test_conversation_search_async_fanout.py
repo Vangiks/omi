@@ -25,7 +25,7 @@ from utils.conversations.search import ConversationSearchUnavailableError  # noq
 
 
 def _conv(cid: str) -> dict:
-    return {'id': cid, 'is_locked': False}
+    return {'id': cid}
 
 
 def _typesense_result(ids: list, page: int = 1, per_page: int = 10) -> dict:

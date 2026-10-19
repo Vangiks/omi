@@ -67,11 +67,9 @@ def omit_null_processing_state(payload: dict[str, Any]) -> dict[str, Any]:
 
     ``Conversation.dict()`` / ``model_dump()`` always emit the modeled field,
     including its None default. Persist is ``merge=True``, so that emitted None
-    is a real Firestore key: missing versus explicit-null is a distinction the
-    dark rollout must respect (``terminal_no_derived_effects`` is written only
-    by the branch that owns it; this field is the same discipline). Drop the
-    key whenever nothing wrote a real state. A real value — the flag-on
-    minimum's ``local_pending`` — passes through untouched.
+    is a real Firestore key, so drop the key whenever nothing wrote a real
+    state. A real value — ``local_pending`` on a row stored before #17 —
+    passes through untouched.
 
     Clearing a stale state on enrichment is the opposite write and cannot be
     an omission: an omitted key survives the merge. The enrichment persist
@@ -89,7 +87,7 @@ def omit_null_processing_state(payload: dict[str, Any]) -> dict[str, Any]:
 def clear_summary_retryable(payload: dict[str, Any]) -> dict[str, Any]:
     """A processing result answers a pending summary retry.
 
-    Used by the enrichment and free-tier terminal persists: a row that carried
+    Used by the enrichment persist: a row that carried
     ``summary_retryable=True`` now holds the outcome of a new processing pass,
     so the retry affordance must go. merge=True keeps an omitted key, so a set
     marker is cleared with an explicit null; an absent or null marker is
@@ -113,9 +111,8 @@ def client_processing_mutation(projection: Any) -> dict[str, Any]:
 
     1. Merge into a document-create payload (``create_processing_conversation``
        / ``create_completed_conversation`` when this persist IS the conversation's
-       first write). ``_store_projected_conversation`` /
-       ``_store_deterministic_minimum`` do this only for
-       ``CreateConversation`` / ``ExternalIntegrationCreateConversation``.
+       first write), only for ``CreateConversation`` /
+       ``ExternalIntegrationCreateConversation``.
     2. Pass to ``update_conversation`` after the coordinator returns. This is
        the working way for a route whose conversation already exists (from-segments
        post-create stamp, late-bind, synchronous finalize): the coordinator's

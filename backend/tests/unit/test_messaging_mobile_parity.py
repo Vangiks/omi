@@ -10,7 +10,6 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
-from fastapi import HTTPException
 from tests.unit.test_chat_quota_counting_router import _make_chat_client, _cleanup
 
 
@@ -27,7 +26,7 @@ def environment():
     _cleanup(saved)
 
 
-@pytest.mark.parametrize('scenario', ['success', 'quota', 'accounting', 'typed_error', 'malformed_history', 'files'])
+@pytest.mark.parametrize('scenario', ['success', 'accounting', 'typed_error', 'malformed_history', 'files'])
 @pytest.mark.parametrize('typed', [False, True])
 def test_mobile_stored_documents_stream_bytes_and_prompt_inputs_match(environment, scenario, typed):
     router, service, old_send, namespace = environment
@@ -65,8 +64,6 @@ def test_mobile_stored_documents_stream_bytes_and_prompt_inputs_match(environmen
     service.chat_db.get_cache_aligned_messages.return_value = (
         [{'broken': True}] if scenario == 'malformed_history' else []
     )
-    if scenario == 'quota':
-        service.enforce_chat_quota.side_effect = HTTPException(402, {'error': 'quota_exceeded', 'plan': 'Free'})
     if scenario == 'accounting':
         service.llm_usage_db.record_chat_quota_question.side_effect = RuntimeError('unavailable')
     data = service.SendMessageRequest(text='hello', file_ids=['f'] if scenario == 'files' else [], device_tools=[])

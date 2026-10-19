@@ -12,16 +12,15 @@ app:
 - `POST /v2/messages` ran the turn with no app, giving the wrong persona and
   storing the reply as main chat.
 
-Seam: the router handlers are called directly with `chat_db`,
-`initial_message_util` and the quota enforcer patched — no Firestore client and
-no FastAPI app construction.
+Seam: the router handlers are called directly with `chat_db` and
+`initial_message_util` patched — no Firestore client and no FastAPI app
+construction.
 """
 
 from datetime import datetime, timezone
 from unittest.mock import Mock
 
 import pytest
-from fastapi import HTTPException
 
 import routers.chat as chat_router
 import utils.chat_session_target as chat_target
@@ -147,40 +146,3 @@ def test_reading_a_named_session_scopes_history_to_its_app(monkeypatch, sessions
     }
 
 
-def test_over_quota_turn_in_a_named_session_carries_session_and_app(monkeypatch, sessions):
-    """The canned turn joins the named session and is stored under its app."""
-    added = []
-    joined = []
-
-    def _enforce(uid, platform=None, **_kwargs):
-        raise HTTPException(
-            status_code=402,
-            detail={'error': 'quota_exceeded', 'plan': 'Free', 'unit': 'questions', 'limit': 30},
-        )
-
-    monkeypatch.setattr(chat_turn, 'enforce_chat_quota', _enforce)
-    monkeypatch.setattr(chat_router.chat_db, 'add_message', lambda uid, msg: added.append(msg))
-    monkeypatch.setattr(
-        chat_router.chat_db,
-        'add_message_to_chat_session',
-        lambda uid, sid, mid: joined.append((sid, mid)),
-    )
-
-    from models.chat import SendMessageRequest
-
-    # The over-quota path resolves the client population from request headers,
-    # so this turn needs a real request rather than a bare payload.
-    request = Request({'type': 'http', 'headers': [(b'x-app-platform', b'ios')]})
-
-    chat_router.send_message(
-        SendMessageRequest(text='hi'),
-        request,
-        plugin_id=None,
-        app_id=None,
-        chat_session_id='sess-app',
-        uid='uid-1',
-    )
-
-    assert [m['app_id'] for m in added] == ['app-9', 'app-9']
-    assert {sid for sid, _ in joined} == {'sess-app'}
-    assert {mid for _, mid in joined} == {m['id'] for m in added}

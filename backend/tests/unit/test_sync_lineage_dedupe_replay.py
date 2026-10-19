@@ -59,7 +59,6 @@ def live_row(**extra):
         'finished_at': at(T0 + 70),
         'source': 'omi',
         'client_device_id': 'pendant',
-        'is_locked': False,
         'discarded': False,
         'status': 'completed',
         'external_data': {'recording_session_id': ORIGIN, 'recording_origin_id': ORIGIN},
@@ -869,7 +868,6 @@ def test_pending_plan_output_defers_through_real_process_segment(pipeline_module
         stamped_target='STAMP',
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
     )
     signed_url, prerecorded_call = MagicMock(), MagicMock()
     ok, _, finish = _drive_process_segment(
@@ -906,7 +904,6 @@ def test_tolerant_pending_plan_output_defers_through_real_process_segment(pipeli
         stamped_target=stamp,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
     )
     assert segment_plan.targets == {'wal': None}
     assert segment_plan.binding_reasons == {'wal': 'ambiguous_pending'}

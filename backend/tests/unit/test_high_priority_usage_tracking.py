@@ -5,7 +5,6 @@ Verifies that track_usage context managers are properly placed around LLM calls 
 - goals.py (suggest_goal, get_goal_advice, extract_and_update_goal_progress)
 - knowledge_graph.py (extract_knowledge_from_memory, rebuild_knowledge_graph.process_memory)
 - external_integrations.py (get_conversation_summary, generate_comprehensive_daily_summary)
-- notifications.py (generate_notification_message, generate_credit_limit_notification)
 """
 
 import os
@@ -223,12 +222,11 @@ sys.modules["utils.llms.memory"].get_prompt_memories = MagicMock(return_value=("
 
 # --- Stub utils.memory.memory_service.MemoryService (canonical memory read path) ---
 class _StubMemoryRecord:
-    def __init__(self, content, is_locked=False):
+    def __init__(self, content):
         self.content = content
-        self.is_locked = is_locked
 
     def dict(self):
-        return {'content': self.content, 'is_locked': self.is_locked}
+        return {'content': self.content}
 
 
 class _StubMemoryService:
@@ -285,7 +283,7 @@ clients_mod.parser = mock_parser
 def _get_llm_stub(name, **_kwargs):
     if name in {'goals', 'knowledge_graph', 'daily_summary_simple'}:
         return mock_llm_mini
-    if name in {'goals_advice', 'notifications'}:
+    if name == 'goals_advice':
         return mock_llm_medium
     if name == 'daily_summary':
         return mock_llm_medium_experiment
@@ -497,73 +495,11 @@ class TestExternalIntegrationsTracking:
             mock_llm_mini.invoke = original_invoke
 
 
-class TestNotificationsTracking:
-    """Verify track_usage wraps LLM calls in notifications.py."""
-
-    def test_both_notification_calls_tracked(self):
-        source = _read_source("utils/llm/notifications.py")
-        count = source.count("with track_usage(uid, Features.SUBSCRIPTION_NOTIFICATION):")
-        assert count == 2, f"Expected 2 track_usage(SUBSCRIPTION_NOTIFICATION) wrappers, found {count}"
-
-    def test_generate_notification_message_sets_context(self):
-        """Verify generate_notification_message sets context during async LLM call."""
-        captured_ctx = {}
-
-        async def capturing_ainvoke(prompt):
-            ctx = _usage_context.get()
-            if ctx:
-                captured_ctx['uid'] = ctx.uid
-                captured_ctx['feature'] = ctx.feature
-            return MagicMock(content="Hey there! Welcome!")
-
-        original_ainvoke = mock_llm_medium.ainvoke
-        mock_llm_medium.ainvoke = capturing_ainvoke
-        try:
-            from utils.llm.notifications import generate_notification_message
-
-            loop = asyncio.new_event_loop()
-            result = loop.run_until_complete(generate_notification_message("test-uid-notif", "Alice", "unlimited"))
-            loop.close()
-            assert captured_ctx.get('feature') == Features.SUBSCRIPTION_NOTIFICATION
-            assert captured_ctx.get('uid') == "test-uid-notif"
-            assert result[0] == "omi"
-        finally:
-            mock_llm_medium.ainvoke = original_ainvoke
-
-    def test_generate_credit_limit_notification_sets_context(self):
-        """Verify generate_credit_limit_notification sets context during async LLM call."""
-        captured_ctx = {}
-
-        async def capturing_ainvoke(prompt):
-            ctx = _usage_context.get()
-            if ctx:
-                captured_ctx['uid'] = ctx.uid
-                captured_ctx['feature'] = ctx.feature
-            return MagicMock(content="You've been using transcription a lot!")
-
-        original_ainvoke = mock_llm_medium.ainvoke
-        mock_llm_medium.ainvoke = capturing_ainvoke
-        try:
-            from utils.llm.notifications import generate_credit_limit_notification
-
-            loop = asyncio.new_event_loop()
-            result = loop.run_until_complete(generate_credit_limit_notification("test-uid-credit", "Bob"))
-            loop.close()
-            assert captured_ctx.get('feature') == Features.SUBSCRIPTION_NOTIFICATION
-            assert captured_ctx.get('uid') == "test-uid-credit"
-            assert result[0] == "omi"
-        finally:
-            mock_llm_medium.ainvoke = original_ainvoke
-
-
 class TestFeatureConstants:
     """Verify all new feature constants exist."""
 
     def test_daily_summary_constant(self):
         assert Features.DAILY_SUMMARY == "daily_summary"
-
-    def test_subscription_notification_constant(self):
-        assert Features.SUBSCRIPTION_NOTIFICATION == "subscription_notification"
 
     def test_knowledge_graph_constant(self):
         assert Features.KNOWLEDGE_GRAPH == "knowledge_graph"

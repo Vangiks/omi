@@ -11,7 +11,7 @@ import {
 import { CompactPluginCard } from '@/components/marketplace/plugin-card/CompactPluginCard';
 import { CategoryBreadcrumb } from '@/components/marketplace/CategoryBreadcrumb';
 import { BreadcrumbJsonLd, SoftwareAppJsonLd } from '@/components/seo/JsonLd';
-import { Calendar, User, FolderOpen, Puzzle, ArrowRight, DollarSign } from 'lucide-react';
+import { Calendar, User, FolderOpen, Puzzle, ArrowRight } from 'lucide-react';
 import Image from '@tschk/moonshine-next/image';
 import Link from '@tschk/moonshine-next/link';
 import { registerMoonshineRoute } from '@/moonshine/register-client-route';
@@ -211,7 +211,6 @@ export default function PluginDetailPage() {
         category={categoryName}
         ratingValue={plugin.rating_avg}
         ratingCount={plugin.rating_count}
-        price={plugin.is_paid ? plugin.price : 0}
         url={`/apps/${plugin.id}`}
       />
       {/* Fixed Header and Navigation */}
@@ -247,13 +246,6 @@ export default function PluginDetailPage() {
                 <div>
                   <div className="flex items-center gap-3">
                     <h1 className="text-4xl font-bold text-white">{plugin.name}</h1>
-                    {plugin.is_paid && (
-                      <span className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/15 px-3 py-1.5 text-sm font-semibold text-amber-400">
-                        <DollarSign className="h-4 w-4" />
-                        {plugin.price?.toFixed(2)}
-                        {plugin.payment_plan === 'monthly_recurring' ? '/mo' : ''}
-                      </span>
-                    )}
                   </div>
                   <p className="mt-2 text-xl text-gray-400">by {plugin.author}</p>
 
@@ -342,27 +334,6 @@ export default function PluginDetailPage() {
           <section className="mt-16">
             <h2 className="mb-6 text-2xl font-bold text-white">Additional Details</h2>
             <div className="grid gap-8 sm:grid-cols-2">
-              {plugin.is_paid && (
-                <div>
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="h-5 w-5 text-amber-400" />
-                    <div className="text-sm font-medium text-gray-400">Pricing</div>
-                  </div>
-                  <div className="mt-1 pl-7">
-                    <span className="text-base font-semibold text-amber-400">
-                      ${plugin.price?.toFixed(2)}
-                      {plugin.payment_plan === 'monthly_recurring' ? '/month' : ''}
-                    </span>
-                    <span className="ml-2 text-sm text-gray-400">
-                      {plugin.payment_plan === 'monthly_recurring'
-                        ? '(Monthly subscription)'
-                        : plugin.payment_plan === 'one_time'
-                          ? '(One-time purchase)'
-                          : '(Paid)'}
-                    </span>
-                  </div>
-                </div>
-              )}
               {formatDate(plugin.created_at) && (
                 <div>
                   <div className="flex items-center gap-2">

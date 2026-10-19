@@ -38,8 +38,7 @@ def _fixture(monkeypatch, window):
     bad = conversation.transcript_segments[-1]
     bad.start, bad.end = window
     monkeypatch.setattr(stage.users_db, 'get_user_speaker_embedding', lambda uid: VOICES[0].tolist())
-    monkeypatch.setattr(stage, 'named_speaker_prompts_allowed', lambda uid: False)
-    monkeypatch.setattr(stage.users_db, 'get_people', lambda uid: pytest.fail('free owner reads paid people'))
+    monkeypatch.setattr(stage.users_db, 'get_people', lambda uid: [])
     return conversation, bad
 
 

@@ -58,9 +58,9 @@ const APPS_SURFACE = 'apps'
 // Surfaces the backend `detail` on an enable/disable failure ONLY when it is
 // user-appropriate and actionable — currently just the disabled-app "…currently
 // unavailable…" 400. The other backend details are deliberately omitted: the
-// private/paid 403 "You are not authorized…" is non-actionable (and ambiguous —
-// same message for both cases) and the external-app 400 "App setup is not completed"
-// is handled by the dedicated setup flow, not this quick toggle. macOS swallows ALL
+// private-app 403 "You are not authorized…" is non-actionable and the external-app
+// 400 "App setup is not completed" is handled by the dedicated setup flow, not this
+// quick toggle. macOS swallows ALL
 // of these (its bound `errorMessage` has zero read sites); Windows surfaces the
 // failure via a toast, and shows the raw detail only where it helps the user.
 function userSafeDetail(e: unknown): string | undefined {
@@ -520,7 +520,7 @@ export function Apps(): React.JSX.Element {
       // Install — attempt-first (macOS handleInstall): POST enable, and only if it
       // fails route an external-integration app into its setup flow (open browser +
       // poll) instead of surfacing the 400. A non-external failure toasts the error
-      // (surfacing what macOS swallows: paid/private 403, "currently unavailable" 400,
+      // (surfacing what macOS swallows: private-app 403, "currently unavailable" 400,
       // or a network failure). No optimistic flip here — the button spins until the
       // real outcome is known, so it never flickers Installed→Install→Setting up.
       setBusy((s) => new Set(s).add(a.id))
@@ -530,16 +530,6 @@ export function Apps(): React.JSX.Element {
       } catch (e) {
         if (worksExternally(a)) {
           beginSetupFlow(a)
-        } else if (a.is_paid) {
-          // Paid app the user hasn't bought → the backend gates enable with a 403
-          // (identical message to the private-app 403, so we can't branch on the body).
-          // macOS swallows this silently; surface it and point to the detail sheet's
-          // purchase flow instead of a bare "Couldn't install".
-          console.error('Enable paid app failed:', e)
-          toast(`${a.name} is a paid app`, {
-            tone: 'error',
-            body: 'Open it to purchase before installing.'
-          })
         } else {
           console.error('Enable app failed:', e)
           toast(`Couldn’t install ${a.name}`, { tone: 'error', body: userSafeDetail(e) })

@@ -63,16 +63,14 @@ SYNC_CONVERSATION_BYTE_BUDGET = FIRESTORE_MAX_DOCUMENT_BYTES - 124 * 1024  # 900
 
 
 def capture_mismatch(left: dict, right: dict) -> str:
-    """Which partition fields differ, as one of eight fixed tokens.
+    """Which partition fields differ, as one of four fixed tokens.
 
     ``none`` exactly when ``compatible_capture`` holds: every field is compared
-    for equality, so two locked captures match. Never exposes field values.
+    for equality. Never exposes field values.
     """
     fields = [
         name for key, name in (('source', 'source'), ('client_device_id', 'device')) if left.get(key) != right.get(key)
     ]
-    if bool(left.get('is_locked')) != bool(right.get('is_locked')):
-        fields.append('lock')
     return '_'.join(fields) or 'none'
 
 
@@ -100,9 +98,7 @@ def fragment_rule(segments: list[dict]) -> tuple[Optional[str], str]:
 
 def compatible_capture(left: dict, right: dict) -> bool:
     # Unknown is a partition, not a wildcard: wildcard equality is non-transitive.
-    return all(left.get(key) == right.get(key) for key in ('source', 'client_device_id')) and bool(
-        left.get('is_locked')
-    ) == bool(right.get('is_locked'))
+    return all(left.get(key) == right.get(key) for key in ('source', 'client_device_id'))
 
 
 def interval_matches(row: dict, incoming: dict) -> bool:
@@ -324,10 +320,10 @@ def assign_in_transaction(
     anchor_mismatch = capture_mismatch(own_anchor, incoming) if own_anchor else 'none'
     if anchor_mismatch != 'none':
         logger.warning('event=sync_assignment_target outcome=anchor_rejected mismatch=%s', anchor_mismatch)
-        # The stored retry anchor changed source, device or lock state since it
-        # was written. It can no longer match temporally, so continuing would
-        # replace it with a new row. An unchanged anchor (locked or not) is a
-        # plain retry and deduplicates below.
+        # The stored retry anchor changed source or device since it was
+        # written. It can no longer match temporally, so continuing would
+        # replace it with a new row. An unchanged anchor is a plain retry and
+        # deduplicates below.
         raise SyncAssignmentConflict('sync anchor provenance mismatch', subtype='provenance_mismatch')
 
     live_stats: Optional[dict] = None
@@ -566,7 +562,6 @@ def assign_in_transaction(
             result['relevance_decision'] = sync_intake_decision(rule)
         elif is_rule_discard_decision(result.get('relevance_decision')):
             result['relevance_decision'] = None
-        result['is_locked'] = bool(incoming.get('is_locked'))
         result['private_cloud_sync_enabled'] = any(
             row.get('private_cloud_sync_enabled') for row in [incoming, *records]
         )

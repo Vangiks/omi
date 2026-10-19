@@ -32,7 +32,6 @@ from database.people_stats_cache import invalidate_people_stats_cache
 from models.client_processing import PROJECTION_FAMILY_FIELDS
 from utils.conversations.processing_trigger import PROCESSING_MODES, ProcessingTrigger
 from utils.conversations.recovery import (
-    TERMINAL_NO_DERIVED_EFFECTS_FIELD,
     raw_transcript_bytes,
     recovery_audio_file_ids,
     structured_has_protected_content,
@@ -318,13 +317,9 @@ def recovery_admission_refusal(
         return 'tombstoned'
     if conversation.get('deferred'):
         return 'deferred'
-    if conversation.get('is_locked'):
-        return 'locked'
     processing_state = getattr(conversation.get('processing_state'), 'value', conversation.get('processing_state'))
     if processing_state == 'local_pending':
         return 'local_pending'
-    if conversation.get(TERMINAL_NO_DERIVED_EFFECTS_FIELD):
-        return 'terminal_no_derived'
     source = getattr(conversation.get('source'), 'value', conversation.get('source'))
     if source != 'omi':
         return 'source'

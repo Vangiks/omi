@@ -151,31 +151,18 @@ def is_firestore_index_guard_path(path: str) -> bool:
 AREA_TESTS = (
     (
         (
-            'backend/config/plan_catalog',
-            'backend/scripts/generate_plan_catalog.py',
             'backend/models/users.py',
             'backend/utils/subscription.py',
-            'backend/utils/subscription_state_machine.py',
-            'backend/utils/overage.py',
-            'backend/utils/fair_use.py',
-            'backend/utils/sync/rate_limit.py',
-            'backend/scripts/support/find_stripe_entitlement_mismatches.py',
-            'backend/routers/payment.py',
             'backend/routers/retired_desktop_proactivity.py',
-            'backend/database/phone_call_config.py',
         ),
         (),
         (
-            'tests/unit/test_plan_catalog_contract.py',
             'tests/unit/test_subscription_*.py',
             'tests/unit/test_user_subscription_wire_contract.py',
             'tests/unit/test_stripe_*.py',
-            'tests/unit/test_payment_price_id_validation.py',
             'tests/unit/test_chat_quota.py',
-            'tests/unit/test_fair_use_*.py',
             'tests/unit/test_phone_call*.py',
             'tests/unit/test_desktop_proactivity.py',
-            'tests/unit/test_sync_fair_use_gate.py',
         ),
     ),
     (
@@ -269,19 +256,6 @@ AREA_TESTS = (
         ('backend/routers/action_items', 'backend/services/action_items/', 'backend/utils/action_items'),
         (),
         ('tests/unit/test_action_item*.py', 'tests/unit/test_dev_api_action_items_poison.py'),
-    ),
-    (
-        ('backend/routers/payment', 'backend/services/payment/', 'backend/utils/payments'),
-        (),
-        (
-            'tests/unit/test_payment_*.py',
-            'tests/unit/test_stripe_*.py',
-            'tests/unit/test_subscription_*.py',
-            'tests/unit/test_available_plans_resilience.py',
-            'tests/unit/test_trial_metadata.py',
-            'tests/unit/test_paywall_reconnect_gate.py',
-            'tests/unit/test_chat_quota.py',
-        ),
     ),
     (
         ('backend/routers/apps', 'backend/services/apps/', 'backend/utils/apps'),

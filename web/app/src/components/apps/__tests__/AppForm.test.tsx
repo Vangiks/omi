@@ -7,7 +7,6 @@ const api = vi.hoisted(() => ({
   getAppCategories: vi.fn(async () => [{ id: 'productivity', title: 'Productivity' }]),
   getAppCapabilities: vi.fn(async () => [{ id: 'chat', title: 'Chat' }]),
   getNotificationScopes: vi.fn(async () => []),
-  getPaymentPlans: vi.fn(async () => []),
   createApp: vi.fn(async () => ({ app_id: 'app-2' })),
   updateApp: vi.fn(async () => {}),
   uploadAppThumbnail: vi.fn(async () => ({
@@ -67,5 +66,26 @@ describe('AppForm screenshots', () => {
         undefined,
       ),
     );
+  });
+});
+
+describe('AppForm without paid apps', () => {
+  beforeEach(() => {
+    api.updateApp.mockClear();
+  });
+
+  it('offers no price and saves an app flagged as paid without price fields', async () => {
+    const paidApp = { ...app, is_paid: true, price: 5, payment_plan: 'one_time' } as App;
+    const { container } = render(<AppForm mode="edit" app={paidApp} />);
+
+    await uploadScreenshot(container);
+    expect(screen.queryByText('Paid App')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+
+    await waitFor(() => expect(api.updateApp).toHaveBeenCalled());
+    const [, data] = api.updateApp.mock.calls[0] as unknown as [string, Record<string, unknown>];
+    expect(data).not.toHaveProperty('is_paid');
+    expect(data).not.toHaveProperty('price');
+    expect(data).not.toHaveProperty('payment_plan');
   });
 });

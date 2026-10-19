@@ -594,7 +594,6 @@ class MemoryDB(Memory):
     scoring: Optional[str] = None
     app_id: Optional[str] = None
     data_protection_level: Optional[str] = None
-    is_locked: bool = False
     is_read: bool = False
     is_dismissed: bool = False
     kg_extracted: bool = False

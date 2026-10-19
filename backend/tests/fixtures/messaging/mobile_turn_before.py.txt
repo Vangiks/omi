@@ -1,26 +1,6 @@
 # Frozen /v2/messages before shared-service extraction. Executable parity oracle.
 def send_message(data, request, plugin_id=None, app_id=None, chat_session_id=None, uid=None, x_app_platform=None):
     typed_failures = request.headers.get('X-Omi-Chat-Failure-Protocol') == '1'
-    try:
-        enforce_chat_quota(uid, platform=x_app_platform, required_llm_provider=_required_chat_quota_provider())
-    except HTTPException as exc:
-        if exc.status_code != 402 or not isinstance(exc.detail, dict):
-            raise
-        if exc.detail.get('error') != 'quota_exceeded':
-            raise
-        _compat_id = app_id or plugin_id
-        if _compat_id in ['null', '']:
-            _compat_id = None
-        _quota_target = resolve_chat_target(uid, _compat_id, chat_session_id)
-        response_msg = _build_quota_exceeded_reply(uid, data, _quota_target.app_id, exc.detail, ChatSession(**_quota_target.session) if _quota_target.session else None)
-
-        def _quota_exceeded_stream():
-            if typed_failures:
-                yield 'error: {"error":"quota_exceeded","message":"quota_exceeded"}\n\n'
-            encoded = base64.b64encode(bytes(response_msg.model_dump_json(), 'utf-8')).decode('utf-8')
-            yield f'done: {encoded}\n\n'
-        record_product_event('chat_message_sent', request=request, uid=uid, outcome='quota_exceeded')
-        return StreamingResponse(_quota_exceeded_stream(), media_type='text/event-stream')
     compat_app_id = app_id or plugin_id
     logger.info(f'send_message {sanitize_pii(data.text)} {compat_app_id} {uid}')
     if compat_app_id in ['null', '']:

@@ -72,7 +72,7 @@ def _scoped_conversation_fetch(
     # (same as list/search hydration); get_conversation alone can silently drop those rows.
     convs = conversations_db.get_conversations_by_id(uid, [conversation_id], include_discarded=True)
     conv = convs[0] if convs else None
-    if not conv or conv.get('is_locked', False):
+    if not conv:
         return [], f"No accessible conversation found for scoped id {conversation_id}."
     if not include_discarded and conv.get('discarded', False):
         return [], f"No accessible conversation found for scoped id {conversation_id}."
@@ -362,10 +362,6 @@ def get_conversations_tool(
                 include_discarded=include_discarded,
                 statuses=status_list,
             )
-
-            # Filter out locked conversations (paid plan required)
-            if conversations_data:
-                conversations_data = [c for c in conversations_data if not c.get('is_locked', False)]
     except Exception as e:
         logger.error(f"❌ Unexpected error retrieving conversations: {e}", exc_info=True)
         return "An unexpected error occurred while fetching conversations. Please try again later."
@@ -640,9 +636,7 @@ def search_conversations_tool(
         elif exact_conversation_id:
             conversation_ids = [exact_conversation_id]
             conversations_data = conversations_db.get_conversations_by_id(uid, conversation_ids)
-            conversations_data = [
-                c for c in conversations_data if not c.get('is_locked', False) and not c.get('discarded', False)
-            ]
+            conversations_data = [c for c in conversations_data if not c.get('discarded', False)]
             conversations_data = [
                 c for c in conversations_data if conversation_matches_date_range(c, starts_at, ends_at)
             ]
@@ -731,9 +725,7 @@ def search_conversations_tool(
                     f"No conversations found matching '{query}'. "
                     + chat_transcript_coverage_note(transcript_search.searched)
                 )
-            conversations_data = [
-                c for c in conversations_data if not c.get('is_locked', False) and not c.get('discarded', False)
-            ]
+            conversations_data = [c for c in conversations_data if not c.get('discarded', False)]
             # Index hits can be stale vs created_at; re-check the hydrated doc against the
             # hard chat window so timeframe-scoped Ask never returns out-of-window rows.
             start_bound = start_dt.timestamp() if start_dt is not None else None

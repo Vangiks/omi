@@ -859,12 +859,10 @@ class TestToolResultContract:
         ("raised", "expected_code"),
         [
             (ToolExecutionError("gone", code=-32001), "not_found"),
-            (ToolExecutionError("pay", code=-32002), "paid_plan_required"),
             (ToolExecutionError("bad", code=-32602), "invalid_arguments"),
             (ToolExecutionError("bad", code=-32000), "invalid_arguments"),
             (HTTPException(status_code=403, detail="denied"), "authorization_denied"),
             (HTTPException(status_code=404, detail="nope"), "not_found"),
-            (HTTPException(status_code=402, detail="pay"), "paid_plan_required"),
             (HTTPException(status_code=429, detail="slow"), "rate_limited"),
             (authorization_denied_error("scope"), "authorization_denied"),
             (RuntimeError("boom"), "internal"),
@@ -1168,7 +1166,6 @@ class TestObservabilityNormalization:
         for code in (
             "none",
             "not_found",
-            "paid_plan_required",
             "invalid_arguments",
             "authorization_denied",
             "rate_limited",

@@ -18,9 +18,6 @@ export interface Plugin {
   rating_count: number;
   capabilities: Set<string>;
   created_at: string | null;
-  is_paid?: boolean;
-  price?: number;
-  payment_plan?: 'one_time' | 'monthly_recurring' | null;
   is_popular?: boolean;
 }
 

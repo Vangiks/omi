@@ -23,6 +23,7 @@ from utils.conversations.audio_placement import prepare_audio_coverage
 from utils.conversations.smart_merge_policy import rebase_donor_segments
 from utils.metrics import OMI_AUDIO_PLACEMENT_TOTAL, OMI_CONVERSATION_SPEAKER_RESOLUTION_REASONS_TOTAL
 from utils.other.audio_chunks import AudioChunkReadSession
+from tests.support.retired_speaker_permissions import retired_speaker_permissions
 
 SR = 16000
 STARTED = datetime(2026, 9, 25, 12, 0, tzinfo=timezone.utc)
@@ -107,7 +108,6 @@ def env(monkeypatch):
     # This fixture supplies no enrolled owner audio. Keep the repair-state
     # dependency hermetic instead of invoking the real SDK client factory.
     monkeypatch.setattr(recovery_db, 'get_user_speaker_embedding_recovery_state', lambda uid: None)
-    monkeypatch.setattr(stage, 'named_speaker_prompts_allowed', lambda uid: True)
     store = {}
     monkeypatch.setattr(stage, 'speaker_embedding_configured', lambda: True)
     monkeypatch.setattr(stage, 'download_speaker_embedding_cache', lambda uid, cid: store.get(cid))
@@ -133,12 +133,12 @@ def _load_baseline_stage():
         text=True,
     ).stdout
     module = types.ModuleType('speaker_resolution_pinned_baseline')
-    exec(compile(source, 'speaker_resolution.py', 'exec'), module.__dict__)
+    with retired_speaker_permissions():
+        exec(compile(source, 'speaker_resolution.py', 'exec'), module.__dict__)
     return module
 
 
 def _patch_stage_deps(monkeypatch, module, store, diarizer):
-    monkeypatch.setattr(module, 'named_speaker_prompts_allowed', lambda uid: True)
     monkeypatch.setattr(module, 'speaker_embedding_configured', lambda: True)
     monkeypatch.setattr(module, 'download_speaker_embedding_cache', lambda uid, cid: store.get(cid))
     monkeypatch.setattr(module, 'upload_speaker_embedding_cache', lambda uid, cid, data: store.__setitem__(cid, data))
@@ -174,7 +174,8 @@ def _round3_module(name, relpath):
         text=True,
     ).stdout
     module = types.ModuleType(name)
-    exec(compile(source, relpath, 'exec'), module.__dict__)
+    with retired_speaker_permissions():
+        exec(compile(source, relpath, 'exec'), module.__dict__)
     return module
 
 

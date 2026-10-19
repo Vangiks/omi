@@ -109,8 +109,6 @@ def _set_e2e_env():
     os.environ["OMI_MEMORY_READ_RETRY_BURST"] = "64"
     _rr._retry_allowance = _rr.RetryAllowance()
     os.environ["AUDIO_MERGE_DISPATCH_MODE"] = "inline"
-    # Disable Stripe validation so startup doesn't fail.
-    os.environ["STRIPE_SECRET_KEY"] = ""
     os.environ["ADMIN_KEY"] = ""
     for proxy_var in (
         "HTTP_PROXY",
@@ -559,7 +557,6 @@ def sample_conversation_data(fresh_uid):
         ],
         "discarded": False,
         "status": "completed",
-        "is_locked": False,
     }
 
 

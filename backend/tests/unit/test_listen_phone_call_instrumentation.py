@@ -49,9 +49,6 @@ def _phone_call_host(**overrides):
         ),
         state=SimpleNamespace(
             current_conversation_id=None,
-            fair_use_dg_budget_exhausted=False,
-            fair_use_track_dg_usage=False,
-            dg_usage_ms_pending=0,
             first_audio_byte_timestamp=None,
         ),
         client_device_context=SimpleNamespace(platform='ios'),

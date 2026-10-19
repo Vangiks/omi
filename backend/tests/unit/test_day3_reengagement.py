@@ -406,7 +406,7 @@ def test_every_ended_status_counts_as_real_output(monkeypatch, status):
     """The mirror-image failure, and the more damaging one for this cohort.
 
     Tightening to `status == 'completed'` looks obviously safer and silently
-    erases real conversations: `_store_deferred_conversation` persists a
+    erases real conversations: the former lazy desktop deferral persisted a
     desktop capture for a freemium/Neo user with `deferred = True` and
     `status = processing`, and it stays that way until the user opens it. Those
     users are exactly who this experiment targets, so treating `processing` as

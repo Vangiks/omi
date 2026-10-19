@@ -4,7 +4,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.omi.me
 
 /**
  * Same-origin passthrough for the *unauthenticated* backend endpoints the
- * public pages read (marketplace, fair-use case status).
+ * public pages read (the marketplace).
  *
  * The sibling `/api/proxy/[...path]` route rejects every request without an
  * Authorization header, and the backend sends no CORS headers by default
@@ -19,7 +19,6 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://api.omi.me
 const PUBLIC_PATH_PATTERNS: RegExp[] = [
   /^v1\/approved-apps$/,
   /^v2\/apps$/,
-  /^v1\/fair-use\/case\/[^/]+\/status$/,
 ];
 
 export function isPublicProxyPath(path: string): boolean {
@@ -44,15 +43,6 @@ const UPSTREAM_TIMEOUT_MS = 10_000;
  * a cached error would outlive the outage that produced it.
  */
 const SUCCESS_CACHE_CONTROL = 'public, max-age=60, stale-while-revalidate=300';
-const FAIR_USE_STATUS_PATH = /^v1\/fair-use\/case\/[^/]+\/status$/;
-
-export function publicProxyCacheControl(
-  path: string,
-  succeeded: boolean,
-): string | undefined {
-  if (FAIR_USE_STATUS_PATH.test(path)) return 'no-store';
-  return succeeded ? SUCCESS_CACHE_CONTROL : undefined;
-}
 
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
@@ -75,8 +65,7 @@ export async function GET(request: Request) {
       'Content-Type':
         response.headers.get('content-type') || 'application/json; charset=utf-8',
     };
-    const cacheControl = publicProxyCacheControl(path, response.ok);
-    if (cacheControl) headers['Cache-Control'] = cacheControl;
+    if (response.ok) headers['Cache-Control'] = SUCCESS_CACHE_CONTROL;
     return new Response(body, { status: response.status, headers });
   } catch (error) {
     console.error('Public proxy error:', error);

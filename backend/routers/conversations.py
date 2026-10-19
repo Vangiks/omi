@@ -74,7 +74,6 @@ from utils.conversations.projection_payload import (
 )
 from utils.conversations.process_conversation import (
     AppUsageAttribution,
-    DerivedEffectsDisposition,
     process_conversation,
     run_first_open_derived_work,
     retrieve_in_progress_conversation,
@@ -152,9 +151,6 @@ def _get_valid_conversation_by_id(uid: str, conversation_id: str, *, follow_sync
         )
         if not conversation or conversations_db.is_soft_deleted(conversation):
             raise HTTPException(status_code=404, detail="Conversation not found")
-
-    if conversation.get('is_locked', False):
-        raise HTTPException(status_code=402, detail="A paid plan is required to access this conversation.")
 
     return conversation
 
@@ -371,7 +367,7 @@ def _accepted_client_projection(raw: Any, segments: Any) -> Optional[ClientProce
     """Bind a client projection to the persisted transcript, or drop it.
 
     Schema failures and hash mismatch are not request errors: the conversation
-    still finalizes on the deterministic minimum. Warnings are content-free
+    still finalizes without the projection. Warnings are content-free
     (reason plus provenance only — never transcript or body).
     """
     if raw is None:
@@ -578,15 +574,10 @@ def process_in_progress_conversation(
 
     conversation.status = ConversationStatus.processing
     persisted = False
-    derived_effects_disposition = DerivedEffectsDisposition.RUN
 
     def record_persistence(current: bool) -> None:
         nonlocal persisted
         persisted = current
-
-    def record_derived_effects_disposition(current: DerivedEffectsDisposition) -> None:
-        nonlocal derived_effects_disposition
-        derived_effects_disposition = current
 
     # This synchronous path has no durable job for the reconciler to replay, so
     # a processing failure must return the admission to in_progress — otherwise
@@ -598,19 +589,12 @@ def process_in_progress_conversation(
             conversation.language,
             conversation,
             persistence_observer=record_persistence,
-            derived_effects_disposition_observer=record_derived_effects_disposition,
             client_projection=client_projection,
             trigger=ProcessingTrigger.CLIENT_FINALIZE,
         )
     if not persisted:
         latest = _get_valid_conversation_by_id(uid, conversation.id)
         return CreateConversationResponse(conversation=deserialize_conversation(latest), messages=[])
-    # A terminal free-tier minimum persists successfully but must not fan out
-    # apps/webhooks — the same decision the durable finalizer already honours
-    # via derived_effects_disposition_observer (section 1.7). The conversation
-    # itself still returns to the client; this suppresses derived effects only.
-    if derived_effects_disposition == DerivedEffectsDisposition.TERMINAL_NO_DERIVED_EFFECTS:
-        return CreateConversationResponse(conversation=conversation, messages=[])
     messages = asyncio.run(trigger_external_integrations(uid, conversation))
 
     return CreateConversationResponse(conversation=conversation, messages=messages)
@@ -982,7 +966,7 @@ def get_conversations_count(
     response_model=Conversation,
     tags=['conversations'],
     description=(
-        "Detail responses include transcript fields when available. Locked or redacted conversations "
+        "Detail responses include transcript fields when available. Redacted conversations "
         "may include an empty transcript_segments array even though transcript data exists."
     ),
 )
@@ -1592,8 +1576,6 @@ def _assign_manual_speaker(
         )
     except LookupError as error:
         raise HTTPException(status_code=404, detail=str(error)) from error
-    except PermissionError as error:
-        raise HTTPException(status_code=402, detail='A paid plan is required to access this conversation.') from error
     except ValueError as error:
         raise HTTPException(status_code=409, detail=str(error)) from error
     conversation = deserialize_conversation(raw)
@@ -1958,14 +1940,10 @@ async def generate_conversation_topic_endpoint(
     on a just-saved conversation instead of inventing one via Anthropic Haiku chat
     completions; full backend processing still overwrites it later.
     """
-    # Deferred with the LLM helper: this router is covered by module-isolation tests that
-    # build a minimal dependency graph, and utils.subscription pulls database.user_usage
-    # in at import time.
+    # Deferred: this router is covered by module-isolation tests that build a minimal
+    # dependency graph.
     from utils.llm import conversation_topic as conversation_topic_llm
-    from utils.subscription import is_trial_paywalled
 
-    if await run_blocking(db_executor, is_trial_paywalled, uid, 'desktop'):
-        raise HTTPException(status_code=402, detail='trial_expired')
     topic = await run_blocking(
         llm_executor,
         lambda: conversation_topic_llm.generate_conversation_topic(uid, body.transcript),
@@ -1990,7 +1968,6 @@ async def _search_exact_conversation_reference(
         [exact_conversation_id],
         include_discarded=bool(search_request.include_discarded),
     )
-    conversations = [conversation for conversation in conversations if not conversation.get('is_locked')]
     conversations = [
         conversation
         for conversation in conversations
@@ -2135,9 +2112,6 @@ async def search_conversations_endpoint(
     # Preserve merge order (transcript-first on page 1); Firestore fetch may reshuffle.
     by_id = {c.get('id'): c for c in conversations if c.get('id')}
     conversations = [by_id[cid] for cid in conversation_ids if cid in by_id]
-    # Typesense filters locked hits, but the index can lag Firestore. Re-check after hydration
-    # so search never leaks that a locked conversation matched a query.
-    conversations = [conversation for conversation in conversations if not conversation.get('is_locked')]
     # Speaker filtering happens here, not in Typesense: the index has no transcript_segments field, so
     # asking Typesense for one 400'd and 500'd the request. The hydrated Firestore documents do carry
     # transcript_segments, so match against those.
@@ -2150,8 +2124,7 @@ async def search_conversations_endpoint(
         and conversation_matches_date_range(conversation, start_timestamp, end_timestamp)
     ]
     conversations = conversations[:effective_per_page]
-    # Attach grep-style transcript snippets (start/end for seek-to-moment) before list redaction
-    # clears segments on locked rows.
+    # Attach grep-style transcript snippets (start/end for seek-to-moment) before list redaction.
     if (search_request.query or '').strip():
         conversations = attach_match_snippets_to_conversations(conversations, search_request.query)
     redact_conversations_for_list(conversations)
@@ -2170,7 +2143,7 @@ async def search_conversations_endpoint(
     tags=['conversations'],
 )
 def get_conversation_suggested_apps(conversation_id: str, uid: str = Depends(auth.get_current_user_uid)):
-    from utils.apps import get_available_app_by_id_with_reviews, get_is_user_paid_app
+    from utils.apps import get_available_app_by_id_with_reviews
 
     conversation_data = _get_valid_conversation_by_id(uid, conversation_id)
     conversation = deserialize_conversation(conversation_data)
@@ -2181,12 +2154,6 @@ def get_conversation_suggested_apps(conversation_id: str, uid: str = Depends(aut
         app_data = get_available_app_by_id_with_reviews(app_id, uid)
         if app_data:
             app = App(**app_data)
-            # Add user-specific data
-            app.is_user_paid = get_is_user_paid_app(app.id, uid)
-
-            # Add payment link with user reference
-            if app.payment_link:
-                app.payment_link = f'{app.payment_link}?client_reference_id=uid_{uid}'
 
             # Generate thumbnail URLs if thumbnails exist
             if app.thumbnails:
@@ -2267,7 +2234,7 @@ def merge_conversations(
     Merge multiple conversations into a new conversation (async).
 
     Flow:
-    1. Validates conversations (locked? completed?)
+    1. Validates conversations (completed?)
     2. Returns immediately with 200 OK
     3. Background task creates new merged conversation
     4. Background task deletes source conversations

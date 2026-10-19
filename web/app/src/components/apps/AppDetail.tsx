@@ -9,7 +9,6 @@ import {
   Star,
   Download,
   Loader2,
-  Check,
   Lock,
   MessageSquare,
   ExternalLink,
@@ -509,24 +508,6 @@ export function AppDetail({ appId }: AppDetailProps) {
                       )}
                     </div>
                   ))}
-                </div>
-              </Section>
-            )}
-
-            {/* Pricing */}
-            {app.is_paid && app.price !== undefined && (
-              <Section title="Pricing">
-                <div className="rounded-lg bg-bg-tertiary p-4">
-                  <p className="text-lg font-medium text-text-primary">
-                    ${(app.price / 100).toFixed(2)}
-                    {app.payment_plan === 'monthly' && '/month'}
-                  </p>
-                  {app.is_user_paid && (
-                    <p className="mt-1 flex items-center gap-1 text-sm text-green-400">
-                      <Check className="h-4 w-4" />
-                      Subscribed
-                    </p>
-                  )}
                 </div>
               </Section>
             )}

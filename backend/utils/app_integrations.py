@@ -42,8 +42,6 @@ from database.chat import add_app_message, get_app_messages
 from database.goals import get_user_goals
 from database.notifications import get_mentor_notification_frequency
 from database.users import get_user_language_preference  # used via module attribute by proactivity_producers
-from utils.subscription import is_trial_paywalled
-from utils.mentor_admission import mentor_plan_allows_evaluation
 from database.redis_db import (
     get_generic_cache,
     set_generic_cache,
@@ -243,8 +241,6 @@ async def trigger_external_integrations(
     instead of failing the conversation's fanout one final time.
     """
     if not conversation or conversation.discarded:
-        return []
-    if conversation.is_locked:
         return []
 
     client_kind = resolve_client_kind(
@@ -449,8 +445,7 @@ def _retrieve_contextual_memories(uid: str, user_context):
         entities=filters.get("entities", []),
         dates=filters.get("dates", []),
     )
-    convos = conversations_db.get_conversations_by_id(uid, memories_id)
-    return [c for c in convos if not c.get('is_locked')]
+    return conversations_db.get_conversations_by_id(uid, memories_id)
 
 
 def _hit_proactive_notification_rate_limits(uid: str, app: App):
@@ -734,10 +729,6 @@ def admit_mentor_evaluation(uid: str, conversation_messages: list[dict]) -> tupl
         if skip_reason:
             logger.info(f"mentor_gate_debounce skipped uid={uid} reason={skip_reason} words={gate_word_count}")
             return None
-        # Resolve entitlement only after every cheap rejection. Free users
-        # consume neither a gate evaluation nor any context/model work.
-        if not mentor_plan_allows_evaluation(uid):
-            return None
         _record_mentor_gate_evaluation(
             uid,
             now=gate_now,
@@ -945,12 +936,6 @@ async def _async_trigger_realtime_integrations(
     *,
     client_kind: ClientKind = 'unknown',
 ) -> dict:
-    # Paywall: skip mentor + third-party proactive notifications when this
-    # transcription session belongs to a paywalled desktop user.
-    # Reactivates automatically when the user upgrades or activates BYOK.
-    if await run_blocking(db_executor, is_trial_paywalled, uid, source):
-        return {}
-
     # The mentor lane is v2-only: the legacy mentor pipeline was deleted once
     # v2 reached 100%. Shared buffering/admission still gates it, and any
     # non-cohort env value (unset, stale legacy/v2, typo) invokes nothing.

@@ -245,11 +245,9 @@ cannot use re-entry to bypass expiry, link revocation or channel reply windows.
 
 ## Rollout, evidence, and design differences
 
-`OMI_MESSAGING_CHANNELS=off` by default, an empty exact uid allowlist, and the existing
-`get_user_valid_subscription(..., provision=False)` authority fail closed. Admission uses
-`is_paid_plan(subscription.plan)` for every paid catalog plan, rather than copying billing
-or expiry logic. Basic/free and expired subscriptions are rejected by the existing
-subscription authority. Production config enables all valid paid users on Telegram and only David's exact
+`OMI_MESSAGING_CHANNELS=off` by default and an empty exact uid allowlist fail closed.
+Admission does not read a subscription: this fork has no billing.
+Production config enables all users on Telegram and only David's exact
 uid on iMessage, on Cloud Run `backend`; other services and environments retain
 their default-off behavior.
 
@@ -341,16 +339,16 @@ Open Graph metadata and `web/` are unchanged.
 Provider contracts: [Linq sending messages](https://docs.linqapp.com/channel/imessage/guides/messaging/sending-messages/)
 and [rich link previews](https://docs.linqapp.com/channel/imessage/guides/messaging/rich-link-previews/).
 
-## Paid messaging launch policy
+## Messaging launch policy
 
 `OMI_MESSAGING_CHANNEL_POLICY` overrides legacy uid admission per channel. Telegram's
-`cohort:"*"` admits all valid paid plans; iMessage defaults to Operator/Architect and
-180 distinct linked users. Cohorts, plans and seat caps are configurable. Explicit `seat_cap:"off"` retains
-legacy all-paid admission without capacity IO; prod uses it for David-only iMessage. Atomic link
+`cohort:"*"` admits every user; iMessage defaults to
+180 distinct linked users. Cohorts and seat caps are configurable. Explicit `seat_cap:"off"` admits
+the cohort without capacity IO; prod uses it for David-only iMessage. Atomic link
 redemption and per-user member records own seat accounting; unlink/deletion release the
 last member link. Legacy env-only deployments behave as before. Optional cached remote
 channel switches, shared Redis Telegram pacing, typed waitlist errors, retention jobs
-and metric/alert deployment steps are in the [runbook](runbooks/messaging-channels.md#paid-launch-preparation-and-seat-operations).
+and metric/alert deployment steps are in the [runbook](runbooks/messaging-channels.md#launch-preparation-and-seat-operations).
 
 
 ## Inbound modality matrix (Brief S)
@@ -371,6 +369,6 @@ and metric/alert deployment steps are in the [runbook](runbooks/messaging-channe
 | Unsupported attachment | Generic worker apology → one specific supported-format reply | Generic worker apology → one specific supported-format reply |
 
 Limits, incident evidence, exact prod policy, and manual launch steps are in the
-[runbook](runbooks/messaging-channels.md#approved-all-paid-telegram-configuration-brief-s).
+[runbook](runbooks/messaging-channels.md#approved-all-user-telegram-configuration-brief-s).
 No client binary or app code change is required; PostHog entry visibility must be
-expanded by the operator for the paid Telegram audience.
+expanded by the operator for the Telegram audience.

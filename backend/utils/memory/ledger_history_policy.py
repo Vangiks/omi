@@ -40,8 +40,6 @@ def is_ledger_history_item(item: MemoryItem, row: MemoryDB) -> bool:
         return False
     if set(item.sensitivity_labels).intersection(RESTRICTED_SENSITIVITY_LABELS):
         return False
-    if row.is_locked:
-        return False
     # Admit only states the public MemoryDB wire shape can represent. A
     # status-only superseded row would otherwise serialize as current.
     return (
@@ -72,9 +70,6 @@ def is_temporal_history_access_eligible(
     if item.status not in {MemoryItemStatus.active, MemoryItemStatus.superseded}:
         return False
     if item.processing_state != ProcessingState.processed:
-        return False
-    promotion = item.promotion or {}
-    if promotion.get('is_locked') is True:
         return False
     if item.source_state in {SourceState.tombstoned, SourceState.purged}:
         return False

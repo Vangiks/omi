@@ -69,6 +69,8 @@ def test_release_lands_in_the_recorded_plan_bucket(store) -> None:
 
     day = store.rows[('users', UID, 'llm_usage', '2026-09-02')]
     assert day['backend_chat']['quota_questions'] == 0
-    assert day['plan_usage']['basic']['backend_chat']['quota_questions'] == 0
+    # Record and release must share one plan bucket, whatever plan it is.
+    (plan_bucket,) = day['plan_usage'].values()
+    assert plan_bucket['backend_chat']['quota_questions'] == 0
     # The release must not mint a phantom call on the bucket.
-    assert day['plan_usage']['basic']['backend_chat'].get('call_count', 0) == 1
+    assert plan_bucket['backend_chat'].get('call_count', 0) == 1

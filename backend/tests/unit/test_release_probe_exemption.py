@@ -29,21 +29,15 @@ def test_constant_matches_the_documented_uid() -> None:
     assert RELEASE_PROBE_UID == 'omi-release-probe'
 
 
-def test_desktop_gates_exempt_only_the_probe_uid() -> None:
-    """The gate cluster must consult the shared predicate (no local literal,
-    no reinvented matching), and every desktop deferral branch must be
-    guarded by it. Static contract: the guard module is the single source of
-    truth and the gates' `not probe_uid` conditions reference its result."""
+def test_discard_gates_exempt_only_the_probe_uid() -> None:
+    """The discard gates must consult the shared predicate (no local literal,
+    no reinvented matching). Static contract: the guard module is the single
+    source of truth."""
     conversations = Path(__file__).resolve().parents[2] / 'utils' / 'conversations'
     process_source = (conversations / 'process_conversation.py').read_text(encoding='utf-8')
     assert "from utils.release_probe import is_release_probe_uid" in process_source
-    assert "probe_uid = is_release_probe_uid(uid)" in process_source
     assert "'omi-release-probe'" not in process_source
-    # All three desktop deferral gates (trial paywall, S6 policy, legacy
-    # deferral) sit behind the exemption guard.
-    guarded = process_source.count('and not probe_uid')
-    assert guarded == 3, f'expected 3 exempted desktop gates, found {guarded}'
-    # The discard verdict is a fourth desktop post-processing gate: the probe
+    # The discard verdict is a desktop post-processing gate: the probe
     # lane's terminal contract completes only through a kept conversation, so
     # both of its verdicts (the LLM discard decision and the empty-title
     # fallback) must skip for the probe uid (run 35583992730).

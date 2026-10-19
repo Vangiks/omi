@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse, Response, StreamingResponse
 from database import redis_db
 from llm_gateway.gateway.providers import VertexAccessTokenSupplier
 from utils.byok import get_byok_key
-from utils.executors import critical_executor, db_executor, run_blocking
+from utils.executors import critical_executor, run_blocking
 from utils.http_client import (
     get_desktop_gemini_client,
     get_desktop_gemini_semaphore,
@@ -45,12 +45,9 @@ from utils.llm.desktop_llm_stub import (
 )
 from utils.journey_metrics_contract import ClientKind, resolve_client_kind_from_headers
 from utils.observability.journeys import ClientJourneyAttempt
-from utils.free_tier_basic_gates import basic_plan_gate_proxy_embed_enabled
 from utils.metrics import SCREEN_TASK_CLIENT_BYPASS_TOTAL
-from utils.managed_compute import Decision, authorize_managed_compute
 from utils.llm.screen_task_admission import enforce_flagged_screen_task_proxy
 from utils.other.endpoints import get_current_user_uid
-from utils.subscription import RELEASE_PROBE_UID, is_desktop_trial_paywalled
 
 router = APIRouter(route_class=DesktopGeminiProxyRoute)
 
@@ -1404,87 +1401,14 @@ async def _proxy_unobserved(request: Request, path: str, streaming: bool, uid: s
     )
 
 
-async def _authorized_desktop_user(request: Request, uid: str = Depends(get_current_user_uid)) -> str:
-    try:
-        _, requested_model, _ = _path_parts(request.path_params.get('path', ''))
-    except HTTPException:
-        requested_model = ''
-    managed_luna = requested_model == LUNA_MODEL
-    if await run_blocking(
-        db_executor,
-        is_desktop_trial_paywalled,
-        uid,
-        'desktop',
-        required_byok_provider=None if managed_luna else 'gemini',
-        byok_exempt=not managed_luna,
-    ):
-        raise HTTPException(status_code=402, detail='trial_expired')
-    return uid
-
-
-# Gen-1 Gemini generate/stream is the screen-intelligence spend path (free-tier S14).
-# screen_frame_judge is the configured Gemini-provider feature, so a request-scoped
-# Gemini BYOK key satisfies authorize_managed_compute. Embed actions (TBD-4) are the
-# remaining company-paid surface (Vertex :predict single embed, AI Studio batch):
-# basic non-BYOK gets the same 402 plan_gated. They share screen_frame_judge's
-# Gemini provider binding, so the BYOK exemption stays provider-exact without a
-# second configured feature. desktop_proactivity completions are gated in their own
-# router (S14 proactivity half).
-_PLAN_GATED_PROXY_GENERATE_ACTIONS = frozenset({'generateContent', 'streamGenerateContent'})
-_PLAN_GATED_PROXY_EMBED_ACTIONS = frozenset({'embedContent', 'batchEmbedContents'})
-# generate/stream stay gated unconditionally (S14, already live in prod).
-# embed actions join this set so existing membership tests stay meaningful;
-# runtime consults BASIC_PLAN_GATE_PROXY_EMBED_ENABLED before authorizing.
-_PLAN_GATED_PROXY_ACTIONS = _PLAN_GATED_PROXY_GENERATE_ACTIONS | _PLAN_GATED_PROXY_EMBED_ACTIONS
-_PLAN_GATED_PROXY_FEATURE = 'screen_frame_judge'
-
-
-def _plan_gate_detail(decision: Decision) -> dict[str, str]:
-    plan_type = decision.plan.value if decision.plan is not None else 'basic'
-    return {'error': 'plan_gated', 'plan_type': plan_type, 'reason': decision.reason}
-
-
-async def _enforce_managed_plan_gate(uid: str, path: str) -> None:
-    try:
-        _, model, action = _path_parts(path)
-    except HTTPException:
-        return
-    if action in _PLAN_GATED_PROXY_EMBED_ACTIONS:
-        if not basic_plan_gate_proxy_embed_enabled():
-            return
-    elif action not in _PLAN_GATED_PROXY_GENERATE_ACTIONS:
-        return
-    # Same exemption as enforce_chat_quota: dest's candidate probe signs in as
-    # this fixed non-human Free-plan UID to prove the Gemini provider path.
-    # Gating it 402s every desktop-backend auto-dev promotion (seen on
-    # 9cbe134a3c / #12839: `gemini_proxy: HTTP 402 (untyped)`).
-    if uid == RELEASE_PROBE_UID:
-        return
-    funding_owner = 'byok' if get_byok_key('gemini') and model != LUNA_MODEL else 'omi'
-    decision = await run_blocking(
-        db_executor,
-        authorize_managed_compute,
-        uid,
-        _PLAN_GATED_PROXY_FEATURE,
-        funding_owner,
-    )
-    if decision.allowed:
-        return
-    if decision.reason == 'authorization_unavailable':
-        raise HTTPException(status_code=503, detail='plan authorization is temporarily unavailable')
-    raise HTTPException(status_code=402, detail=_plan_gate_detail(decision))
-
-
 @router.post('/v1/proxy/gemini/{path:path}')
-async def gemini_proxy(request: Request, path: str, uid: str = Depends(_authorized_desktop_user)) -> Response:
+async def gemini_proxy(request: Request, path: str, uid: str = Depends(get_current_user_uid)) -> Response:
     if request.headers.get('X-Omi-Screen-Task-Client-Bypass') == 'true':
         SCREEN_TASK_CLIENT_BYPASS_TOTAL.inc()
     enforce_flagged_screen_task_proxy(request.headers)
-    await _enforce_managed_plan_gate(uid, path)
     return await _proxy(request, path, False, uid)
 
 
 @router.post('/v1/proxy/gemini-stream/{path:path}')
-async def gemini_stream_proxy(request: Request, path: str, uid: str = Depends(_authorized_desktop_user)) -> Response:
-    await _enforce_managed_plan_gate(uid, path)
+async def gemini_stream_proxy(request: Request, path: str, uid: str = Depends(get_current_user_uid)) -> Response:
     return await _proxy(request, path, True, uid)

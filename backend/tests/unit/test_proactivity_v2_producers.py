@@ -17,7 +17,7 @@ from utils import commitment_followup_tasks as scheduler
 from tests.unit.test_proactivity_v2_budget import store
 
 
-def test_mentor_context_preserves_past_conversation_items_and_excludes_locked(monkeypatch):
+def test_mentor_context_preserves_past_conversation_items(monkeypatch):
     newest = {'id': 'newest', 'text': 'Newer context'}
     older = {'id': 'older', 'text': 'Older context'}
     monkeypatch.setattr(integration, 'get_prompt_memories', lambda uid: ('User', '- Known fact'))
@@ -28,7 +28,7 @@ def test_mentor_context_preserves_past_conversation_items_and_excludes_locked(mo
     monkeypatch.setattr(
         integration.conversations_db,
         'get_conversations',
-        lambda *args, **kwargs: [newest, {'id': 'locked', 'is_locked': True}, older],
+        lambda *args, **kwargs: [newest, older],
     )
     monkeypatch.setattr(integration, 'deserialize_conversations', lambda rows: rows)
     calls = []
@@ -222,8 +222,8 @@ async def test_safety_structured_output_guard(lane, guard, delivered):
 
 
 @pytest.mark.asyncio
-async def test_claim_denial_free_user_makes_zero_model_calls(lane):
-    lane.claim.side_effect = ProactivityDenied('not_paid')
+async def test_claim_denial_makes_zero_model_calls(lane):
+    lane.claim.side_effect = ProactivityDenied('disabled')
     assert await mentor(lane) is None
     lane.model.assert_not_awaited()
     lane.publish.assert_not_awaited()
@@ -279,7 +279,6 @@ async def test_followup_one_call_feed_only_idempotent_no_task_mutation(lane):
         {'conversation_id': None},
         {'status': 'cancelled'},
         {'due_at': datetime.now(timezone.utc) + timedelta(days=1)},
-        {'is_locked': True},
     ],
 )
 async def test_followup_ineligible_task_no_claim(lane, change):
@@ -333,7 +332,6 @@ async def test_exclusive_dispatch(lane, pipeline, flag, expected):
 
     flag_lookup = MagicMock(side_effect=resolve)
     lane.monkeypatch.setattr(integration.proactivity_flags, 'enabled', flag_lookup)
-    lane.monkeypatch.setattr(integration, 'is_trial_paywalled', lambda *args: False)
     admission = MagicMock(return_value=[{'text': 'test'}])
     lane.monkeypatch.setattr(integration, 'process_mentor_notification', admission)
     new = AsyncMock(return_value=None)
@@ -353,7 +351,6 @@ async def test_exclusive_dispatch(lane, pipeline, flag, expected):
 @pytest.mark.parametrize('messages', [None, [], [{'text': 'test'}]])
 async def test_cohort_resolves_only_after_shared_admission(lane, messages):
     lane.monkeypatch.setenv('MENTOR_PIPELINE', 'cohort')
-    lane.monkeypatch.setattr(integration, 'is_trial_paywalled', lambda *args: False)
     calls = []
 
     def admit(uid, segments):
@@ -377,7 +374,6 @@ async def test_cohort_resolves_only_after_shared_admission(lane, messages):
 @pytest.mark.asyncio
 async def test_invalid_flip_during_shared_admission_invokes_neither_lane(lane):
     lane.monkeypatch.setenv('MENTOR_PIPELINE', 'cohort')
-    lane.monkeypatch.setattr(integration, 'is_trial_paywalled', lambda *args: False)
 
     def admit(uid, segments):
         lane.monkeypatch.setenv('MENTOR_PIPELINE', 'typo')
@@ -398,7 +394,6 @@ async def test_invalid_flip_during_shared_admission_invokes_neither_lane(lane):
 async def test_flag_denial_does_not_abort_app_integrations(lane):
     """A cohort flag error denies the mentor lane only; app lookup still runs."""
     lane.monkeypatch.setenv('MENTOR_PIPELINE', 'cohort')
-    lane.monkeypatch.setattr(integration, 'is_trial_paywalled', lambda *args: False)
     lane.monkeypatch.setattr(integration, 'process_mentor_notification', lambda *args: [{'text': 'test'}])
     lane.monkeypatch.setattr(
         integration.proactivity_flags,
@@ -430,14 +425,14 @@ async def test_mentor_failure_logs_only_metadata(lane, caplog):
 
 
 @pytest.mark.asyncio
-async def test_followup_free_user_zero_calls(lane):
+async def test_followup_claim_denial_zero_calls(lane):
     due = datetime.now(timezone.utc) - timedelta(minutes=1)
     lane.monkeypatch.setattr(
         producers.tasks,
         'get_action_item',
         MagicMock(return_value={'conversation_id': 'c', 'due_at': due, 'completed': False}),
     )
-    lane.claim.side_effect = ProactivityDenied('not_paid')
+    lane.claim.side_effect = ProactivityDenied('disabled')
     await producers.produce_followup('u', 't', due.isoformat())
     lane.model.assert_not_awaited()
     lane.publish.assert_not_awaited()

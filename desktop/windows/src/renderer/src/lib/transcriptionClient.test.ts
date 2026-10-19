@@ -8,7 +8,11 @@ const h = vi.hoisted(() => ({
 vi.mock('./firebase', () => ({ auth: h.auth }))
 vi.mock('./omiListenClient', () => ({ startOmiListen: h.startOmiListen }))
 
-import { startTranscription, type TranscriptionCallbacks } from './transcriptionClient'
+import {
+  isServerRefusalMessage,
+  startTranscription,
+  type TranscriptionCallbacks
+} from './transcriptionClient'
 
 function callbacks(): TranscriptionCallbacks {
   return {
@@ -70,5 +74,72 @@ describe('startTranscription startup contract', () => {
     await expect(startup).rejects.toMatchObject({ name: 'AbortError' })
     expect(stop).toHaveBeenCalledOnce()
     expect(cb.onError).toHaveBeenCalledOnce()
+  })
+})
+
+type ListenListener = {
+  onConnected: () => void
+  onClosed: (code: number, reason: string) => void
+  onEvent: (event: { type: string; raw: Record<string, unknown> }) => void
+}
+
+async function connectedSession(): Promise<{
+  cb: TranscriptionCallbacks
+  listener: ListenListener
+}> {
+  h.auth.currentUser = { uid: 'user-1' }
+  let listener: ListenListener | null = null
+  h.startOmiListen.mockImplementation(async (_source: string, l: ListenListener) => {
+    listener = l
+    setTimeout(() => l.onConnected(), 0)
+    return { stop: vi.fn(), finalize: vi.fn() }
+  })
+  const cb = callbacks()
+  await startTranscription('system', cb, 'transcribe')
+  return { cb, listener: listener! }
+}
+
+function lastErrorMessage(cb: TranscriptionCallbacks): string {
+  const calls = vi.mocked(cb.onError).mock.calls
+  return calls[calls.length - 1][0].message
+}
+
+describe('server close after connect', () => {
+  it('reports a 1008 close as a server refusal without mentioning a subscription', async () => {
+    const { cb, listener } = await connectedSession()
+
+    listener.onClosed(1008, '')
+
+    const message = lastErrorMessage(cb)
+    expect(message).not.toMatch(/subscription|free quota/i)
+    expect(isServerRefusalMessage(message)).toBe(true)
+  })
+
+  it('reports a close whose reason names trial_expired as a server refusal', async () => {
+    const { cb, listener } = await connectedSession()
+
+    listener.onClosed(4000, 'trial_expired')
+
+    expect(isServerRefusalMessage(lastErrorMessage(cb))).toBe(true)
+  })
+
+  it('ends the session on a depleted freemium event without mentioning a quota', async () => {
+    const { cb, listener } = await connectedSession()
+
+    listener.onEvent({ type: 'freemium_threshold_reached', raw: { remaining_seconds: 0 } })
+
+    const message = lastErrorMessage(cb)
+    expect(message).not.toMatch(/subscription|free quota/i)
+    expect(isServerRefusalMessage(message)).toBe(true)
+  })
+
+  it('reports a network drop as a plain close, not a refusal', async () => {
+    const { cb, listener } = await connectedSession()
+
+    listener.onClosed(1006, '')
+
+    const message = lastErrorMessage(cb)
+    expect(message).toBe('Omi transcription stopped: Omi /v4/listen closed (1006)')
+    expect(isServerRefusalMessage(message)).toBe(false)
   })
 })

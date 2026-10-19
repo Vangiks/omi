@@ -16,7 +16,6 @@ from utils.messaging.contracts import Principal, ReentryEvent
 from utils.messaging.projection import ToolProjection
 from utils.messaging.gateway import Gateway
 from utils.messaging import history
-from config.plan_catalog import PAID_PLAN_TYPES
 
 
 @pytest.fixture
@@ -229,98 +228,31 @@ def test_app_awareness_does_not_override_authoritative_message_window(monkeypatc
     asyncio.run(run())
 
 
-def test_access_uses_existing_subscription_authority_and_defaults_off(monkeypatch):
+def test_access_defaults_off_and_follows_the_cohort(monkeypatch):
     from utils.messaging import access
-    from models.users import PlanType
-    from types import SimpleNamespace
 
     monkeypatch.delenv('OMI_MESSAGING_CHANNELS', raising=False)
     monkeypatch.delenv('OMI_MESSAGING_CHANNELS_UIDS', raising=False)
     monkeypatch.setattr(access, 'get_user_deletion_wipe_status', lambda uid: None)
-    calls = []
-
-    def subscription(uid, *, provision):
-        calls.append((uid, provision))
-        return SimpleNamespace(plan=PlanType.architect)
-
-    monkeypatch.setattr(access, 'get_user_valid_subscription', subscription)
     with pytest.raises(PermissionError):
         access.require_access('u')
-    assert not calls
     monkeypatch.setenv('OMI_MESSAGING_CHANNELS', 'on')
     monkeypatch.setenv('OMI_MESSAGING_CHANNELS_UIDS', 'u')
     access.require_access('u')
-    assert calls == [('u', False)]
     with pytest.raises(PermissionError):
         access.require_access('different')
-    monkeypatch.setattr(access, 'get_user_valid_subscription', lambda *a, **k: SimpleNamespace(plan=PlanType.basic))
-    with pytest.raises(PermissionError):
-        access.require_access('u')
 
 
-@pytest.mark.parametrize('plan', sorted(PAID_PLAN_TYPES, key=lambda plan: plan.value))
-def test_access_admits_every_valid_paid_plan(monkeypatch, plan):
-    from database import users
-    from models.users import Subscription, SubscriptionStatus
-    from utils.messaging import access
-
-    monkeypatch.setenv('OMI_MESSAGING_CHANNELS', 'on')
-    monkeypatch.setenv('OMI_MESSAGING_CHANNELS_UIDS', 'u')
-    monkeypatch.setattr(access, 'get_user_deletion_wipe_status', lambda uid: None)
-    subscription = Subscription(
-        plan=plan,
-        status=SubscriptionStatus.active,
-        current_period_end=int((datetime.now(timezone.utc) + timedelta(days=1)).timestamp()),
-    )
-    monkeypatch.setattr(users, 'get_existing_user_subscription', lambda uid, **kwargs: subscription)
-    access.require_access('u')
-
-
-@pytest.mark.parametrize('plan', ['basic', 'free', 'expired', 'missing'])
-def test_access_rejects_free_and_expired_subscriptions(monkeypatch, plan):
-    from database import users
-    from models.users import PlanType, Subscription, SubscriptionStatus
-    from utils.messaging import access
-
-    monkeypatch.setenv('OMI_MESSAGING_CHANNELS', 'on')
-    monkeypatch.setenv('OMI_MESSAGING_CHANNELS_UIDS', 'u')
-    monkeypatch.setattr(access, 'get_user_deletion_wipe_status', lambda uid: None)
-    # Free uses the catalog's basic wire identity. Expired paid plans must be
-    # downgraded by the real subscription authority, never trusted as paid.
-    subscription = (
-        None
-        if plan == 'missing'
-        else Subscription(
-            plan=PlanType.architect if plan == 'expired' else PlanType.basic,
-            status=SubscriptionStatus.inactive if plan == 'free' else SubscriptionStatus.active,
-            current_period_end=int((datetime.now(timezone.utc) - timedelta(days=1)).timestamp()),
-        )
-    )
-    monkeypatch.setattr(users, 'get_existing_user_subscription', lambda uid, **kwargs: subscription)
-    with pytest.raises(PermissionError, match='Paid plan required'):
-        access.require_access('u')
-
-
-@pytest.mark.parametrize('case', ['paid', 'basic', 'expired', 'outside-cohort', 'switch-off'])
+@pytest.mark.parametrize('case', ['admitted', 'outside-cohort', 'switch-off'])
 def test_link_proof_http_admission(monkeypatch, case):
-    from database import users
     from fastapi import FastAPI
     from fastapi.testclient import TestClient
-    from models.users import PlanType, Subscription, SubscriptionStatus
     from routers import messaging
     from utils.messaging import access
 
     monkeypatch.setenv('OMI_MESSAGING_CHANNELS', 'off' if case == 'switch-off' else 'on')
     monkeypatch.setenv('OMI_MESSAGING_CHANNELS_UIDS', 'other' if case == 'outside-cohort' else 'u')
     monkeypatch.setattr(access, 'get_user_deletion_wipe_status', lambda uid: None)
-    subscription = Subscription(
-        plan=PlanType.basic if case == 'basic' else PlanType.plus,
-        status=SubscriptionStatus.active,
-        current_period_end=int(
-            (datetime.now(timezone.utc) + timedelta(days=-1 if case == 'expired' else 1)).timestamp()
-        ),
-    )
-    monkeypatch.setattr(users, 'get_existing_user_subscription', lambda uid, **kwargs: subscription)
     store = MemoryStore()
     monkeypatch.setattr(messaging, 'MessagingStore', lambda: store)
     app = FastAPI()
@@ -331,8 +263,9 @@ def test_link_proof_http_admission(monkeypatch, case):
         response = client.post(
             '/v1/messaging/link-proofs', json={'channel': 'telegram', 'provider': 'telegram', 'kind': 'token'}
         )
-    assert response.status_code == (200 if case == 'paid' else 403)
-    if case == 'paid':
+    admitted = case == 'admitted'
+    assert response.status_code == (200 if admitted else 403)
+    if admitted:
         assert response.json()['proof']
     else:
         assert response.json()['detail'] == 'Messaging channels unavailable'
@@ -435,7 +368,7 @@ def test_link_availability_reports_reason_per_channel(monkeypatch):
 
     def require_access(uid, channel):
         if channel == 'imessage':
-            raise AccessDenied('channel_plan', 'Operator or Architect plan required for iMessage')
+            raise AccessDenied('channel_disabled', 'Messaging channels disabled')
 
     class Store:
         def seat_state(self, uid, channel):
@@ -447,7 +380,7 @@ def test_link_availability_reports_reason_per_channel(monkeypatch):
     monkeypatch.setattr(router, 'require_access', require_access)
     assert router._availability(Store(), 'uid') == {
         'telegram': {'available': True, 'reason': None, 'waitlisted': False},
-        'imessage': {'available': False, 'reason': 'channel_plan', 'waitlisted': False},
+        'imessage': {'available': False, 'reason': 'channel_disabled', 'waitlisted': False},
     }
 
 

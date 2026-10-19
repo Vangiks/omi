@@ -25,9 +25,6 @@ export interface AppSubmissionData {
   uid: string;
   category: string;
   private: boolean;
-  is_paid: boolean;
-  price: number;
-  payment_plan: string | null;
   thumbnails: string[];
   external_integration?: ExternalIntegration;
   chat_prompt?: string;

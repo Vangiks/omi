@@ -90,7 +90,7 @@ def test_vad_preserves_speech_origin_and_exports_nothing_for_silence(pipeline, t
     assert row['finished_at'].timestamp() == 1700000023
     assert row['started_at'].timestamp() == 1700000020
     assert row['transcript_segments'][0]['start'] == 0
-    assert row['id'] == chunk_identity('u', 'omi', None, False, 1700000020)
+    assert row['id'] == chunk_identity('u', 'omi', None, 1700000020)
     assert outcome['outcome'].value == 'success'
 
 
@@ -406,7 +406,7 @@ def test_bridge_finishes_once_at_process_segment_completion(pipeline, monkeypatc
 
 
 @pytest.mark.parametrize('flag', ['true', 'off'])
-def test_locked_segments_merge_and_an_identical_locked_retry_is_not_a_conflict(pipeline, monkeypatch, flag):
+def test_segments_merge_and_an_identical_retry_is_not_a_conflict(pipeline, monkeypatch, flag):
     monkeypatch.setenv('SYNC_ASSIGNMENT_RECOVERY_ENABLED', flag)
     module, store = pipeline
     response = {'new_memories': set(), 'updated_memories': set()}
@@ -414,14 +414,12 @@ def test_locked_segments_merge_and_an_identical_locked_retry_is_not_a_conflict(p
     # The last call repeats a segment whose assignment already committed.
     for timestamp in (1000, 1060, 1060):
         outcome = {}
-        module.process_segment(
-            f'{timestamp}.wav', 'u', response, threading.Lock(), errors, is_locked=True, deferred_outcome=outcome
-        )
+        module.process_segment(f'{timestamp}.wav', 'u', response, threading.Lock(), errors, deferred_outcome=outcome)
         assert outcome['outcome'].value == 'success'
     assert errors == []
     rows = conversations(store)
     assert len(rows) == 1
-    assert rows[0]['is_locked'] is True and len(rows[0]['transcript_segments']) == 2
+    assert len(rows[0]['transcript_segments']) == 2
 
 
 @pytest.mark.parametrize('condition', ['anchor_deleted', 'lineage_deleted', 'user_managed', 'provenance', 'cycle'])
@@ -429,7 +427,7 @@ def test_assignment_outcomes_through_process_segment(pipeline, condition, monkey
     monkeypatch.setenv('SYNC_ASSIGNMENT_RECOVERY_ENABLED', 'off')
 
     module, store = pipeline
-    cid = chunk_identity('u', 'omi', None, False, 1000)
+    cid = chunk_identity('u', 'omi', None, 1000)
     row = chunk(cid, 1000, device=None)
     row['sync_content_revision'] = 1
     target = None

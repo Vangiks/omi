@@ -44,8 +44,6 @@ _authorization_denied_error = authorization_denied_error
 def tool_error_from_http(exc: HTTPException) -> ToolExecutionError:
     if exc.status_code == 404:
         return ToolExecutionError("Memory not found", code=-32001, http_status=404)
-    if exc.status_code == 402:
-        return ToolExecutionError("A paid plan is required to access this memory.", code=-32002, http_status=402)
     if exc.status_code == 403:
         denied = authorization_denied_error(str(exc.detail))
         denied.http_status = 403
@@ -118,7 +116,6 @@ def stable_error_code(exc: ToolExecutionError) -> str:
         return "rate_limited"
     return {
         -32001: "not_found",
-        -32002: "paid_plan_required",
         -32602: "invalid_arguments",
         -32000: "invalid_arguments",
         -32003: "authorization_denied",

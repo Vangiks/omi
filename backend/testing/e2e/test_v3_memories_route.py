@@ -12,7 +12,6 @@ def _memory_doc(memory_id: str, content: str) -> dict:
         "manually_added": True,
         "reviewed": False,
         "edited": False,
-        "is_locked": False,
         "user_review": True,
     }
 

@@ -15,9 +15,6 @@ APP_REDUCE_EXCLUDE_FIELDS = {
     'persona_prompt',
     'chat_prompt',
     'memory_prompt',
-    'payment_product_id',
-    'payment_price_id',
-    'payment_link_id',
     'twitter',
     'email',
     'money_made',
@@ -150,11 +147,6 @@ class AppBaseModel(BaseModel):
     score: Optional[float] = None
     proactive_notification: Optional[ProactiveNotification] = None
     created_at: Optional[datetime] = None
-    is_paid: Optional[bool] = False
-    price: Optional[float] = 0.0
-    payment_plan: Optional[str] = None
-    payment_link: Optional[str] = None
-    is_user_paid: Optional[bool] = False
     thumbnails: Optional[List[str]] = Field(default_factory=list)
     thumbnail_urls: Optional[List[str]] = Field(default_factory=list)
     is_influencer: Optional[bool] = False
@@ -187,8 +179,6 @@ class AppCatalogItem(BaseModel):
     rating_avg: Optional[float] = None
     rating_count: int = 0
     external_integration: Optional[ExternalIntegration] = None
-    is_paid: Optional[bool] = False
-    price: Optional[float] = None
     enabled: bool = False
 
 
@@ -205,9 +195,6 @@ class App(AppBaseModel):
     user_review: Optional[AppReview] = None
     money_made: Optional[float] = None
     usage_count: Optional[int] = None
-    payment_product_id: Optional[str] = None
-    payment_price_id: Optional[str] = None
-    payment_link_id: Optional[str] = None
 
     def get_rating_avg(self) -> Optional[str]:
         return f'{self.rating_avg:.1f}' if self.rating_avg is not None else None
@@ -311,9 +298,6 @@ class AppCreate(BaseModel):
     external_integration: Optional[ExternalIntegration] = None
     proactive_notification: Optional[ProactiveNotification] = None
     created_at: Optional[datetime] = None
-    is_paid: Optional[bool] = False
-    price: Optional[float] = 0.0  # cents/100
-    payment_plan: Optional[str] = None
     thumbnails: Optional[List[str]] = Field(default_factory=list)  # List of thumbnail IDs
     chat_tools: Optional[List[ChatTool]] = Field(default_factory=list)
     source_code_url: Optional[str] = None
@@ -339,9 +323,6 @@ class AppUpdate(BaseModel):
     external_integration: Optional[ExternalIntegration] = None
     proactive_notification: Optional[ProactiveNotification] = None
     created_at: Optional[datetime] = None
-    is_paid: Optional[bool] = None
-    price: Optional[float] = None  # cents/100
-    payment_plan: Optional[str] = None
     thumbnails: Optional[List[str]] = None  # List of thumbnail IDs
     chat_tools: Optional[List[ChatTool]] = None
     updated_at: Optional[datetime] = None

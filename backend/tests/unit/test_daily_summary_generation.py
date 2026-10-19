@@ -55,7 +55,7 @@ def _install_generation_fakes(monkeypatch, *, existing_by_date=None, tokens_unus
         'get_daily_summary_by_date',
         lambda uid, date_str: existing_by_date.get(date_str),
     )
-    monkeypatch.setattr(notif.conversations_db, 'get_conversations', lambda *a, **k: [{'is_locked': False, 'id': 'c1'}])
+    monkeypatch.setattr(notif.conversations_db, 'get_conversations', lambda *a, **k: [{'id': 'c1'}])
     monkeypatch.setattr(notif, 'deserialize_conversations', lambda items: [_FakeConvo() for _ in items])
 
     def _generate(uid, conversations, date_str, *a, **k):
@@ -207,7 +207,6 @@ def test_existing_day_is_one_firestore_read_and_no_llm(monkeypatch):
 
 def _route_patches(users_router, **overrides):
     defaults = {
-        'enforce_chat_quota': MagicMock(),
         'notification_db': MagicMock(),
         'daily_summaries_db': MagicMock(),
         'get_generic_cache': MagicMock(return_value=None),
@@ -231,7 +230,6 @@ def test_create_route_happy_path():
     with patch.multiple(users_router, **patches):
         result = users_router.create_user_daily_summary(request, uid='u1', x_app_platform='macos')
     assert result['id'] == 'new-1'
-    patches['enforce_chat_quota'].assert_called_once_with('u1', platform='macos')
     patches['generate_daily_summary_on_demand'].assert_called_once()
     patches['set_generic_cache'].assert_called_once()
 
@@ -333,8 +331,8 @@ def test_a_day_of_minimum_conversations_costs_zero_llm_calls_and_no_push(monkeyp
 
     def _conversations(uid, start_date=None, end_date=None, **_k):
         if start_date and start_date.date() >= display:
-            return [{'is_locked': False, 'id': 'thin'}]
-        return [{'is_locked': False, 'id': 'full'}]
+            return [{'id': 'thin'}]
+        return [{'id': 'full'}]
 
     monkeypatch.setattr(notif.conversations_db, 'get_conversations', _conversations)
     monkeypatch.setattr(
@@ -370,8 +368,8 @@ def test_a_day_with_one_nonempty_overview_generates_exactly_once(monkeypatch):
     def _conversations(uid, start_date=None, end_date=None, **_k):
         if start_date and start_date.date() >= display:
             # The current day: one §1.7-minimum conversation and one enriched one.
-            return [{'is_locked': False, 'id': 'thin'}, {'is_locked': False, 'id': 'full'}]
-        return [{'is_locked': False, 'id': 'full'}]
+            return [{'id': 'thin'}, {'id': 'full'}]
+        return [{'id': 'full'}]
 
     monkeypatch.setattr(notif.conversations_db, 'get_conversations', _conversations)
     monkeypatch.setattr(
@@ -535,27 +533,6 @@ def test_losing_the_lock_does_not_release_another_workers_day(monkeypatch):
 
     assert declined == notif._DECLINE_LOCKED
     assert released == []
-
-
-def test_a_day_of_only_locked_conversations_still_backfills(monkeypatch):
-    """`is_locked` conversations prove the owner was recording, so their older days are worth
-    walking back for. Classifying the day as `no_conversations` skipped the backfill entirely
-    for exactly the accounts that had one."""
-    generated_dates, _created, _sent, _released, _webhooks = _install_generation_fakes(monkeypatch)
-    display = notif._display_date_for_now('UTC')
-    today = display.strftime('%Y-%m-%d')
-
-    def _conversations(uid, start_date=None, end_date=None, **k):
-        # Only the current day is all-locked; the backfill days have usable conversations.
-        if start_date and start_date.date() >= display:
-            return [{'is_locked': True, 'id': 'c1'}]
-        return [{'is_locked': False, 'id': 'c2'}]
-
-    monkeypatch.setattr(notif.conversations_db, 'get_conversations', _conversations)
-    notif._send_summary_notification(('u1', ['tok1'], 'UTC'))
-
-    assert today not in generated_dates
-    assert generated_dates, 'an owner whose day was all-locked must still have earlier days filled'
 
 
 def test_create_route_does_not_arm_the_cooldown_when_nothing_was_generated():

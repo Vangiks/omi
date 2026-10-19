@@ -10,7 +10,7 @@ from tests.unit.fixtures.strict_firestore_transaction import StrictFirestore, St
 
 
 @pytest.mark.parametrize(
-    'fence', ['current', 'corrected', 'revision', 'deleted', 'account_deleting', 'locked', 'flag_off']
+    'fence', ['current', 'corrected', 'revision', 'deleted', 'account_deleting', 'flag_off']
 )
 def test_promotion_is_atomic_preserves_manual_edits_and_fences_current_revision(monkeypatch, fence):
     uid, cid = 'synthetic-user', 'synthetic-conversation'
@@ -62,8 +62,6 @@ def test_promotion_is_atomic_preserves_manual_edits_and_fences_current_revision(
         )
     if fence == 'deleted':
         data['deleted'] = True
-    if fence == 'locked':
-        data['is_locked'] = True
     path = ('users', uid, 'conversations', cid)
     client = StrictFirestore({path: data})
     if fence == 'account_deleting':

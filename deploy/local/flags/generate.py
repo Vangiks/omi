@@ -41,6 +41,8 @@ EXCLUDE: list[tuple[str, str]] = [
     (r'^USE_VERTEX_AI$', 'Vertex AI needs Google Cloud credentials'),
     # Omi-operated channels: bots and numbers belong to Omi.
     (r'TELEGRAM|IMESSAGE|MESSAGING|TWILIO|MCP_OAUTH|X_OAUTH|STRIPE', 'channels and integrations run by Omi'),
+    # Removed from the fork with the plans (#3).
+    (r'^FREE_TIER_|^BASIC_PLAN_GATE_', 'free-tier processing modes'),
 ]
 EXCLUDE_RE = [(re.compile(pattern), reason) for pattern, reason in EXCLUDE]
 

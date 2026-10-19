@@ -351,7 +351,6 @@ def test_tool_applies_chat_visibility_before_projecting_timeline(monkeypatch):
         processing_state=ProcessingState.blocked,
         expires_at=NOW + timedelta(days=1),
     )
-    locked = _item("mem-locked", promotion={"is_locked": True})
     rejected = _item("mem-rejected", promotion={"user_review": False})
     archived = _item("mem-archived", tier=MemoryLayer.archive)
     superseded = _item("mem-superseded", status=MemoryItemStatus.superseded)
@@ -359,7 +358,7 @@ def test_tool_applies_chat_visibility_before_projecting_timeline(monkeypatch):
     monkeypatch.setattr(
         timeline_tools,
         "_iter_authoritative_items",
-        lambda uid, *, db_client, limit: iter([allowed, restricted, blocked, locked, rejected, archived, superseded]),
+        lambda uid, *, db_client, limit: iter([allowed, restricted, blocked, rejected, archived, superseded]),
     )
     result = timeline_tools.get_entity_timeline_tool.invoke(
         {"entity": "person:alice", "limit": 20},
@@ -370,7 +369,6 @@ def test_tool_applies_chat_visibility_before_projecting_timeline(monkeypatch):
     for memory_id in (
         "mem-restricted",
         "mem-blocked",
-        "mem-locked",
         "mem-rejected",
         "mem-archived",
         "mem-superseded",

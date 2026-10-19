@@ -7,11 +7,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from config.plan_catalog_generated import PAID_PLAN_IDS, PROACTIVITY_V2_BUDGET, PlanType
+# Same for every user: the former architect cap, 19900 cents * 1000 // 30 days.
+DAILY_CAP_MICRO_USD = 663333
 
 
 class ProactivityDenied(Exception):
@@ -68,34 +69,6 @@ def producer_for(name: str) -> Producer:
     if not producer.enabled:
         raise ProactivityDenied('producer_disabled')
     return producer
-
-
-def daily_cap(plan: str) -> tuple[int, bool]:
-    try:
-        canonical = PlanType('basic' if plan == 'free' else plan).value
-    except ValueError as exc:
-        raise ProactivityDenied('unknown_plan') from exc
-    if canonical not in PAID_PLAN_IDS:
-        return 0, False
-    policy = PROACTIVITY_V2_BUDGET
-    prices = policy['monthly_reference_cents']
-    pending = canonical not in prices
-    cents = min(v for k, v in prices.items() if k in PAID_PLAN_IDS and v > 0) if pending else prices[canonical]
-    return cents * policy['fraction_basis_points'] // policy['days_per_month'], pending
-
-
-def active_plan(user: dict[str, Any], now: datetime) -> str:
-    subscription = user.get('subscription', {})
-    if not isinstance(subscription, dict):
-        raise ProactivityDenied('unknown_plan')
-    raw_plan = subscription.get('plan', 'basic')
-    plan = PlanType('basic' if raw_plan == 'free' else raw_plan).value
-    if plan == 'basic':
-        return plan
-    expiry = subscription.get('current_period_end')
-    if not isinstance(expiry, (int, float)) or isinstance(expiry, bool) or expiry < now.timestamp():
-        return 'basic'
-    return plan
 
 
 def utc_now() -> datetime:

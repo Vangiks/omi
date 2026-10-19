@@ -65,11 +65,6 @@ for _mod_name in ('database.firestore_cache', 'database.redis_db'):
         setattr(_mod, _attr, MagicMock())
     _install_stub(_mod_name, _mod)
 
-# Stub utils.subscription (imported at module level for get_default_basic_subscription)
-_utils_sub = types.ModuleType('utils.subscription')
-setattr(_utils_sub, 'get_default_basic_subscription', MagicMock())
-_install_stub('utils.subscription', _utils_sub)
-
 # database.users is imported against the stubs above, so record its prior
 # sys.modules entry now; the autouse fixture below restores/removes it so the
 # half-stubbed module does not leak into other unit-test modules.
@@ -133,20 +128,6 @@ def _run_claim(data, stale_after=timedelta(minutes=10), running_stale_after=user
 
     result = raw_fn(txn, FakeDocRef(), stale_after, running_stale_after)
     return result, txn._updates
-
-
-def _run_mark_billing_failed(data):
-    txn = _make_txn()
-    txn_obj = users_db._mark_user_deletion_billing_failed_txn
-    raw_fn = getattr(txn_obj, 'to_wrap', txn_obj)
-    snapshot = _make_snapshot(data)
-
-    class FakeDocRef:
-        def get(self, transaction=None):
-            return snapshot
-
-    result = raw_fn(txn, FakeDocRef(), 'uid1', 'sub_123', 'stripe down')
-    return result, txn._sets
 
 
 def _run_mark_completed(data):
@@ -259,25 +240,6 @@ def test_adopt_legacy_late_cleanup_refuses_a_changed_record():
 
     assert result is False
     assert updates == []
-
-
-def test_mark_billing_failed_allows_pre_wipe_states():
-    result, sets = _run_mark_billing_failed({'uid': 'uid1', 'wipe_status': 'deleting_auth'})
-
-    assert result is True
-    assert len(sets) == 1
-    _, fields, kwargs = sets[0]
-    assert fields['wipe_status'] == 'billing_failed'
-    assert fields['billing_subscription_id'] == 'sub_123'
-    assert fields['billing_error'] == 'stripe down'
-    assert kwargs == {'merge': True}
-
-
-def test_mark_billing_failed_does_not_clobber_terminal_wipes():
-    for status in ('cancelled', 'completed'):
-        result, sets = _run_mark_billing_failed({'uid': 'uid1', 'wipe_status': status})
-        assert result is False
-        assert sets == []
 
 
 def test_claim_txn_skips_fresh_pending_marker():
@@ -589,62 +551,26 @@ def test_get_pending_deletion_wipes_includes_stale_running():
     assert 'live1' not in uids, 'fresh running record must not be recovered'
 
 
-def test_mark_billing_failed_allows_started_wipe_before_auth_deletion():
-    for status in ('pending', 'retrying', 'running', 'failed'):
-        result, sets = _run_mark_billing_failed({'uid': 'uid1', 'wipe_status': status})
-        assert result is True
-        assert sets[0][1]['wipe_status'] == 'billing_failed'
-
-
-def test_mark_billing_failed_never_restores_access_after_auth_deletion():
-    for status in ('running', 'failed'):
-        result, sets = _run_mark_billing_failed(
-            {'uid': 'uid1', 'wipe_status': status, 'wipe_auth_deleted_at': datetime.now(timezone.utc)}
-        )
-        assert result is False
-        assert sets == []
-
-
-def test_reconcile_query_and_claim_recover_only_already_gone_billing_failures():
-    errors = [
-        'stripe cancel returned no subscription',
-        'No such subscription: sub_123',
-        'resource_missing',
-        'A canceled subscription can only update its cancellation_details and metadata.',
-        'already canceled',
-        'subscription is incomplete_expired',
-        'Stripe timeout',
-        'Stripe rate limit 429',
-        'Stripe server error 503',
-    ]
-    docs = [{'uid': str(i), 'wipe_status': 'billing_failed', 'billing_error': error} for i, error in enumerate(errors)]
+def test_reconciler_and_claims_ignore_retired_billing_failed_marker():
+    data = {'uid': 'uid1', 'wipe_status': 'billing_failed', 'billing_error': 'subscription already gone'}
     with patch.object(
-        users_db, 'account_deletion_collection', lambda **_kwargs: _FakeCollection({'billing_failed': docs})
+        users_db, 'account_deletion_collection', lambda **_kwargs: _FakeCollection({'billing_failed': [data]})
     ):
-        result = users_db.get_pending_deletion_wipes()
-    assert [row['uid'] for row in result] == [str(i) for i in range(6)]
-    for i, data in enumerate(docs):
-        claimed, updates = _run_claim(data)
-        assert claimed == (str(i) if i < 6 else None)
-        if i < 6:
-            assert updates[0][1]['wipe_status'] == 'retrying'
-        else:
-            assert updates == []
+        assert users_db.get_pending_deletion_wipes() == []
+    assert _run_claim(data) == (None, [])
 
-
-def test_task_delivery_can_retry_transient_billing_failure():
     txn = _make_txn()
-    snapshot = _make_snapshot({'uid': 'uid1', 'wipe_status': 'billing_failed', 'billing_error': 'Stripe timeout'})
+    snapshot = _make_snapshot(data)
     doc_ref = types.SimpleNamespace(get=lambda transaction=None: snapshot)
     raw_fn = getattr(users_db._claim_deletion_wipe_task_txn, 'to_wrap', users_db._claim_deletion_wipe_task_txn)
-    assert raw_fn(txn, doc_ref, users_db.DELETION_WIPE_RUNNING_STALE_AFTER) == 'claimed'
-    assert txn._updates[0][1]['wipe_status'] == 'retrying'
+    assert raw_fn(txn, doc_ref, users_db.DELETION_WIPE_RUNNING_STALE_AFTER) == 'not_actionable'
+    assert txn._updates == []
 
 
 def test_heartbeat_keeps_running_wipe_unclaimable_without_resurrecting_other_states():
     assert users_db.DELETION_WIPE_RUNNING_STALE_AFTER == timedelta(minutes=45)
     raw_fn = getattr(users_db._heartbeat_user_deletion_wipe_txn, 'to_wrap', users_db._heartbeat_user_deletion_wipe_txn)
-    for status in ('running', 'billing_failed', 'failed', 'completed', 'retrying'):
+    for status in ('running', 'failed', 'completed', 'retrying'):
         data = {
             'uid': 'uid1',
             'wipe_status': status,

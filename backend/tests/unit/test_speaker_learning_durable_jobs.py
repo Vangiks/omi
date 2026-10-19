@@ -276,7 +276,7 @@ def test_owner_relabel_revokes_owner_job(world):
 
 
 @pytest.mark.parametrize('target', ['person', 'owner'])
-@pytest.mark.parametrize('flag,outcome', [('deleted', 'deleted'), ('is_locked', 'locked'), ('discarded', 'discarded')])
+@pytest.mark.parametrize('flag,outcome', [('deleted', 'deleted'), ('discarded', 'discarded')])
 def test_source_lifecycle_flags_terminal_without_extraction(world, flag, outcome, target):
     if target == 'person':
         assign(person_id='p', segment_ids=['s0'])
@@ -515,15 +515,6 @@ def test_ensure_job_for_legacy_live_request(world):
     world.store.rows[LEDGER_PATH] = {'jobs': {}}
     job_id = ledger.ensure_job(UID, CONV, person_id='p', segment_ids=['s0'], firestore_client=world.store)
     assert job_id and the_job(world.store)[1]['state'] == 'pending'
-
-
-def test_manual_teaching_is_not_subscription_gated(world, monkeypatch):
-    monkeypatch.setattr(
-        'utils.speaker_permissions.users_db.get_user_valid_subscription',
-        lambda uid, **kwargs: (_ for _ in ()).throw(AssertionError('no plan check on manual teaching')),
-    )
-    assign(person_id='p', segment_ids=['s0'])
-    assert the_job(world.store)[1]['state'] == 'pending'
 
 
 def _publish_person(world, *, person_id='p', ids=('s0',), generation=1, embedding=(1.0,)):

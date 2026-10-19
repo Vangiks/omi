@@ -71,7 +71,7 @@ from database.firestore_index_registry import (
 from database.memory_collections import MemoryCollections
 from database.memory_apply_store import cleanup_expired_memory_deletion_receipts
 from models.memory_apply import MemoryControlState, WriterMode
-from models.memory_contracts import MemoryExtractionError, deterministic_contract_id
+from models.memory_contracts import deterministic_contract_id
 from models.product_memory import (
     LedgerWriteReason,
     MemoryItem,
@@ -80,12 +80,7 @@ from models.product_memory import (
     MemorySubjectScope,
     normalized_memory_content_key,
 )
-from utils.free_tier_memory_policy import (
-    free_tier_memory_suppression_enabled,
-    memory_formation_verdict,
-)
 from utils.memory.belief_model import belief_automation_enabled, belief_model_enabled
-from utils.managed_compute import authorize_managed_compute
 from utils.memory.canonical_memory_adapter import read_canonical_memory_item
 from utils.memory.daily_memory_sweep_queue import ProcessOutcome, drain_sweep_uids
 from utils.memory.knowledge_ledger import (
@@ -270,8 +265,6 @@ SOURCE_REASON_CODES = frozenset(
         "invocation_indeterminate",
         "invocation_payload_expired",
         "invocation_pre_dispatch_exhausted",
-        "source_locked_before_dispatch",
-        "source_lock_check_unavailable",
         "source_scan_over_budget",
         "contentless_rows_omitted",
         "unknown_reason",
@@ -2031,11 +2024,6 @@ def _invoke_model_once_claimed(
             if any(not isinstance(item, dict) for item in built):
                 raise ValueError("model invocation candidate output is malformed")
         except Exception as error:
-            if isinstance(error, MemoryExtractionError) and error.extractor in {
-                "source_locked_before_dispatch",
-                "source_lock_check_unavailable",
-            }:
-                evidence["failure_reason"] = error.extractor
             reason = dispatch_scope.pre_dispatch_reason(error)
             pre_dispatch = reason is not None
 
@@ -4202,7 +4190,6 @@ class CompletedDaySourceRead:
     status: Literal["complete", "incomplete"] = "incomplete"
     reason: str = ""
     truncated: bool = False
-    locked_rows_excluded: int = 0
     contentless_rows_omitted: int = 0
     rows_seen: int = 0
     rows_used: int = 0
@@ -4393,10 +4380,10 @@ def _read_completed_day_conversation_sources(
             query = query.where("started_at", "<", window.end_utc)
         # The started_at index already ends in ascending __name__. Project
         # only eligibility fields; one overflow probe distinguishes exactly-cap
-        # windows from incomplete scans. No status/lock composite is needed.
+        # windows from incomplete scans. No status composite is needed.
         query = query.order_by("started_at").order_by("__name__")
         snapshots = list(
-            query.select(("started_at", "discarded", "is_locked", "status", "finished_at"))
+            query.select(("started_at", "discarded", "status", "finished_at"))
             .limit(COMPLETED_DAY_SCAN_CAP + 1)
             .stream()
         )
@@ -4405,14 +4392,11 @@ def _read_completed_day_conversation_sources(
     if len(snapshots) > COMPLETED_DAY_SCAN_CAP:
         return _incomplete_day_read("source_scan_over_budget")
     eligible_snapshots = []
-    locked_rows_excluded = 0
     contentless_rows_omitted = 0
     for snapshot in snapshots:
         raw = snapshot.to_dict()
         if not getattr(snapshot, "id", "") or not isinstance(raw, dict):
             return _incomplete_day_read("row_undecodable")
-        if raw.get("is_locked") and not raw.get("discarded"):
-            locked_rows_excluded += 1
         eligibility = _completed_day_row_eligibility(raw)
         if eligibility == "unfinished":
             return _incomplete_day_read("row_not_eligible")
@@ -4443,8 +4427,6 @@ def _read_completed_day_conversation_sources(
         # cursor past a transcript that may still change.
         eligibility = _completed_day_row_eligibility(raw)
         if eligibility == "discarded":
-            if raw.get("is_locked") and not raw.get("discarded"):
-                locked_rows_excluded += 1
             continue
         if eligibility != "eligible":
             return _incomplete_day_read("row_not_eligible")
@@ -4511,7 +4493,6 @@ def _read_completed_day_conversation_sources(
         status="complete",
         reason=truncation_reason if truncated else "",
         truncated=truncated,
-        locked_rows_excluded=locked_rows_excluded,
         contentless_rows_omitted=contentless_rows_omitted,
         rows_seen=len(eligible_snapshots),
         rows_used=len(selection.rows),
@@ -4521,7 +4502,7 @@ def _read_completed_day_conversation_sources(
 def _completed_day_row_eligibility(raw: Mapping[str, Any]) -> Literal["eligible", "discarded", "unfinished"]:
     """Return the pre-extraction eligibility proof for one conversation row."""
 
-    if bool(raw.get("discarded", False)) or bool(raw.get("is_locked", False)):
+    if bool(raw.get("discarded", False)):
         return "discarded"
     raw_status = raw.get("status")
     status = getattr(raw_status, "value", raw_status)
@@ -5098,20 +5079,6 @@ def _split_daily_summary_page(
     return tuple(candidates), tuple(assignments)
 
 
-def _assert_selected_sources_unlocked(db_client: Any, uid: str, conversation_ids: Sequence[str]) -> None:
-    """Recheck privacy at each provider boundary; never substitute different input."""
-    for conversation_id in conversation_ids:
-        try:
-            snapshot = db_client.document(f"users/{uid}/conversations/{conversation_id}").get(field_paths=["is_locked"])
-            if not snapshot.exists:
-                raise ValueError("source unavailable")
-            locked = (snapshot.to_dict() or {}).get("is_locked", False)
-        except Exception as error:
-            raise MemoryExtractionError("source_lock_check_unavailable") from error
-        if locked:
-            raise MemoryExtractionError("source_locked_before_dispatch")
-
-
 def _load_or_stage_daily_summary_candidates(
     uid: str,
     local_date: date,
@@ -5449,9 +5416,6 @@ def _load_or_stage_daily_summary_candidates(
             window_id=window.window_id,
             input_digest=transcript_digest,
             invocation_evidence=invocation_evidence,
-            before_provider_dispatch=lambda: _assert_selected_sources_unlocked(
-                db_client, uid, tuple(row.conversation_id for row in conversation_rows)
-            ),
         )
         if dispatch_evidence is not None and "failure_reason" in invocation_evidence:
             dispatch_evidence["failure_reason"] = invocation_evidence["failure_reason"]
@@ -5761,7 +5725,6 @@ def produce_completed_day_daily_summary_sources(
         return _incomplete_runtime_sources(source_read.reason or "source_incomplete")
     conversation_rows = source_read.rows
     dispatch_evidence: Dict[str, Any] = {
-        "locked_rows_excluded": source_read.locked_rows_excluded,
         "contentless_rows_omitted": source_read.contentless_rows_omitted,
         "rows_seen": source_read.rows_seen,
         "rows_used": source_read.rows_used,
@@ -6524,27 +6487,6 @@ def run_daily_memory_sweep_scheduler(
                 blocked_users += 1
                 completed_uids.append(uid)
                 return ProcessOutcome.ack()
-            if free_tier_memory_suppression_enabled(uid):
-                # §1.8: a basic account is not admitted to the sweep at all, so
-                # an account that downgrades stops being swept rather than
-                # having its already-claimed day fail late. Ack like the
-                # disabled-cohort branch above: a definite plan answer is a
-                # successful bounded decision and may advance the fair page
-                # cursor. Rejecting instead would burn receipt leases and
-                # strand the tail. The sweep is a cron with no request, so the
-                # funding owner is always the platform.
-                verdict = memory_formation_verdict(
-                    decision_for=lambda feature: authorize_managed_compute(uid, feature, "omi")
-                )
-                if verdict.suppressed:
-                    logger.info(
-                        "daily-memory-sweep skipping uid=%s: plan denies managed formation reason=%s",
-                        uid,
-                        verdict.reason,
-                    )
-                    blocked_users += 1
-                    completed_uids.append(uid)
-                    return ProcessOutcome.ack()
             timezone_name = str(timezone_resolver(uid) or "UTC")
             cursor = _read_cursor(db_client, uid, control)
             if cursor.last_completed_local_date is not None and cursor.timezone_name != timezone_name:

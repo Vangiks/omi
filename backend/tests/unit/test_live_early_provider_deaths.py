@@ -344,8 +344,6 @@ def _receiver_for_close(monkeypatch, *, raw, frames, language='ko', close_code=1
     receiver.host.state.last_audio_received_time = None
     receiver.host.state.last_activity_time = None
     receiver.host.state.audio_ring_buffer = None
-    receiver.host.state.fair_use_dg_budget_exhausted = False
-    receiver.host.state.fair_use_track_dg_usage = False
     receiver.host.state.realtime_demand = type('Demand', (), {'totals': lambda _self: {}})()
     receiver.host.limits.ws_receive_timeout = 1.0
     receiver.host.is_multi_channel = False

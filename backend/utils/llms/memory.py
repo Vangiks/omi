@@ -179,9 +179,7 @@ def safe_create_memory(memory_data: Dict[str, Any]) -> MemoryDB:
 
 
 def _is_prompt_visible(memory: MemoryDB) -> bool:
-    """Rejected, pending-review, locked, and invalidated rows stay out of prompts."""
-    if memory.is_locked:
-        return False
+    """Rejected, pending-review, and invalidated rows stay out of prompts."""
     if memory.user_review is False:
         return False
     if memory.invalid_at is not None:

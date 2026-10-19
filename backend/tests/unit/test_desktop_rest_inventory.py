@@ -49,6 +49,11 @@ OUT_OF_SCOPE_PREFIXES = (
     '/v2/messages/',  # SSE streaming
     '/v2/files',  # multipart upload
     '/v2/apps',  # Rust-proxied app routes (desktop uses v1/apps)
+    '/v1/payments/',  # billing removed from the fork; the macOS app is kept for reference
+    '/v1/users/me/referral',  # referral program removed with billing
+    '/v1/users/me/subscription',  # subscription removed with billing (#54)
+    '/v1/users/me/trial',  # subscription removed with billing (#54)
+    '/v1/users/me/usage-quota',  # subscription removed with billing (#54)
 )
 
 # Swift string-interpolation route literals look like "v1/conversations/\(id)".
@@ -294,7 +299,6 @@ def test_conversations_search_hydrates_index_hits_before_returning_app_client_ro
 
     assert 'search_results = search_conversations(' in endpoint_source
     assert 'get_conversations_by_id_without_photos(' in endpoint_source
-    assert "if not conversation.get('is_locked')" in endpoint_source
     assert "search_results['items'] = conversations" in endpoint_source
     assert "search_results['total_pages'] =" in endpoint_source
     assert 'return search_conversations(' not in endpoint_source

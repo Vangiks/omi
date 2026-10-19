@@ -647,7 +647,7 @@ async def test_rollover_skips_carry_when_the_previous_read_fails(monkeypatch):
 
 
 @pytest.mark.anyio
-@pytest.mark.parametrize('flag', ['deleted', 'discarded', 'is_locked'])
+@pytest.mark.parametrize('flag', ['deleted', 'discarded'])
 async def test_rollover_never_carries_from_a_torn_previous_row(monkeypatch, flag):
     harness = _CarryHarness(monkeypatch)
     harness.add_previous(_person_receipt(), [_segment('s0')])

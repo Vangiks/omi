@@ -12,21 +12,19 @@ from database.account_deletion_marker import (
     account_deletion_firestore_client,
     get_user_deletion_wipe_status,
 )
-from database.account_deletion_policy import deletion_billing_error_is_already_gone
 from database.account_deletion_transitions import (
     adopt_legacy_late_agent_vm_cleanup as _adopt_legacy_late_agent_vm_cleanup_txn,
     mark_wipe_completed as _mark_user_deletion_wipe_completed_txn,
     record_late_agent_vm_cleanup as _record_late_agent_vm_cleanup_txn,
 )
 from database.firestore_cache import CachePolicy, get_or_fetch, invalidate
-from database.firestore_tier_context import invalidate_subscription, observe_subscription
 from database.person_aliases import (
     dismiss_person_soft,
     find_person_by_name,
     list_people,
     rename_person_retaining_aliases,
 )
-from database.read_boundary import parse_snapshot_or_none, parse_snapshot_strict
+from database.read_boundary import parse_snapshot_or_none
 from database.speaker_learning_fields import project_person_learning, speech_sample_source, voice_learning_fields
 from database.speaker_profile_authority import person_teaching_authorized
 from database.redis_db import (
@@ -39,9 +37,6 @@ from models.users import (
     LOCATION_CONTEXT_PURPOSE,
     LocationContextConsent,
     LocationContextConsentStatus,
-    Subscription,
-    PlanType,
-    SubscriptionStatus,
 )
 from models.other import Person
 import logging
@@ -266,20 +261,6 @@ def set_user_private_cloud_sync_enabled(uid: str, value: bool):
     """Enable or disable private cloud sync for a user."""
     user_ref = db.collection('users').document(uid)
     user_ref.update({'private_cloud_sync_enabled': value})
-
-
-def set_user_cancellation_feedback(uid: str, reason: str, reason_details: Optional[str] = None):
-    user_ref = db.collection('users').document(uid)
-    user_ref.set(
-        {
-            'cancellation_feedback': {
-                'reason': reason,
-                'reason_details': reason_details or '',
-                'timestamp': datetime.now(timezone.utc),
-            }
-        },
-        merge=True,
-    )
 
 
 # BYOK (Bring Your Own Keys) — free-plan flag.
@@ -607,39 +588,6 @@ def resolve_deletion_wipe_job_id(wipe_job_id: str) -> DeletionWipeTaskResolution
     return {'outcome': 'resolved', 'uid': doc.id}
 
 
-@transactional
-def _mark_user_deletion_billing_failed_txn(transaction, doc_ref, uid: str, subscription_id: str | None, error: str):
-    snapshot = doc_ref.get(transaction=transaction)
-    if snapshot.exists:
-        data = snapshot.to_dict() or {}
-        if data.get('wipe_status') in ('cancelled', 'completed') or data.get('wipe_auth_deleted_at'):
-            return False
-
-    transaction.set(
-        doc_ref,
-        {
-            'wipe_status': 'billing_failed',
-            'billing_failed_at': datetime.now(timezone.utc),
-            'billing_subscription_id': subscription_id or '',
-            'billing_error': error,
-        },
-        merge=True,
-    )
-    return True
-
-
-def mark_user_deletion_billing_failed(uid: str, subscription_id: str | None, error: str) -> bool:
-    """Record that account deletion is blocked on Stripe cancellation.
-
-    The worker must first verify Firebase Auth still exists. Started wipes may
-    park here before Auth deletion; a post-Auth or terminal marker stays fenced.
-    """
-    client = account_deletion_firestore_client()
-    doc_ref = account_deletion_document(uid, firestore_client=client)
-    transaction = client.transaction()
-    return _mark_user_deletion_billing_failed_txn(transaction, doc_ref, uid, subscription_id, error)
-
-
 def cancel_user_deletion_wipe(uid: str):
     """Cancel a pending deletion-wipe marker.
 
@@ -674,10 +622,8 @@ def get_pending_deletion_wipes(
 ) -> list[dict]:
     """Return account_deletions documents whose wipe needs retry.
 
-    Queries ``failed`` records whose per-attempt backoff has elapsed,
-    ``billing_failed`` records with historical already-gone billing errors,
-    stale ``pending`` records
-    (queued more than ``stale_after`` ago), stale ``deleting_auth`` records
+    Queries ``failed`` records whose per-attempt backoff has elapsed, stale
+    ``pending`` records (queued more than ``stale_after`` ago), stale ``deleting_auth`` records
     (intent written but never transitioned to ``pending`` — usually a crash
     after ``auth.delete_account()`` succeeded), stale ``running`` records (worker
     started but hasn't finished within ``running_stale_after`` — probably
@@ -713,15 +659,6 @@ def get_pending_deletion_wipes(
         if failed_at and failed_at + deletion_wipe_retry_delay(data.get('wipe_attempts') or 1) > now:
             continue
         result.append(data | {'uid': doc.id})
-
-    if len(result) < limit:
-        billing_docs = account_deletion_collection().where('wipe_status', '==', 'billing_failed').stream()
-        for doc in billing_docs:
-            if len(result) >= limit:
-                break
-            data = doc.to_dict()
-            if deletion_billing_error_is_already_gone(data.get('billing_error')):
-                result.append(data | {'uid': doc.id})
 
     if len(result) < limit:
         # Over-fetch *all* pending docs and age-filter in Python. A tight
@@ -791,8 +728,7 @@ def _claim_deletion_wipe_txn(
 ) -> str | None:
     """Atomically claim a wipe for re-enqueueing inside a Firestore transaction.
 
-    Transitions ``wipe_status`` from ``failed``, already-gone ``billing_failed``,
-    stale ``pending``, stale
+    Transitions ``wipe_status`` from ``failed``, stale ``pending``, stale
     ``deleting_auth`` (auth user verified gone by caller), stale ``running``
     (worker crashed mid-execution), or stale ``retrying`` to ``retrying`` so
     concurrent workers cannot re-enqueue the same wipe. Fresh ``pending``,
@@ -807,11 +743,6 @@ def _claim_deletion_wipe_txn(
     data = snapshot.to_dict()
     status = data.get('wipe_status')
     now = datetime.now(timezone.utc)
-    if status == 'billing_failed':
-        if not deletion_billing_error_is_already_gone(data.get('billing_error')):
-            return None
-        transaction.update(doc_ref, {'wipe_status': 'retrying', 'wipe_claimed_at': now})
-        return snapshot.id
     if status == 'deleting_auth':
         # Recoverable only after the caller verified the Firebase auth user is
         # gone. Re-validate the age inside the transaction so a fresh intent
@@ -902,9 +833,7 @@ def _claim_deletion_wipe_task_txn(transaction, doc_ref, running_stale_after: tim
         if running_at and running_at >= now - running_stale_after:
             return 'running'
 
-    # A queued task retries transient pre-Auth billing failures. The reconciler
-    # only recovers historical already-gone billing errors, never an outage.
-    if status in ('pending', 'retrying', 'failed', 'running', 'billing_failed'):
+    if status in ('pending', 'retrying', 'failed', 'running'):
         transaction.update(doc_ref, {'wipe_status': 'retrying', 'wipe_claimed_at': now})
         return 'claimed'
 
@@ -1410,7 +1339,7 @@ def delete_user_data(uid: str):
     # early "User not found" return would falsely mark the deletion complete.
     # This picks up
     # everything the user has written (conversations, deleted_conversations, memories, action_items,
-    # folders, goals, integrations, task_integrations, fcm_tokens, fair_use_*,
+    # folders, goals, integrations, task_integrations, fcm_tokens,
     # hourly_usage, meetings, screen_activity, files, people, chat_sessions,
     # messages, and any future additions).
     for sub in user_ref.collections():
@@ -1502,84 +1431,6 @@ def set_chat_message_rating_score(
     if app_id:
         data['app_id'] = app_id
     db.collection('analytics').document(doc_id).set(data)
-
-
-# **************************************
-# ************** Payments **************
-# **************************************
-
-
-def get_stripe_connect_account_id(uid: str):
-    user_ref = db.collection('users').document(uid)
-    user_data = user_ref.get().to_dict() or {}
-    return user_data.get('stripe_account_id', None)
-
-
-def set_stripe_connect_account_id(uid: str, account_id: str):
-    user_ref = db.collection('users').document(uid)
-    user_ref.update({'stripe_account_id': account_id})
-
-
-def set_paypal_payment_details(uid: str, data: dict):
-    user_ref = db.collection('users').document(uid)
-    user_ref.update({'paypal_details': data})
-
-
-def get_paypal_payment_details(uid: str):
-    user_ref = db.collection('users').document(uid)
-    user_data = user_ref.get().to_dict() or {}
-    return user_data.get('paypal_details', None)
-
-
-def set_default_payment_method(uid: str, payment_method_id: str):
-    user_ref = db.collection('users').document(uid)
-    user_ref.update({'default_payment_method': payment_method_id})
-
-
-def get_default_payment_method(uid: str):
-    user_ref = db.collection('users').document(uid)
-    user_data = user_ref.get().to_dict() or {}
-    return user_data.get('default_payment_method', None)
-
-
-def get_stripe_customer_id(uid: str) -> Optional[str]:
-    """Get the Stripe customer ID for a user."""
-    user_ref = db.collection('users').document(uid)
-    user_doc = user_ref.get()
-    if user_doc.exists:
-        user_data = user_doc.to_dict()
-        return user_data.get('stripe_customer_id')
-    return None
-
-
-def set_stripe_customer_id(uid: str, customer_id: str):
-    user_ref = db.collection('users').document(uid)
-    user_ref.update({'stripe_customer_id': customer_id})
-
-
-def get_user_by_stripe_customer_id(customer_id: str):
-    users_ref = db.collection('users')
-    query = users_ref.where(filter=FieldFilter('stripe_customer_id', '==', customer_id)).limit(1)
-    docs = list(query.stream())
-    if docs:
-        user_dict = docs[0].to_dict()
-        user_dict['uid'] = docs[0].id
-        return user_dict
-    return None
-
-
-def update_user_subscription(uid: str, subscription_data: dict):
-    """Updates the user's subscription information, removing dynamic fields before storing."""
-    subscription_data_to_store = subscription_data.copy()
-    subscription_data_to_store.pop('features', None)
-    subscription_data_to_store.pop('limits', None)
-
-    user_ref = db.collection('users').document(uid)
-    invalidate_subscription(uid)
-    try:
-        user_ref.update({'subscription': subscription_data_to_store})
-    finally:
-        invalidate_subscription(uid)
 
 
 # **************************************
@@ -1796,78 +1647,6 @@ def set_user_onboarding_state(uid: str, onboarding_data: dict, *, firestore_clie
     user_ref.set({'onboarding': onboarding_data}, merge=[f'onboarding.{field}' for field in onboarding_data])
 
 
-def get_user_subscription(uid: str, *, firestore_client: Any | None = None, read_only: bool = False) -> Subscription:
-    """Get a subscription; read_only suppresses default creation and legacy migration."""
-    user_ref = (firestore_client or db).collection('users').document(uid)
-    user_doc = user_ref.get(['subscription'])
-    if user_doc.exists:
-        user_data = user_doc.to_dict()
-        if 'subscription' in user_data:
-            sub_data = user_data['subscription']
-            legacy_free_plan = isinstance(sub_data, dict) and sub_data.get('plan') == 'free'
-
-            def subscription_payload(_snapshot: object) -> dict:
-                if not isinstance(sub_data, dict):
-                    raise TypeError('Firestore subscription payload must be a mapping')
-                payload = dict(sub_data)
-                if legacy_free_plan:
-                    payload['plan'] = PlanType.basic.value
-                return payload
-
-            subscription = parse_snapshot_strict(Subscription, user_doc, payload_from_snapshot=subscription_payload)
-            # Handle migration for old 'free' plan identifier after validating the normalized payload.
-            if legacy_free_plan and not read_only:
-                sub_data['plan'] = PlanType.basic.value
-                update_user_subscription(uid, sub_data)
-            observe_subscription(uid, subscription)
-            return subscription
-
-    # If subscription doesn't exist for the user, create and return a default free plan.
-    # Imported here, not at module scope: utils.subscription imports this module, so a
-    # module-level import makes utils.subscription unimportable on its own (see
-    # get_user_valid_subscription, which defers the same import for the same reason).
-    from utils.subscription import get_default_basic_subscription
-
-    default_subscription = get_default_basic_subscription()
-    if read_only:
-        return default_subscription
-    # Strip dynamic fields before storing
-    sub_to_store = default_subscription.model_dump()
-    sub_to_store.pop('features', None)
-    sub_to_store.pop('limits', None)
-    user_ref.set({'subscription': sub_to_store}, merge=True)
-    observe_subscription(uid, default_subscription)
-    return default_subscription
-
-
-def get_existing_user_subscription(uid: str, *, firestore_client: Any | None = None) -> Optional[Subscription]:
-    """Gets the user's stored subscription without creating a default record."""
-    user_ref = (firestore_client or db).collection('users').document(uid)
-    user_doc = user_ref.get(['subscription'])
-    if not user_doc.exists:
-        observe_subscription(uid, None)
-        return None
-
-    user_data = user_doc.to_dict()
-    if 'subscription' not in user_data:
-        observe_subscription(uid, None)
-        return None
-
-    sub_data = user_data['subscription']
-
-    def subscription_payload(_snapshot: object) -> dict:
-        if not isinstance(sub_data, dict):
-            raise TypeError('Firestore subscription payload must be a mapping')
-        payload = dict(sub_data)
-        if payload.get('plan') == 'free':
-            payload['plan'] = PlanType.basic.value
-        return payload
-
-    subscription = parse_snapshot_strict(Subscription, user_doc, payload_from_snapshot=subscription_payload)
-    observe_subscription(uid, subscription)
-    return subscription
-
-
 def get_user_training_data_opt_in(uid: str) -> Optional[dict]:
     """Get user's training data opt-in status."""
     user_ref = db.collection('users').document(uid)
@@ -1946,50 +1725,6 @@ def set_user_training_data_opt_in(uid: str, status: str):
             }
         }
     )
-
-
-def get_user_valid_subscription(
-    uid: str, *, firestore_client: Any | None = None, provision: bool = True
-) -> Optional[Subscription]:
-    """
-    Gets the user's subscription if it is currently valid for use.
-
-    A subscription is considered valid if:
-    - It's a basic (free) plan with 'active' status.
-    - It's a paid plan with a 'current_period_end' that has not passed yet.
-      This allows users to use the service until the end of the billing period
-      they paid for, even after cancelling.
-
-    Returns the Subscription object if valid, otherwise None.
-
-    ``provision=False`` never merge-writes a default Free plan. Desktop-backend
-    quota must use that mode against the customer Firestore so a miss cannot
-    stamp ``plan: basic`` onto a paying user.
-    """
-    # Imported here, not at module scope: utils.subscription imports this module, and a
-    # module-level import back into it forms a cycle that makes utils.subscription raise
-    # ImportError whenever it is the first of the pair to be imported.
-    from utils.subscription import get_default_basic_subscription
-
-    if provision:
-        subscription = get_user_subscription(uid, firestore_client=firestore_client)
-    else:
-        subscription = get_existing_user_subscription(uid, firestore_client=firestore_client)
-        if subscription is None:
-            subscription = get_default_basic_subscription()
-
-    # Basic (free) plans are only valid if their status is active.
-    if subscription.plan == PlanType.basic:
-        return subscription if subscription.status == SubscriptionStatus.active else None
-
-    # For paid plans, validity is determined by the period end.
-    if subscription.current_period_end:
-        period_end_dt = datetime.fromtimestamp(subscription.current_period_end, tz=timezone.utc)
-        if period_end_dt >= datetime.now(timezone.utc):
-            return subscription
-
-    # Fallback to default basic subscription
-    return get_default_basic_subscription()
 
 
 # **************************************

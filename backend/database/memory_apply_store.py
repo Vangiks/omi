@@ -3129,7 +3129,6 @@ def _validate_required_ledger_source(
         or source.status != expected.status
         or source.sensitivity_labels != expected.sensitivity_labels
         or restricted
-        or bool((source.promotion or {}).get("is_locked", False))
     ):
         return _source_not_active(control_state, operation, "required ledger source changed or is unavailable")
     if ledger_reopen_receipt is None:

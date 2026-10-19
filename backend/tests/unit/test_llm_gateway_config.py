@@ -33,12 +33,10 @@ def test_gateway_route_overrides_do_not_change_the_legacy_model_profile():
 
     assert get_model('conv_discard') == 'gpt-5-nano'
     assert get_model('memories') == LUNA_MODEL
-    assert get_model('fair_use') == LUNA_MODEL
     assert get_model('chat_agent') == LUNA_MODEL
 
     assert config.route_artifacts['route.conv_discard.model_config.001'].primary.model == 'gpt-5-nano'
     assert config.route_artifacts['route.memories.model_config.001'].primary.model == LUNA_MODEL
-    assert config.route_artifacts['route.fair_use.model_config.001'].primary.model == LUNA_MODEL
     assert config.route_artifacts['route.chat_agent.model_config.001'].primary.provider == 'openai'
     assert config.route_artifacts['route.chat_agent.model_config.001'].primary.model == LUNA_MODEL
     assert config.route_artifacts['route.memory_l2.model_config.001'].provider_options['reasoning_effort'] == 'medium'

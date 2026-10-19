@@ -43,7 +43,7 @@ export const PostHogManager = {
       if (!isInitialized) return;
       posthog.capture(event, properties);
     } catch {
-      // A throwing capture must not block checkout.
+      // Analytics must not block the caller.
     }
   },
   pageView(pageName: string) {

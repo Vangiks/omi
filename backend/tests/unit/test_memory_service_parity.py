@@ -47,7 +47,7 @@ class _FirestoreFake:
         return _DocumentRef(self, path)
 
 
-def _sample_memory_dict(memory_id: str = "mem-1", *, locked: bool = False) -> dict:
+def _sample_memory_dict(memory_id: str = "mem-1") -> dict:
     now = datetime(2026, 1, 15, tzinfo=timezone.utc)
     return {
         "id": memory_id,
@@ -57,7 +57,6 @@ def _sample_memory_dict(memory_id: str = "mem-1", *, locked: bool = False) -> di
         "created_at": now,
         "updated_at": now,
         "scoring": "01_00_1736899200",
-        "is_locked": locked,
         "manually_added": False,
         "user_review": None,
         "visibility": "private",
@@ -244,7 +243,7 @@ def test_evidence_identity_conflict_is_a_client_conflict_not_a_server_fault(serv
 def test_manual_memory_without_route_capability_stays_on_external_contract(service_mod):
     service = service_mod.MemoryService(db_client=_FirestoreFake())
     memory_db = service_mod.MemoryDB.model_validate(
-        _sample_memory_dict(memory_id="manual-memory", locked=False) | {"category": "manual", "manually_added": True}
+        _sample_memory_dict(memory_id="manual-memory") | {"category": "manual", "manually_added": True}
     )
     compatibility_result = MagicMock(return_value=memory_db)
     direct_result = MagicMock(return_value=memory_db)

@@ -189,7 +189,6 @@ class TestNewFeatureConstants:
             Features.TRANSCRIBE,
             Features.REALTIME_INTEGRATIONS,
             Features.DAILY_SUMMARY,
-            Features.SUBSCRIPTION_NOTIFICATION,
             Features.KNOWLEDGE_GRAPH,
             Features.OTHER,
         }

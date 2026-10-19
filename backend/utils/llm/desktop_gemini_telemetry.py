@@ -304,7 +304,7 @@ def get_proxy_telemetry(request: Request, *, streaming: bool) -> ProxyTelemetry:
 
 def _dependency_outcome(exc: HTTPException) -> str:
     if exc.status_code == 402:
-        return 'trial_expired' if exc.detail == 'trial_expired' else 'plan_gated'
+        return 'plan_gated'
     if exc.status_code == 503:
         return 'authorization_unavailable'
     if exc.status_code == 429:

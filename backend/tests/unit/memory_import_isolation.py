@@ -109,15 +109,6 @@ def install_canonical_write_runtime_stubs() -> list[str]:
     sys.modules["firebase_admin"] = firebase_admin
     touched.append("firebase_admin")
 
-    subscription_mod = types.ModuleType("utils.subscription")
-    subscription_mod.get_default_basic_subscription = MagicMock()
-    subscription_mod.is_trial_paywalled = lambda uid: False
-    subscription_mod.should_defer_desktop_processing = lambda uid: False
-    subscription_mod.request_has_llm_byok_key = lambda: False
-    subscription_mod.should_skip_omi_paid_postprocessing = lambda uid, uses_custom_stt=False, source=None: False
-    sys.modules["utils.subscription"] = subscription_mod
-    touched.append("utils.subscription")
-
     users_mod = AutoMockModule("database.users")
     users_mod.get_data_protection_level = MagicMock(return_value="enhanced")
     sys.modules["database.users"] = users_mod
@@ -251,8 +242,6 @@ def install_ws_i_heavy_import_stubs() -> list[str]:
     _set("langchain", langchain)
     _set("langchain.prompts", langchain.prompts)
 
-    _set("stripe", types.ModuleType("stripe"))
-
     subjects_mod = types.ModuleType("utils.conversations.subjects")
     subjects_mod.infer_subject_from_segments = lambda segments: (None, None)
     _set("utils.conversations.subjects", subjects_mod)
@@ -274,14 +263,6 @@ def install_ws_i_heavy_import_stubs() -> list[str]:
     users_mod.get_user_language_preference = lambda uid: "en"
     users_mod.get_data_protection_level = MagicMock(return_value="enhanced")
     _set("database.users", users_mod)
-
-    subscription_mod = types.ModuleType("utils.subscription")
-    subscription_mod.get_default_basic_subscription = MagicMock()
-    subscription_mod.is_trial_paywalled = lambda uid: False
-    subscription_mod.should_defer_desktop_processing = lambda uid: False
-    subscription_mod.request_has_llm_byok_key = lambda: False
-    subscription_mod.should_skip_omi_paid_postprocessing = lambda uid, uses_custom_stt=False, source=None: False
-    _set("utils.subscription", subscription_mod)
 
     vector_db_mod = AutoMockModule("database.vector_db")
     vector_db_mod.find_similar_memories = MagicMock(return_value=[])
@@ -377,13 +358,11 @@ WS_I_HEAVY_STUB_MODULE_NAMES = (
     "utils.conversations.calendar_linking",
     "langchain",
     "langchain.prompts",
-    "stripe",
     "utils.conversations.subjects",
     "utils.llm.conversation_processing",
     "pinecone",
     "database.auth",
     "database.users",
-    "utils.subscription",
     "database.vector_db",
     "database.memories",
     "database.redis_db",
@@ -424,10 +403,6 @@ WS_I_HEAVY_STUB_MODULE_NAMES = (
 
 def install_ws_c_backfill_stubs() -> list[str]:
     touched = install_canonical_write_runtime_stubs()
-
-    stripe_mod = types.ModuleType("stripe")
-    sys.modules["stripe"] = stripe_mod
-    touched.append("stripe")
 
     pinecone_mod = types.ModuleType("pinecone")
     pinecone_mod.Pinecone = MagicMock()
@@ -493,7 +468,6 @@ def install_ws_j_heavy_import_stubs() -> list[str]:
         "utils.speaker_identification",
         "utils.app_integrations",
         "utils.analytics",
-        "utils.subscription",
         "utils.webhooks",
         "utils.billing",
         "utils.llm.conversation_processing",
@@ -507,7 +481,6 @@ def install_ws_j_heavy_import_stubs() -> list[str]:
         "database.llm_usage",
         "database.app_review_config",
         "database.webhook_health",
-        "stripe",
         "pytz",
         "twilio",
         "google.cloud",
@@ -565,10 +538,8 @@ def install_ws_m_heavy_import_stubs() -> list[str]:
         "database.redis_db",
         "database.conversations",
         "database.memories",
-        "utils.subscription",
         "utils.executors",
         "utils.llm.knowledge_graph",
-        "stripe",
         "pytz",
         "google.cloud",
         "google.api_core",
@@ -607,10 +578,8 @@ def install_ws_n_heavy_import_stubs() -> list[str]:
         "database.memories",
         "database.vector_db",
         "database.users",
-        "utils.subscription",
         "utils.executors",
         "utils.llm.knowledge_graph",
-        "stripe",
         "pytz",
         "google.cloud",
         "google.api_core",
@@ -644,7 +613,6 @@ def install_ws_b_import_stubs() -> list[str]:
 WS_B_STUB_MODULE_NAMES = (
     "database._client",
     "firebase_admin",
-    "utils.subscription",
     "database.users",
     "pinecone",
     "typesense",
@@ -654,9 +622,7 @@ WS_B_STUB_MODULE_NAMES = (
 WS_C_STUB_MODULE_NAMES = (
     "database._client",
     "firebase_admin",
-    "utils.subscription",
     "database.users",
-    "stripe",
     "pinecone",
     "database.vector_db",
     "database.memories",
@@ -773,7 +739,6 @@ def install_mcp_search_memories_stubs(backend_dir: str) -> list[str]:
         "database.mem_db",
         "database.mcp_api_key",
         "database.daily_summaries",
-        "database.fair_use",
         "database.auth",
         "database.dev_api_key",
         "database.screen_activity",
@@ -795,8 +760,6 @@ def install_mcp_search_memories_stubs(backend_dir: str) -> list[str]:
         "utils.other.endpoints",
         "utils.stt.pre_recorded",
         "utils.stt.vad",
-        "utils.fair_use",
-        "utils.subscription",
         "utils.conversations.process_conversation",
         "utils.conversations.render",
         "utils.notifications",

@@ -59,7 +59,6 @@ def _memory(created_at):
         content="Likes espresso",
         created_at=created_at,
         category=SimpleNamespace(value="preferences"),
-        is_locked=False,
     )
 
 

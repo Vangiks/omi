@@ -9,7 +9,7 @@ from uuid import NAMESPACE_URL, uuid5
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
-from config.proactivity_v2 import ProactivityDenied, daily_cap, active_plan, producer_for, utc_now
+from config.proactivity_v2 import ProactivityDenied, producer_for, utc_now
 from database import proactivity as ledger
 from database import proactivity_redis, redis_db
 from utils import proactivity_flags
@@ -30,18 +30,6 @@ def _admit(uid: str, producer: str) -> None:
     if producer == 'conversation_mentor_v2':
         if proactivity_flags.mentor_pipeline(uid) != 'v2' or user.get('mentor_notification_frequency', 0) <= 0:
             raise ProactivityDenied('disabled')
-    cap, pending = daily_cap(active_plan(user, utc_now()))
-    if pending:
-        record_fallback(
-            component='other',
-            from_mode='plan_price',
-            to_mode='lowest_known_paid_cap',
-            reason='price_pending',
-            outcome='recovered',
-            log=logger,
-        )
-    if cap <= 0:
-        raise ProactivityDenied('not_paid')
     ledger.refresh_health(producer, firestore_client=client)
 
 

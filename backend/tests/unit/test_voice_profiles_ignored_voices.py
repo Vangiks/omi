@@ -55,18 +55,14 @@ def test_restore_removes_only_the_ignored_decision_so_prompts_can_return():
     }
     db.record_ignored_voice('u', 'c1', 1, NOW, firestore_client=store)
     store.rows[STATE]['ignored_voices']['c1:1']['assignment_generation'] = 1
-    assert not select_prompts(
-        [store.rows[path]], now=NOW, owner_has_voice=False, named_allowed=True, answered=set(), people={}
-    )
+    assert not select_prompts([store.rows[path]], now=NOW, owner_has_voice=False, answered=set(), people={})
     assert db.remove_ignored_voice('u', 'c1', 1, [], firestore_client=store)
     raw = store.rows[path]
     raw['manual_speaker_assignments'] = conversations_db.decode_manual_speaker_assignments(
         'u', raw['manual_speaker_assignments'], bool(raw.get('manual_speaker_assignments_compressed'))
     )
-    # An unenrolled free account cannot be offered an owner question. Restoring
-    # an ignored voice does restore eligibility for paid naming cards.
-    assert not select_prompts([raw], now=NOW, owner_has_voice=False, named_allowed=False, answered=set(), people={})
-    prompts = select_prompts([raw], now=NOW, owner_has_voice=False, named_allowed=True, answered=set(), people={})
+    # Restoring an ignored voice restores eligibility for naming cards.
+    prompts = select_prompts([raw], now=NOW, owner_has_voice=False, answered=set(), people={})
     assert len(prompts) == 1 and prompts[0].kind == 'identify'
 
 

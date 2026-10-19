@@ -91,7 +91,7 @@ def prepare_recording(pipeline, *, discarded=True):
 async def test_process_now_keeps_short_phone_recording_before_enrichment(pipeline, discarded):
     row = prepare_recording(pipeline, discarded=discarded)
 
-    await pipeline._run_full_pipeline_background_async('job', 'uid', [EXPLICIT], 'phone', False, '/tmp/job')
+    await pipeline._run_full_pipeline_background_async('job', 'uid', [EXPLICIT], 'phone', '/tmp/job')
 
     pipeline.lifecycle_service.restore_discarded.assert_called_once_with('uid', 'recording')
     pipeline.process_conversation.assert_called_once()
@@ -105,7 +105,7 @@ async def test_process_now_keeps_short_phone_recording_before_enrichment(pipelin
 async def test_automatic_or_mixed_uploads_keep_existing_discard_policy(pipeline, paths):
     row = prepare_recording(pipeline)
 
-    await pipeline._run_full_pipeline_background_async('job', 'uid', paths, 'phone', False, '/tmp/job')
+    await pipeline._run_full_pipeline_background_async('job', 'uid', paths, 'phone', '/tmp/job')
 
     pipeline.lifecycle_service.restore_discarded.assert_not_called()
     assert row['discarded'] is True

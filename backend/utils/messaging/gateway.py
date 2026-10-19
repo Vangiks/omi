@@ -300,17 +300,9 @@ class Gateway:
                     await run_blocking(db_executor, self.store.assert_notice_link, message, link)
 
                 notice = (
-                    'Your paid Omi plan has ended. Renew in Omi to chat here.'
-                    if reason == 'paid_plan'
-                    else (
-                        'iMessage requires Operator or Architect. Update your plan in Omi.'
-                        if reason == 'channel_plan'
-                        else (
-                            'Your iMessage seat is unavailable. Join the waitlist in Omi.'
-                            if reason == 'seat_cap'
-                            else 'This channel is currently unavailable for your account. Check Chat Apps in Omi.'
-                        )
-                    )
+                    'Your iMessage seat is unavailable. Join the waitlist in Omi.'
+                    if reason == 'seat_cap'
+                    else 'This channel is currently unavailable for your account. Check Chat Apps in Omi.'
                 )
                 await self._reply_sink(message, guard=notice_guard).finish(notice)
             await run_blocking(db_executor, self.store.complete, path)

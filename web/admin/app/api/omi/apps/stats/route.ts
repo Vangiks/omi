@@ -54,15 +54,11 @@ export async function GET(request: NextRequest) {
 
     // Calculate stats (excluding persona apps)
     let approvedCount = 0;
-    let paidCount = 0;
 
     filteredApps.forEach((app) => {
       // Only count as approved if explicitly approved
       if (app.approved === true) {
         approvedCount++;
-      }
-      if (app.is_paid) {
-        paidCount++;
       }
     });
 
@@ -80,7 +76,6 @@ export async function GET(request: NextRequest) {
       total: filteredApps.length,
       approved: approvedCount,
       inReview: filteredUnapprovedApps.length, // Only public apps awaiting review
-      paid: paidCount,
       partial,
     };
 

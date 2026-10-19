@@ -33,25 +33,13 @@ def policy(monkeypatch):
     return value
 
 
-@pytest.mark.parametrize(
-    'plan,telegram,imessage',
-    [
-        ('basic', False, False),
-        ('plus', True, False),
-        ('unlimited', True, False),
-        ('operator', True, True),
-        ('architect', True, True),
-    ],
-)
-def test_channel_plan_admission(policy, monkeypatch, plan, telegram, imessage):
+def test_channel_admission_ignores_plans(monkeypatch):
+    # Every user has full access (#3): a leftover plan list in the policy admits everyone.
+    value = {'imessage': {'enabled': True, 'cohort': '*', 'plans': ['operator'], 'seat_cap': 1}}
+    monkeypatch.setenv('OMI_MESSAGING_CHANNEL_POLICY', json.dumps(value))
+    monkeypatch.delenv('OMI_MESSAGING_KILL_SWITCH_DOC', raising=False)
     monkeypatch.setattr(access, 'get_user_deletion_wipe_status', lambda uid: None)
-    monkeypatch.setattr(access, 'get_user_valid_subscription', lambda uid, **kw: SimpleNamespace(plan=plan))
-    for channel, allowed in [('telegram', telegram), ('imessage', imessage)]:
-        if allowed:
-            access.require_access('any-paid-user', channel)
-        else:
-            with pytest.raises(PermissionError):
-                access.require_access('any-paid-user', channel)
+    access.require_access('any-user', 'imessage')
 
 
 @pytest.mark.parametrize(
@@ -62,7 +50,6 @@ def test_channel_plan_admission(policy, monkeypatch, plan, telegram, imessage):
         '{"telegram":{"enabled":true,"cohort":true}}',
         '{"imessage":{"enabled":true,"cohort":"*","seat_cap":true}}',
         '{"imessage":{"enabled":true,"cohort":"*","seat_cap":null}}',
-        '{"imessage":{"enabled":true,"cohort":"*","plans":null}}',
     ],
 )
 def test_malformed_policy_fails_closed(monkeypatch, raw):
@@ -84,13 +71,12 @@ def test_legacy_and_configurable_policy(monkeypatch):
                 'imessage': {
                     'enabled': True,
                     'cohort': ['v'],
-                    'plans': ['operator', 'architect', 'unlimited'],
                     'seat_cap': 7,
                 }
             }
         ),
     )
-    assert channel_policy('imessage')['plans'][-1] == 'unlimited'
+    assert channel_policy('imessage')['seat_cap'] == 7
     assert cohort_enabled('v', 'imessage') and not cohort_enabled('u', 'imessage')
     assert not cohort_enabled('v', 'telegram')
 
@@ -140,7 +126,7 @@ def test_unknown_sender_gets_one_reply_per_window():
     assert all(row['status'] == 'done' for row in store.jobs.values())
 
 
-@pytest.mark.parametrize('reason', ['paid_plan', 'channel_plan', 'channel_disabled'])
+@pytest.mark.parametrize('reason', ['seat_cap', 'channel_disabled'])
 def test_lost_access_replies_once_without_model(reason):
     adapter, store = LoopbackAdapter(), MemoryStore()
     incoming = message(adapter)
@@ -559,7 +545,6 @@ def test_imessage_only_policy_still_admits_app_awareness(monkeypatch):
     monkeypatch.setenv('OMI_MESSAGING_CHANNEL_POLICY', json.dumps({'imessage': {'enabled': True, 'cohort': ['u']}}))
     monkeypatch.delenv('OMI_MESSAGING_KILL_SWITCH_DOC', raising=False)
     monkeypatch.setattr(access, 'get_user_deletion_wipe_status', lambda uid: None)
-    monkeypatch.setattr(access, 'get_user_valid_subscription', lambda *a, **kw: SimpleNamespace(plan='operator'))
     assert cohort_enabled('u') and not cohort_enabled('u', 'telegram')
     access.require_app_access('u')
     with pytest.raises(PermissionError):

@@ -41,7 +41,6 @@ from routers import (
 from utils.http_client import close_all_clients
 from utils.llm.vertex_reservation_state import reservation_state
 from utils.jit_rollout import close_posthog_control_plane
-from utils.free_tier_cohort import close_free_tier_control_plane
 from utils.metrics import start_metrics_sidecar_server, stop_metrics_sidecar_server
 from utils.llm.managed_spend_ledger import shutdown_managed_spend_ledger
 from utils.executors import log_executor_health, start_background_task
@@ -107,7 +106,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await reservation_state.aclose()
         await close_all_clients()
         close_posthog_control_plane()
-        close_free_tier_control_plane()
         stop_metrics_sidecar_server()
 
 

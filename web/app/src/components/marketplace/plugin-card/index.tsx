@@ -75,12 +75,6 @@ export const PluginCard = memo(function PluginCard({ plugin }: PluginCardProps) 
                 <h2 className="line-clamp-2 text-lg font-bold leading-tight text-white">
                   {plugin.name}
                 </h2>
-                {plugin.is_paid && (
-                  <span className="inline-flex shrink-0 items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-xs font-medium text-amber-400">
-                    ${plugin.price?.toFixed(2)}
-                    {plugin.payment_plan === 'monthly_recurring' ? '/mo' : ''}
-                  </span>
-                )}
               </div>
               <p className="mt-2 line-clamp-2 text-sm text-gray-400 group-hover:text-gray-300">
                 {plugin.description}

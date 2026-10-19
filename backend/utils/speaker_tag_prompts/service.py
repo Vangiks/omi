@@ -1,7 +1,7 @@
 """Speaker tag prompts: a bounded daily set and atomic manual answers.
 
 Owner checks bind one complete played excerpt, consume a durable conversation
-quota and never grant enrollment consent. Paid naming cards retain the existing
+quota and never grant enrollment consent. Naming cards retain the existing
 manual tagging and quality-gated, preference-controlled teaching behavior.
 """
 
@@ -83,7 +83,6 @@ from utils.speaker_tag_prompts.selection import (
     select_prompts,
 )
 from utils.stt.speaker_embedding import extract_embedding_from_bytes
-from utils.speaker_permissions import named_speaker_prompts_allowed
 from utils.stt.speaker_match import mean_embedding
 from utils.speaker_tag_prompts import embedding_cache as owner_embedding_cache
 
@@ -369,7 +368,6 @@ def get_prompts(uid: str, now: Optional[datetime] = None, *, owner_excerpt: bool
             next_eligible_at=last_empty + EMPTY_RECHECK,
         )
 
-    named_allowed = named_speaker_prompts_allowed(uid)
     conversations = conversations_db.get_conversations(
         # created_at >= started_at, so this existing indexed range is a superset of conversations that
         # started in the window; selection then applies the started_at bound.
@@ -378,7 +376,7 @@ def get_prompts(uid: str, now: Optional[datetime] = None, *, owner_excerpt: bool
         start_date=now - PROMPT_WINDOW,
         end_date=now,
     )
-    stored_people = [person for person in users_db.get_people(uid) if person.get('id')] if named_allowed else []
+    stored_people = [person for person in users_db.get_people(uid) if person.get('id')]
     people = {person['id']: person.get('name') or '' for person in stored_people}
     pinned = {person['id'] for person in stored_people if person.get('pinned') is True}
     deadline = time.monotonic() + LIST_VERIFY_BUDGET_SECONDS
@@ -447,7 +445,6 @@ def get_prompts(uid: str, now: Optional[datetime] = None, *, owner_excerpt: bool
         conversations,
         now=now,
         owner_has_voice=owner_has_voice,
-        named_allowed=named_allowed,
         answered=voice_profiles_db.answered_prompt_ids(state, now),
         people=people,
         pinned=pinned,
@@ -726,8 +723,6 @@ def apply_answer(
     answer = effective_answer(request)
     if answer not in _ALLOWED_ANSWERS[request.kind]:
         raise TagPromptInvalid(f'{answer.value} is not a valid answer for {request.kind.value}')
-    # Naming a voice by hand is free on every plan; only automatic non-owner suggestions are paid
-    # (get_prompts withholds them), so an answer to an already-served card is never refused here.
 
     person_id: Optional[str] = None
     person_enrolled = False

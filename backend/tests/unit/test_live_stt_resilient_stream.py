@@ -157,9 +157,6 @@ def window_receiver_at_ring_limit(monkeypatch, *, pending_speech):
     listener.host.multi_lang_enabled = False
     listener.host.request.uid = 'user'
     listener.host.client_device_context.platform = 'ios'
-    listener.host.state.fair_use_dg_budget_exhausted = False
-    listener.host.state.fair_use_track_dg_usage = False
-    listener.host.state.dg_usage_ms_pending = 0
     listener._capture = lambda *_args: None
     ring = listener._window_replay_audio
     assert ring is not None

@@ -140,7 +140,6 @@ def validate_merge_compatibility(
     Rejection criteria (hard failures):
     - Less than 2 conversations
     - Any conversation is a soft-deleted tombstone
-    - Any conversation is locked
     - Any conversation is not completed (processing/merging/in_progress)
 
     Warning criteria (soft, user informed but not blocked):
@@ -159,15 +158,6 @@ def validate_merge_compatibility(
     for conv in conversations:
         if conv.get("deleted"):
             return False, "Cannot merge a deleted conversation.", None
-
-    # Check none are locked
-    for conv in conversations:
-        if conv.get("is_locked", False):
-            return (
-                False,
-                "Cannot merge locked conversations. Please unlock them first.",
-                None,
-            )
 
     # Check all are completed
     for conv in conversations:

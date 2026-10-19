@@ -158,7 +158,6 @@ def _desktop_transcribe_isolation():
             'conversations',
             'daily_summaries',
             'dev_api_key',
-            'fair_use',
             'folders',
             'goals',
             'helpers',
@@ -386,10 +385,8 @@ def _desktop_transcribe_isolation():
             'utils.apps',
             'utils.retrieval',
             'utils.retrieval.graph',
-            'utils.fair_use',
             'utils.cloud_tasks',
             'utils.log_sanitizer',
-            'models.fair_use',
             'models.sync',
             'models.processing_memory',
             'models.integrations',
@@ -836,7 +833,6 @@ class TestDeepgramPrerecordedFromBytesEdgeCases:
 def _stub_router_deps():
     """Stub all transitive dependencies needed to import routers.chat via importlib."""
     extra_models = [
-        'models.fair_use',
         'models.users',
         'models.sync',
         'models.processing_memory',
@@ -846,9 +842,7 @@ def _stub_router_deps():
     ]
     extra_database = ['database.sync_jobs', 'database.user_usage']
     extra_utils = [
-        'utils.fair_use',
         'utils.log_sanitizer',
-        'utils.subscription',
         'utils.social',
         'utils.speaker_assignment',
         'utils.speaker_identification',
@@ -879,9 +873,6 @@ def _stub_router_deps():
     limiter_stub.record_actual_duration = MagicMock()
     limiter_stub.MAX_SESSION_DURATION_S = 120
     sys.modules['utils.voice_duration_limiter'] = limiter_stub
-    subscription_stub = sys.modules.setdefault('utils.subscription', MagicMock())
-    subscription_stub.enforce_chat_quota = MagicMock()
-    subscription_stub.is_trial_paywalled = MagicMock(return_value=False)
     # Ensure redis_db.check_rate_limit returns (True, 99, 0)
     rdb = sys.modules.get('database.redis_db')
     if rdb:

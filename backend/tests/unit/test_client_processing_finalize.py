@@ -1,10 +1,9 @@
 """S4 Worker C: POST /v1/conversations and /{id}/finalize accept a projection.
 
-Named proofs: a valid projection at the synchronous finalize is stored and a
-basic user pays no managed structure call; digest mismatch / malformed payload
-drop the projection without 422ing the finished recording; a stored document
-projection still sets has_projection; an explicit ingest-time projection wins
-over a stored one. The durable POST /{id}/finalize path persists an accepted
+Named proofs: a valid projection at the synchronous finalize is stored;
+digest mismatch / malformed payload drop the projection without 422ing the
+finished recording; a stored document projection stays attached in memory;
+an explicit ingest-time projection wins over a stored one. The durable POST /{id}/finalize path persists an accepted
 projection onto Conversation.client_processing (no Cloud Task payload change)
 so the worker's stored-projection path can see it. An idempotent durable retry
 hash-binds a late projection against the stored transcript and writes only
@@ -14,8 +13,8 @@ A transcript-text or speaker/person mutation atomically DELETE_FIELDs the
 projection in the same write; a losing concurrent synchronous finalize still
 persists a projection that hash-binds against ``latest``.
 A winning synchronous finalize persists the accepted projection through the
-ingress-owned mutation on the admission CAS itself (paid, basic, and flag-off
-all survive a Firestore reread). Admission and the stamp are one write: a
+ingress-owned mutation on the admission CAS itself (it survives a Firestore
+reread). Admission and the stamp are one write: a
 later loser late-bind overwrites that stamp, a stalled second write cannot
 commit an older winner after the loser, and a mutation failure does not
 strand the row on processing. The winner must not stamp again after
@@ -26,7 +25,7 @@ candidate is not stored after a T2 segment update on late-bind, synchronous
 admit, or durable admit; the conversation still finalizes.
 A route response attaches a projection only when the transaction stored it:
 a T1-validated candidate dropped after a T2 race is absent from Firestore
-and from the response, and the client receives the deterministic minimum.
+and from the response, and the client receives the processed conversation.
 A matching transcript still returns the projection that was stored.
 The transaction reports that decision; the routes do not reread. A's rejected
 T1 is not replaced by B's later T2 in A's response, and a failed read that
@@ -60,7 +59,6 @@ from pydantic import ValidationError
 
 import database.conversations as conversations_db
 
-from config.plan_catalog import PlanType
 from models.client_processing import (
     CLIENT_PROCESSING_SCHEMA_VERSION,
     ClientProcessing,
@@ -78,8 +76,6 @@ from tests.unit.fixtures.strict_firestore_transaction import StrictFirestore
 from tests.support.dream_firestore import DreamFirestore
 from tests.support.transcript_correction_store import install_store, target_updates, read
 from utils.conversations.transcript_hash import transcript_sha256
-import utils.managed_compute as managed_compute
-from utils.managed_compute import Decision
 
 _BACKEND = Path(__file__).resolve().parents[2]
 _UID = 's4-finalize-uid'
@@ -93,6 +89,8 @@ PROJECTION_TITLE_B = 'Later T2 projection from B'
 STORED_TITLE = 'Stored retry projection'
 EXPLICIT_TITLE = 'Explicit ingest projection'
 _MISMATCH_HASH = '0' * 64
+# Title the stubbed `_get_structured` returns: every conversation is fully processed.
+LLM_TITLE = 'llm-title'
 
 
 def _build_fakes() -> dict[str, ModuleType]:
@@ -216,12 +214,6 @@ def _build_fakes() -> dict[str, ModuleType]:
     add('utils.conversations.subjects', AutoMockModule('utils.conversations.subjects')).infer_subject_from_segments = (
         lambda segments: (None, None)
     )
-
-    subscription = add('utils.subscription', AutoMockModule('utils.subscription'))
-    subscription.is_trial_paywalled = MagicMock(return_value=False)
-    subscription.should_defer_desktop_processing = MagicMock(return_value=False)
-    subscription.request_has_llm_byok_key = MagicMock(return_value=False)
-    subscription.should_skip_omi_paid_postprocessing = MagicMock(return_value=False)
 
     byok = ModuleType('utils.byok')
     byok.get_byok_key = lambda _provider: None
@@ -411,46 +403,14 @@ def _in_progress(*, client_processing: ClientProcessing | None = None) -> Conver
     )
 
 
-def _basic_decision() -> Decision:
-    return Decision(
-        allowed=False,
-        reason='basic_not_entitled',
-        feature='conv_structure',
-        funding_owner='omi',
-        plan=PlanType.basic,
-        plan_resolved=True,
-    )
-
-
-def _paid_decision() -> Decision:
-    return Decision(
-        allowed=True,
-        reason='plan_paid',
-        feature='conv_structure',
-        funding_owner='omi',
-        plan=PlanType.plus,
-        plan_resolved=True,
-    )
-
-
-def _enable_flag(monkeypatch: pytest.MonkeyPatch, pc: Any) -> None:
-    monkeypatch.setattr(pc, 'free_tier_local_processing_enabled', lambda *_: True)
-
-
-def _authorize(monkeypatch: pytest.MonkeyPatch, pc: Any, decision: Decision) -> None:
-    monkeypatch.setattr(managed_compute, 'authorize_managed_compute', lambda *_args, **_kwargs: decision)
-    monkeypatch.setattr(managed_compute, 'request_carries_validated_byok_key', lambda _feature: False)
-
-
 def _spy_managed_effects(monkeypatch: pytest.MonkeyPatch, pc: Any) -> dict[str, MagicMock]:
     spies = {
-        'get_structured': MagicMock(return_value=(Structured(title='llm-title'), False)),
+        'get_structured': MagicMock(return_value=(Structured(title=LLM_TITLE), False)),
         'extract_memories': MagicMock(),
         'extract_memories_inner': MagicMock(),
         'trigger_apps': MagicMock(),
         'assign_folder': MagicMock(return_value=(None, 0.0, '')),
         'init_first_open': MagicMock(return_value=True),
-        'should_defer': MagicMock(return_value=True),
     }
     monkeypatch.setattr(pc, '_get_structured', spies['get_structured'])
     monkeypatch.setattr(pc, 'extract_memories', spies['extract_memories'])
@@ -458,9 +418,7 @@ def _spy_managed_effects(monkeypatch: pytest.MonkeyPatch, pc: Any) -> dict[str, 
     monkeypatch.setattr(pc, 'trigger_conversation_apps', spies['trigger_apps'])
     monkeypatch.setattr(pc, 'assign_conversation_to_folder', spies['assign_folder'])
     monkeypatch.setattr(pc.conversations_db, 'initialize_first_open_work', spies['init_first_open'])
-    monkeypatch.setattr(pc, 'should_defer_desktop_processing', spies['should_defer'])
     monkeypatch.setattr(pc, '_enrich_meeting_context', lambda *args, **kwargs: None)
-    monkeypatch.setattr(pc, 'is_trial_paywalled', lambda *args, **kwargs: False)
     monkeypatch.setattr(
         pc,
         'resolve_authorized_first_open_plan',
@@ -468,27 +426,6 @@ def _spy_managed_effects(monkeypatch: pytest.MonkeyPatch, pc: Any) -> dict[str, 
     )
     monkeypatch.setattr(pc, 'record_jit_first_open', MagicMock())
     return spies
-
-
-def _assert_no_managed(spies: dict[str, MagicMock]) -> None:
-    spies['get_structured'].assert_not_called()
-    spies['extract_memories'].assert_not_called()
-    spies['extract_memories_inner'].assert_not_called()
-    spies['trigger_apps'].assert_not_called()
-    spies['assign_folder'].assert_not_called()
-    spies['init_first_open'].assert_not_called()
-
-
-def _capture_has_projection(monkeypatch: pytest.MonkeyPatch, pc: Any) -> dict[str, Any]:
-    captured: dict[str, Any] = {}
-    real = pc.resolve_free_tier_processing_plan
-
-    def wrap(**kwargs: Any):
-        captured.update(kwargs)
-        return real(**kwargs)
-
-    monkeypatch.setattr(pc, 'resolve_free_tier_processing_plan', wrap)
-    return captured
 
 
 def _persisted_payload(mock: MagicMock) -> dict[str, Any]:
@@ -679,7 +616,7 @@ def _durable_finalize_without_projection(
     """First durable finalize with no projection; status becomes processing.
 
     Returns the finalization capture and a JSON snapshot of ``structured`` after
-    the worker-simulated deterministic minimum is applied in-memory. The
+    the worker-simulated processed structure is applied in-memory. The
     retry must not rewrite those bytes.
     """
     captured = _prepare_durable_finalize(monkeypatch, conv, conversation)
@@ -689,7 +626,7 @@ def _durable_finalize_without_projection(
     assert response.conversation.client_processing is None
     extra = _durable_extra_updates(captured)
     assert extra is None or 'client_processing' not in extra
-    # Simulate the Cloud Tasks worker having persisted the deterministic minimum.
+    # Simulate the Cloud Tasks worker having persisted its structure.
     conversation.structured = Structured(title=_SEGMENT_TEXT, overview='')
     structured_json = conversation.structured.model_dump_json()
     captured['update'].reset_mock()
@@ -697,12 +634,9 @@ def _durable_finalize_without_projection(
 
 
 # red-proof: omit client_projection= from the process_conversation call in the handler
-def test_valid_projection_at_finalize_is_stored_no_managed_for_basic(monkeypatch, stack) -> None:
+def test_valid_projection_at_finalize_is_stored(monkeypatch, stack) -> None:
     pc, conv = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
-    captured = _capture_has_projection(monkeypatch, pc)
     store = _install_sync_finalize_store(monkeypatch, pc, conv)
     conversation = _in_progress()
     _prepare_finalize(monkeypatch, conv, conversation)
@@ -711,29 +645,24 @@ def test_valid_projection_at_finalize_is_stored_no_managed_for_basic(monkeypatch
 
     response = conv.process_in_progress_conversation(request=request, uid=_UID)
 
-    assert captured.get('has_projection') is True
     assert response.conversation.client_processing is not None
     assert response.conversation.client_processing.structure.title == PROJECTION_TITLE
-    assert response.conversation.structured.title == _SEGMENT_TEXT
+    assert response.conversation.structured.title == LLM_TITLE
     assert response.conversation.structured.overview == ''
     assert response.conversation.structured.title != PROJECTION_TITLE
     # Existing-row coordinator persist strips; the ingress mutation is the store.
     assert store['persist_payloads']
     payload = store['persist_payloads'][-1]
     assert 'client_processing' not in payload
-    assert _nested(payload, 'structured', 'title') == _SEGMENT_TEXT
+    assert _nested(payload, 'structured', 'title') == LLM_TITLE
     assert _nested(payload, 'structured', 'overview') == ''
     _assert_projection_on_reread(store)
-    _assert_no_managed(spies)
 
 
 # red-proof: skip the hash compare so a mismatch is stored and no warning fires
 def test_digest_mismatch_drops_projection_and_still_finalizes(monkeypatch, stack, caplog) -> None:
     pc, conv = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
-    captured = _capture_has_projection(monkeypatch, pc)
     persisted = pc.lifecycle_service.persist_processed_conversation
     persisted.reset_mock()
     conversation = _in_progress()
@@ -744,12 +673,11 @@ def test_digest_mismatch_drops_projection_and_still_finalizes(monkeypatch, stack
     with caplog.at_level(logging.WARNING, logger=conv.__name__):
         response = conv.process_in_progress_conversation(request=request, uid=_UID)
 
-    assert captured.get('has_projection') is False
     assert response.conversation.client_processing is None
     assert response.conversation.status == ConversationStatus.completed
     payload = _persisted_payload(persisted)
     assert payload.get('client_processing') is None
-    assert _nested(payload, 'structured', 'title') == _SEGMENT_TEXT
+    assert _nested(payload, 'structured', 'title') == LLM_TITLE
     warnings = [record for record in caplog.records if 'hash_mismatch' in record.getMessage()]
     assert len(warnings) == 1
     message = warnings[0].getMessage()
@@ -759,16 +687,12 @@ def test_digest_mismatch_drops_projection_and_still_finalizes(monkeypatch, stack
     assert 'local-test-model' in message
     assert 'mlx' in message
     assert 'apple_silicon' in message
-    _assert_no_managed(spies)
 
 
 # red-proof: type ProcessConversationRequest.client_processing as ClientProcessing (malformed would 422)
 def test_malformed_projection_does_not_422_and_still_finalizes(monkeypatch, stack, caplog) -> None:
     pc, conv = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
-    captured = _capture_has_projection(monkeypatch, pc)
     persisted = pc.lifecycle_service.persist_processed_conversation
     persisted.reset_mock()
     conversation = _in_progress()
@@ -780,7 +704,6 @@ def test_malformed_projection_does_not_422_and_still_finalizes(monkeypatch, stac
     with caplog.at_level(logging.WARNING, logger=conv.__name__):
         response = conv.process_in_progress_conversation(request=request, uid=_UID)
 
-    assert captured.get('has_projection') is False
     assert response.conversation.client_processing is None
     assert response.conversation.status == ConversationStatus.completed
     payload = _persisted_payload(persisted)
@@ -788,7 +711,6 @@ def test_malformed_projection_does_not_422_and_still_finalizes(monkeypatch, stac
     warnings = [record for record in caplog.records if 'schema_invalid' in record.getMessage()]
     assert len(warnings) == 1
     assert CANARY not in warnings[0].getMessage()
-    _assert_no_managed(spies)
 
 
 def test_malformed_non_object_projection_does_not_422(stack) -> None:
@@ -799,39 +721,31 @@ def test_malformed_non_object_projection_does_not_422(stack) -> None:
         ClientProcessing.model_validate(CANARY)
 
 
-# red-proof: has_projection=client_projection is not None (stored-only retry would skip store_projection)
-def test_stored_projection_alone_makes_has_projection_true(monkeypatch, stack) -> None:
+# red-proof: drop the stored projection when no explicit one is passed
+def test_stored_projection_alone_stays_attached(monkeypatch, stack) -> None:
     pc, _conv = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
-    captured = _capture_has_projection(monkeypatch, pc)
     persisted = pc.lifecycle_service.persist_processed_conversation
     persisted.reset_mock()
     stored = _projection(title=STORED_TITLE)
 
     result = pc.process_conversation(_UID, 'en', _in_progress(client_processing=stored))
 
-    assert captured.get('has_projection') is True
     assert result.client_processing is stored
     assert result.client_processing.structure.title == STORED_TITLE
-    assert result.structured.title == _SEGMENT_TEXT
+    assert result.structured.title == LLM_TITLE
     assert result.structured.overview == ''
     assert result.structured.title != STORED_TITLE
     payload = _persisted_payload(persisted)
     # Existing-row persist omits the field (merge leaves a stored projection).
     assert 'client_processing' not in payload
-    assert _nested(payload, 'structured', 'title') == _SEGMENT_TEXT
-    _assert_no_managed(spies)
+    assert _nested(payload, 'structured', 'title') == LLM_TITLE
 
 
 # red-proof: prefer stored client_processing when both are present (explicit would be ignored)
 def test_explicit_projection_beats_stored_one(monkeypatch, stack) -> None:
     pc, _conv = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
-    captured = _capture_has_projection(monkeypatch, pc)
     persisted = pc.lifecycle_service.persist_processed_conversation
     persisted.reset_mock()
     stored = _projection(title=STORED_TITLE)
@@ -839,17 +753,15 @@ def test_explicit_projection_beats_stored_one(monkeypatch, stack) -> None:
 
     result = pc.process_conversation(_UID, 'en', _in_progress(client_processing=stored), client_projection=explicit)
 
-    assert captured.get('has_projection') is True
     assert result.client_processing is explicit
     assert result.client_processing.structure.title == EXPLICIT_TITLE
-    assert result.structured.title == _SEGMENT_TEXT
+    assert result.structured.title == LLM_TITLE
     assert result.structured.overview == ''
     assert result.structured.title != EXPLICIT_TITLE
     assert result.structured.title != STORED_TITLE
     payload = _persisted_payload(persisted)
     assert 'client_processing' not in payload
-    assert _nested(payload, 'structured', 'title') == _SEGMENT_TEXT
-    _assert_no_managed(spies)
+    assert _nested(payload, 'structured', 'title') == LLM_TITLE
 
 
 def _durable_extra_updates(captured: dict[str, Any]) -> dict[str, Any] | None:
@@ -860,12 +772,9 @@ def _durable_extra_updates(captured: dict[str, Any]) -> dict[str, Any] | None:
 
 
 # red-proof: skip extra_updates['client_processing'] = ... (valid projection would enqueue without a stored projection)
-def test_durable_finalize_persists_projection_visible_as_has_projection(monkeypatch, stack) -> None:
+def test_durable_finalize_persists_projection_for_the_worker(monkeypatch, stack) -> None:
     pc, conv = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
-    captured_plan = _capture_has_projection(monkeypatch, pc)
     conversation = _in_progress()
     finalization = _prepare_durable_finalize(monkeypatch, conv, conversation)
     projection = _projection()
@@ -884,15 +793,13 @@ def test_durable_finalize_persists_projection_visible_as_has_projection(monkeypa
     persisted = pc.lifecycle_service.persist_processed_conversation
     persisted.reset_mock()
     result = pc.process_conversation(_UID, 'en', _in_progress(client_processing=stored))
-    assert captured_plan.get('has_projection') is True
     assert result.client_processing is stored
-    assert result.structured.title == _SEGMENT_TEXT
+    assert result.structured.title == LLM_TITLE
     assert result.structured.overview == ''
     assert result.structured.title != PROJECTION_TITLE
     payload = _persisted_payload(persisted)
     # Worker persist of an existing row strips; extra_updates already stored it.
     assert 'client_processing' not in payload
-    _assert_no_managed(spies)
 
 
 # red-proof: skip the hash compare (`if False and expected != ...`) so a mismatch is persisted on extra_updates
@@ -1017,9 +924,7 @@ def test_durable_retry_malformed_projection_leaves_conversation_unchanged(monkey
 # red-proof: log raw model_id/runtime/device_class without sanitizing (newlines forge a second record)
 def test_rejected_projection_provenance_is_bounded_single_line(monkeypatch, stack, caplog) -> None:
     pc, conv = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
     persisted = pc.lifecycle_service.persist_processed_conversation
     persisted.reset_mock()
     conversation = _in_progress()
@@ -1055,7 +960,6 @@ def test_rejected_projection_provenance_is_bounded_single_line(monkeypatch, stac
     assert oversized not in message
     assert message.count('Q') <= 120
     assert 'schema_invalid' in message
-    _assert_no_managed(spies)
 
 
 # ---------------------------------------------------------------------------
@@ -1206,7 +1110,6 @@ def _capture_segment_write(monkeypatch: pytest.MonkeyPatch, conv: Any) -> dict[s
 def test_segment_text_edit_clears_projection_in_the_same_write(monkeypatch) -> None:
     snapshot = {
         'data_protection_level': 'standard',
-        'is_locked': False,
         'transcript_segments': [{'id': 's1', 'text': 'old'}, {'id': 's2', 'text': 'keep'}],
         'client_processing': {'structure': {'title': PROJECTION_TITLE}},
         'structured': {'title': 'keep-title', 'overview': 'keep-overview'},
@@ -1232,7 +1135,6 @@ def test_segment_text_edit_clears_projection_in_the_same_write(monkeypatch) -> N
 def test_segment_text_edit_without_projection_does_not_touch_other_fields(monkeypatch) -> None:
     snapshot = {
         'data_protection_level': 'standard',
-        'is_locked': False,
         'transcript_segments': [{'id': 's1', 'text': 'old'}],
         'structured': {'title': 'keep-title', 'overview': 'keep-overview'},
     }
@@ -1254,7 +1156,6 @@ def test_segment_text_edit_without_projection_does_not_touch_other_fields(monkey
 def test_segment_text_edit_does_not_clear_when_mutation_does_not_write(monkeypatch) -> None:
     snapshot = {
         'data_protection_level': 'standard',
-        'is_locked': False,
         'transcript_segments': [{'id': 's1', 'text': 'old'}],
         'client_processing': {'structure': {'title': PROJECTION_TITLE}},
     }
@@ -1433,15 +1334,9 @@ def test_assign_without_projection_is_unaffected(monkeypatch, stack) -> None:
 def _winning_sync_finalize(
     monkeypatch: pytest.MonkeyPatch,
     stack: Any,
-    *,
-    enable_flag: bool,
-    decision: Decision,
 ) -> tuple[Any, dict[str, Any], dict[str, MagicMock]]:
     pc, conv = stack
-    if enable_flag:
-        _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, decision)
     store = _install_sync_finalize_store(monkeypatch, pc, conv)
     conversation = _in_progress()
     _prepare_finalize(monkeypatch, conv, conversation)
@@ -1451,33 +1346,9 @@ def _winning_sync_finalize(
     return response, store, spies
 
 
-# red-proof: omit extra_updates=client_processing_mutation(...) from admit_processing (paid persist strips; reread loses it)
-def test_paid_sync_finalize_projection_is_in_firestore_on_reread(monkeypatch, stack) -> None:
-    response, store, spies = _winning_sync_finalize(monkeypatch, stack, enable_flag=True, decision=_paid_decision())
-
-    assert response.conversation.client_processing is not None
-    assert response.conversation.client_processing.structure.title == PROJECTION_TITLE
-    assert store['persist_payloads'], 'coordinator never persisted'
-    assert 'client_processing' not in store['persist_payloads'][-1]
-    _assert_projection_on_reread(store)
-    spies['get_structured'].assert_called_once()
-
-
-# red-proof: omit extra_updates=client_processing_mutation(...) from admit_processing and strip the coordinator persist
-def test_basic_sync_finalize_projection_is_in_firestore_on_reread(monkeypatch, stack) -> None:
-    response, store, spies = _winning_sync_finalize(monkeypatch, stack, enable_flag=True, decision=_basic_decision())
-
-    assert response.conversation.client_processing is not None
-    assert response.conversation.client_processing.structure.title == PROJECTION_TITLE
-    assert response.conversation.structured.title == _SEGMENT_TEXT
-    assert response.conversation.structured.overview == ''
-    _assert_projection_on_reread(store)
-    _assert_no_managed(spies)
-
-
-# red-proof: omit extra_updates=client_processing_mutation(...) from admit_processing (flag-off persist strips; reread loses it)
-def test_flag_off_sync_finalize_projection_is_in_firestore_on_reread(monkeypatch, stack) -> None:
-    response, store, spies = _winning_sync_finalize(monkeypatch, stack, enable_flag=False, decision=_paid_decision())
+# red-proof: omit extra_updates=client_processing_mutation(...) from admit_processing (persist strips; reread loses it)
+def test_sync_finalize_projection_is_in_firestore_on_reread(monkeypatch, stack) -> None:
+    response, store, spies = _winning_sync_finalize(monkeypatch, stack)
 
     assert response.conversation.client_processing is not None
     assert response.conversation.client_processing.structure.title == PROJECTION_TITLE
@@ -1653,9 +1524,7 @@ def _prepare_winner_loser_interleave(
 # red-proof: stamp client_processing again after process_conversation (winner overwrites the later loser)
 def test_winner_does_not_overwrite_later_loser_projection(monkeypatch, stack) -> None:
     pc, conv = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
     winner = _in_progress()
     latest = _in_progress()
     latest.status = ConversationStatus.processing
@@ -1693,23 +1562,20 @@ def test_winner_does_not_overwrite_later_loser_projection(monkeypatch, stack) ->
     stored = store['doc']['client_processing']
     assert stored['structure']['title'] == PROJECTION_TITLE
     assert stored['structure']['title'] != PROJECTION_TITLE_A
-    assert _nested(store['doc'], 'structured', 'title') == _SEGMENT_TEXT
+    assert _nested(store['doc'], 'structured', 'title') == LLM_TITLE
     assert _nested(store['doc'], 'structured', 'overview') == ''
     assert _nested(store['doc'], 'structured', 'title') != PROJECTION_TITLE
     assert _nested(store['doc'], 'structured', 'title') != PROJECTION_TITLE_A
     assert store['b_response'].conversation.structured.model_dump_json() == store['structured_before']
     assert store['b_response'].conversation.structured.title == 'deterministic-keep'
-    assert response_a.conversation.structured.title == _SEGMENT_TEXT
+    assert response_a.conversation.structured.title == LLM_TITLE
     assert response_a.conversation.structured.overview == ''
-    _assert_no_managed(spies)
 
 
 # red-proof: skip the hash compare in `_accepted_client_projection` so the loser mismatch is stored
 def test_interleaved_loser_mismatch_does_not_overwrite_winner_projection(monkeypatch, stack, caplog) -> None:
     pc, conv = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
     winner = _in_progress()
     latest = Conversation(
         id=_CONV_ID,
@@ -1749,11 +1615,11 @@ def test_interleaved_loser_mismatch_does_not_overwrite_winner_projection(monkeyp
     stored = store['doc']['client_processing']
     assert stored['structure']['title'] == PROJECTION_TITLE_A
     assert stored['structure']['title'] != PROJECTION_TITLE
-    assert _nested(store['doc'], 'structured', 'title') == _SEGMENT_TEXT
+    assert _nested(store['doc'], 'structured', 'title') == LLM_TITLE
     assert _nested(store['doc'], 'structured', 'overview') == ''
     assert store['b_response'].conversation.client_processing is None
     assert store['b_response'].conversation.structured.model_dump_json() == store['structured_before']
-    assert response_a.conversation.structured.title == _SEGMENT_TEXT
+    assert response_a.conversation.structured.title == LLM_TITLE
     warnings = [record for record in caplog.records if 'hash_mismatch' in record.getMessage()]
     assert len(warnings) == 1
     message = warnings[0].getMessage()
@@ -1761,7 +1627,6 @@ def test_interleaved_loser_mismatch_does_not_overwrite_winner_projection(monkeyp
     assert PROJECTION_TITLE not in message
     assert PROJECTION_TITLE_A not in message
     assert 'edited later' not in message
-    _assert_no_managed(spies)
 
 
 # ---------------------------------------------------------------------------
@@ -1780,9 +1645,7 @@ def test_reversed_commit_order_cannot_store_older_winner_projection(monkeypatch,
     separate winner stamp never sees one.
     """
     pc, conv = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
     winner = _in_progress()
     latest = _in_progress()
     latest.status = ConversationStatus.processing
@@ -1827,11 +1690,10 @@ def test_reversed_commit_order_cannot_store_older_winner_projection(monkeypatch,
     stored = store['doc']['client_processing']
     assert stored['structure']['title'] == PROJECTION_TITLE
     assert stored['structure']['title'] != PROJECTION_TITLE_A
-    assert _nested(store['doc'], 'structured', 'title') == _SEGMENT_TEXT
+    assert _nested(store['doc'], 'structured', 'title') == LLM_TITLE
     assert _nested(store['doc'], 'structured', 'overview') == ''
     assert store['b_response'].conversation.structured.model_dump_json() == store['structured_before']
-    assert response_a.conversation.structured.title == _SEGMENT_TEXT
-    _assert_no_managed(spies)
+    assert response_a.conversation.structured.title == LLM_TITLE
 
 
 # red-proof: admit without extra_updates, then let `update_conversation` raise
@@ -1959,7 +1821,6 @@ def _t1_segment_dict() -> dict[str, Any]:
 def _t1_snapshot(*, status: str = ConversationStatus.completed.value) -> dict[str, Any]:
     return {
         'data_protection_level': 'standard',
-        'is_locked': False,
         'status': status,
         'transcript_segments': [_t1_segment_dict()],
         'structured': {'title': _SEGMENT_TEXT, 'overview': ''},
@@ -2167,7 +2028,6 @@ def test_sync_admit_stores_when_transcript_is_still_t1(monkeypatch) -> None:
 def test_transactional_bind_drops_legacy_noncanonical_stored_row(monkeypatch, caplog) -> None:
     legacy = {
         'data_protection_level': 'standard',
-        'is_locked': False,
         'status': ConversationStatus.completed.value,
         'transcript_segments': [
             {
@@ -2207,9 +2067,9 @@ def _t2_segment_dict() -> dict[str, Any]:
     return {**_t1_segment_dict(), 'text': _T2_TEXT}
 
 
-def _assert_deterministic_minimum(conversation: Conversation) -> None:
+def _assert_projection_dropped(conversation: Conversation) -> None:
     assert conversation.client_processing is None
-    assert conversation.structured.title == _SEGMENT_TEXT
+    assert conversation.structured.title == LLM_TITLE
     assert conversation.structured.overview == ''
     assert conversation.structured.title != PROJECTION_TITLE
 
@@ -2219,9 +2079,7 @@ def _assert_deterministic_minimum(conversation: Conversation) -> None:
 def test_sync_route_transcript_race_omits_projection_from_storage_and_response(monkeypatch, stack) -> None:
     """Route hashes T1; the admission CAS sees T2 and drops. Response matches storage."""
     pc, conv = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
     store = _install_sync_finalize_store(monkeypatch, pc, conv)
     store['doc'] = {
         'data_protection_level': 'standard',
@@ -2244,17 +2102,14 @@ def test_sync_route_transcript_race_omits_projection_from_storage_and_response(m
 
     assert 'client_processing' not in store['admits'][-1]
     assert store['doc'].get('client_processing') is None
-    _assert_deterministic_minimum(response.conversation)
-    _assert_no_managed(spies)
+    _assert_projection_dropped(response.conversation)
 
 
 # red-proof: do not attach conversation.client_processing after the storage reread
-# (matching projection is stored, response is the deterministic minimum)
+# (matching projection is stored, response is the processed conversation)
 def test_sync_route_matching_projection_is_in_storage_and_response(monkeypatch, stack) -> None:
     pc, conv = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
     store = _install_sync_finalize_store(monkeypatch, pc, conv)
     store['doc'] = {
         'data_protection_level': 'standard',
@@ -2273,9 +2128,8 @@ def test_sync_route_matching_projection_is_in_storage_and_response(monkeypatch, 
     assert store['doc']['client_processing']['structure']['title'] == PROJECTION_TITLE
     assert response.conversation.client_processing is not None
     assert response.conversation.client_processing.structure.title == PROJECTION_TITLE
-    assert response.conversation.structured.title == _SEGMENT_TEXT
+    assert response.conversation.structured.title == LLM_TITLE
     assert response.conversation.structured.overview == ''
-    _assert_no_managed(spies)
 
 
 # red-proof: attach conversation.client_processing = client_projection before
@@ -2283,9 +2137,7 @@ def test_sync_route_matching_projection_is_in_storage_and_response(monkeypatch, 
 def test_durable_route_transcript_race_omits_projection_from_storage_and_response(monkeypatch, stack) -> None:
     """Route hashes T1; the outbox bind sees T2 and drops. Response matches storage."""
     pc, conv = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
     conversation = _in_progress()
     captured = _prepare_durable_finalize(monkeypatch, conv, conversation)
     captured['bind_on_commit'] = True
@@ -2304,16 +2156,13 @@ def test_durable_route_transcript_race_omits_projection_from_storage_and_respons
     assert response.conversation.structured.title != PROJECTION_TITLE
     assert response.conversation.structured.overview == ''
     assert response.conversation.status == ConversationStatus.processing
-    _assert_no_managed(spies)
 
 
 # red-proof: do not attach conversation.client_processing after the storage reread
 # (matching projection is stored, response has none)
 def test_durable_route_matching_projection_is_in_storage_and_response(monkeypatch, stack) -> None:
     pc, conv = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
     conversation = _in_progress()
     captured = _prepare_durable_finalize(monkeypatch, conv, conversation)
     captured['bind_on_commit'] = True
@@ -2330,7 +2179,6 @@ def test_durable_route_matching_projection_is_in_storage_and_response(monkeypatc
     assert response.conversation.client_processing is not None
     assert response.conversation.client_processing.structure.title == PROJECTION_TITLE
     assert response.conversation.status == ConversationStatus.processing
-    _assert_no_managed(spies)
 
 
 # ---------------------------------------------------------------------------
@@ -2433,9 +2281,7 @@ def test_bind_report_key_matches_router_constant(stack) -> None:
 def test_sync_rejected_t1_response_does_not_echo_later_t2_projection(monkeypatch, stack) -> None:
     """A's T1 is rejected; B binds T2 before A would have reread; A's response has neither."""
     pc, conv = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
     store = _install_sync_finalize_store(monkeypatch, pc, conv)
     store['doc'] = {
         'data_protection_level': 'standard',
@@ -2462,18 +2308,15 @@ def test_sync_rejected_t1_response_does_not_echo_later_t2_projection(monkeypatch
 
     assert 'client_processing' not in store['admits'][-1]
     assert store['doc']['client_processing']['structure']['title'] == PROJECTION_TITLE_B
-    _assert_deterministic_minimum(response.conversation)
+    _assert_projection_dropped(response.conversation)
     assert response.conversation.client_processing is None
-    _assert_no_managed(spies)
 
 
 # red-proof: attach conversation.client_processing = client_projection when captured['doc'] has some dict
 def test_durable_rejected_t1_response_does_not_echo_later_t2_projection(monkeypatch, stack) -> None:
     """A's T1 is rejected; B binds T2 before A would have reread; A's response has neither."""
     pc, conv = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
     conversation = _in_progress()
     captured = _prepare_durable_finalize(monkeypatch, conv, conversation)
     captured['bind_on_commit'] = True
@@ -2496,16 +2339,13 @@ def test_durable_rejected_t1_response_does_not_echo_later_t2_projection(monkeypa
     assert response.conversation.structured.title != PROJECTION_TITLE
     assert response.conversation.structured.title != PROJECTION_TITLE_B
     assert response.conversation.status == ConversationStatus.processing
-    _assert_no_managed(spies)
 
 
 # red-proof: wrap the post-admission get_conversation in try/except (calls would be 1, row stranded if uncaught)
 def test_sync_winner_does_not_reread_between_admission_and_guard(monkeypatch, stack) -> None:
     """The former reread is gone: a failing get_conversation cannot strand the row."""
     pc, conv = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
     store = _install_sync_finalize_store(monkeypatch, pc, conv)
     store['doc'] = {
         'data_protection_level': 'standard',
@@ -2532,16 +2372,13 @@ def test_sync_winner_does_not_reread_between_admission_and_guard(monkeypatch, st
     assert store['admits'][-1]['client_processing']['structure']['title'] == PROJECTION_TITLE
     assert response.conversation.client_processing is not None
     assert response.conversation.client_processing.structure.title == PROJECTION_TITLE
-    assert response.conversation.structured.title == _SEGMENT_TEXT
-    _assert_no_managed(spies)
+    assert response.conversation.structured.title == LLM_TITLE
 
 
 # red-proof: wrap the post-commit get_conversation in try/except (calls would be 1)
 def test_durable_winner_does_not_reread_after_outbox_commit(monkeypatch, stack) -> None:
     pc, conv = stack
-    _enable_flag(monkeypatch, pc)
     spies = _spy_managed_effects(monkeypatch, pc)
-    _authorize(monkeypatch, pc, _basic_decision())
     conversation = _in_progress()
     captured = _prepare_durable_finalize(monkeypatch, conv, conversation)
     captured['bind_on_commit'] = True
@@ -2566,4 +2403,3 @@ def test_durable_winner_does_not_reread_after_outbox_commit(monkeypatch, stack) 
     assert response.conversation.client_processing is not None
     assert response.conversation.client_processing.structure.title == PROJECTION_TITLE
     assert response.conversation.status == ConversationStatus.processing
-    _assert_no_managed(spies)

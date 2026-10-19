@@ -43,17 +43,11 @@ export const CompactPluginCard = memo(function CompactPluginCard({
 
       {/* Content */}
       <div className="min-w-0 flex-1 space-y-0.5">
-        {/* Title, Paid badge, and NEW badge */}
+        {/* Title and NEW badge */}
         <div className="flex items-center gap-2">
           <h3 className="flex-1 truncate font-medium text-white transition-colors group-hover:text-[#6C8EEF]">
             {plugin.name}
           </h3>
-          {plugin.is_paid && (
-            <span className="inline-flex shrink-0 items-center gap-1 rounded bg-amber-500/10 px-1.5 py-0.5 text-xs font-medium text-amber-400">
-              ${plugin.price?.toFixed(2)}
-              {plugin.payment_plan === 'monthly_recurring' ? '/mo' : ''}
-            </span>
-          )}
           <NewBadge plugin={plugin} />
         </div>
 

@@ -37,7 +37,6 @@ import routers.users as users_router
 import utils.apps as apps_utils
 import utils.conversations.meeting_context_pack as meeting_context_pack
 import utils.imports.limitless as limitless
-import utils.llm.fair_use_classifier as fair_use_classifier
 import utils.llm.goals as llm_goals
 import utils.other.notifications as notifications_utils
 import utils.retrieval.tool_services.conversations as tool_conversations
@@ -327,7 +326,6 @@ def _run_speaker_browse_recipe(monkeypatch: pytest.MonkeyPatch, capture: HelperC
 
 
 def _run_daily_summary_regenerate(monkeypatch: pytest.MonkeyPatch, capture: HelperCapture) -> None:
-    _stub(monkeypatch, users_router, 'enforce_chat_quota', lambda *a, **k: None)
     _stub(monkeypatch, users_router.notification_db, 'get_user_time_zone', lambda uid: None)
     _stub(
         monkeypatch,
@@ -341,7 +339,6 @@ def _run_daily_summary_regenerate(monkeypatch: pytest.MonkeyPatch, capture: Help
 
 
 def _run_daily_summary_test_route(monkeypatch: pytest.MonkeyPatch, capture: HelperCapture) -> None:
-    _stub(monkeypatch, users_router, 'enforce_chat_quota', lambda *a, **k: None)
     _stub(monkeypatch, users_router.notification_db, 'get_user_time_zone', lambda uid: None)
     _stub(monkeypatch, users_router.notification_db, 'get_all_tokens', lambda uid: ['tok'])
     trial(capture, users_router.test_daily_summary, request=None, uid='u1', x_app_platform=None)
@@ -388,10 +385,6 @@ def _run_prior_meetings(monkeypatch: pytest.MonkeyPatch, capture: HelperCapture)
 
 def _run_limitless_lookup(monkeypatch: pytest.MonkeyPatch, capture: HelperCapture) -> None:
     trial(capture, limitless.find_legacy_limitless_conversation_id, 'u1', FROZEN_NOW)
-
-
-def _run_fair_use(monkeypatch: pytest.MonkeyPatch, capture: HelperCapture) -> None:
-    trial(capture, fair_use_classifier._prepare_conversation_summaries, 'u1')
 
 
 def _run_goal_context(monkeypatch: pytest.MonkeyPatch, capture: HelperCapture) -> None:
@@ -459,7 +452,6 @@ def _run_speaker_prompts(monkeypatch: pytest.MonkeyPatch, capture: HelperCapture
         lambda uid: ({'save_other_voice_profiles': False, 'speaker_tag_prompts_enabled': True}, False),
     )
     _stub(monkeypatch, speaker_tag_service.voice_profiles_db, 'get_tag_prompt_state', lambda uid: {})
-    _stub(monkeypatch, speaker_tag_service, 'named_speaker_prompts_allowed', lambda uid: True)
     _stub(monkeypatch, users_db, 'get_people', lambda uid: [])
     trial(capture, speaker_tag_service.get_prompts, 'u1', now=FROZEN_NOW)
 
@@ -652,14 +644,6 @@ WITNESSES: dict[str, CallerWitness] = {
             ('limitless-legacy-lookup',),
             1,
             _run_limitless_lookup,
-        ),
-        CallerWitness(
-            'utils/llm/fair_use_classifier.py:_prepare_conversation_summaries:database.conversations.get_conversations',
-            'database.conversations.get_conversations',
-            'database.conversations.get_conversations',
-            ('fair-use-classification',),
-            1,
-            _run_fair_use,
         ),
         CallerWitness(
             'utils/llm/goals.py:_get_goal_context:database.conversations.get_conversations',

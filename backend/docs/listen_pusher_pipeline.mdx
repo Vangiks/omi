@@ -81,7 +81,7 @@ uploaded media duration and rejects a file that exceeds the remaining allowance;
 successful provider responses increment root `hourly_usage.transcription_seconds`
 by that duration, rounded up to a second. Deepgram BYOK cannot exempt this
 Omi-managed Parakeet call. This proxy does not measure VAD speech or change the
-live-listen, offline-sync, or locked-conversation policies.
+live-listen or offline-sync policies.
 
 Admission and usage recording are not a distributed monthly reservation. The
 proxy probes the seekable upload spool and initially checks allowance before
@@ -173,7 +173,7 @@ silence until the stored `external_data.calendar_meeting_context.start_time` +
 `duration_minutes` + 120 seconds of grace. The stored calendar event id owns this
 window; screen-derived identity does not extend it, and meeting-treatment
 eligibility does not gate it. Reconnect admission, continuation-pointer lookup,
-and the active lifecycle loop use the same deadline. Source/device/lock partitions
+and the active lifecycle loop use the same deadline. Source/device partitions
 and empty-generation deletion keep their existing checks; non-meeting recordings
 keep the 120-second silence rule. The continuation transaction reads the complete
 conversation metadata, including the stored calendar context, without decoding
@@ -2247,7 +2247,7 @@ existing protected transcript payload. This is observational provenance, never
 teaching or access authority. The manual assignment transaction clears it even on
 confirmation; only after commit does `speaker_id_review` log the first manual
 review and `omi_sync_speaker_reviewed_segments_total{outcome="confirmed|corrected"}`
-count it. Retries see cleared provenance, and locked/deleted or failed writes emit
+count it. Retries see cleared provenance, and deleted or failed writes emit
 nothing. Manual receipt overlays also clear stale automatic provenance. Legacy and
 text-only labels have unknown origin and are excluded. Metrics contain no IDs;
 review logs may contain user, conversation and segment IDs but no transcript or
@@ -2288,8 +2288,8 @@ Parakeet service uses the `PARAKEET_`-prefixed equivalents.
 
 ### 4.1 Speaker tag prompts ("Was this you?" / "Who is this?")
 
-`routers/speaker_tag_prompts.py` serves a small daily set from completed,
-unlocked conversations started in the last **48 hours** with stored audio.
+`routers/speaker_tag_prompts.py` serves a small daily set from completed
+conversations started in the last **48 hours** with stored audio.
 `owner_check` is free on every plan and asks only **Was this you? — Yes / No /
 Skip**. `confirm_person` and `identify` remain paid automatic non-owner naming
 cards; manually naming a voice through the tag sheet remains free.
@@ -2441,7 +2441,7 @@ clears the consumed marker or restores playback/answer/issuance authority.
 
 ### People-stats aggregate cache
 
-`GET /v1/users/people?include_stats=true` aggregates the newest conversations (locked/discarded excluded, `started_at` else `created_at`, per-segment `person_id`/`start`/`end`/`speaker_match_source`) into one `person_id -> {conversation_count, last_heard_at, talk_seconds, auto_conversation_count}` map per call. `database.people_stats_cache` caches only that map — Person rows and signed speech-sample URLs stay fresh reads. Entries live at `users/{uid}/people_stats/v1/{generation}/{scan_cap}` in the generic Redis cache (60 s TTL, 262144-byte serialized cap on read and write; oversize/corrupt/nonfinite payloads are misses). A per-uid generation token at `people_stats:v1:{uid}:generation` (86400 s TTL, fetch-or-create via `SET NX`) namespaces every entry: a writer-side bump retires all outstanding entries at once, so the 60 s entry TTL is only a safety cap for a failed invalidation — normal writes invalidate immediately. `collect_people_stats` resolves generation and entry before consuming the scan iterator, so a hit performs zero Firestore reads; it re-checks the generation before writing. If invalidation happens after that check, a fill may still be written under the retired key, which is unreachable. A `ListReadBudget`-truncated scan is never stored — only a full capped pass is cached. For N repeat loads within one unchanged 60 s generation, one capped scan serves all N: a fully populated first scan means a hit avoids all 1000 conversation reads (raw reads can reach 2000 because tombstones and invisible rows consume the document budget without yielding). Every operation fails open to the uncached scan; generation and invalidation failures log uid + error type and count `other`/`cached`->`uncached`/`connection_lost`/`recovered`.
+`GET /v1/users/people?include_stats=true` aggregates the newest conversations (discarded excluded, `started_at` else `created_at`, per-segment `person_id`/`start`/`end`/`speaker_match_source`) into one `person_id -> {conversation_count, last_heard_at, talk_seconds, auto_conversation_count}` map per call. `database.people_stats_cache` caches only that map — Person rows and signed speech-sample URLs stay fresh reads. Entries live at `users/{uid}/people_stats/v1/{generation}/{scan_cap}` in the generic Redis cache (60 s TTL, 262144-byte serialized cap on read and write; oversize/corrupt/nonfinite payloads are misses). A per-uid generation token at `people_stats:v1:{uid}:generation` (86400 s TTL, fetch-or-create via `SET NX`) namespaces every entry: a writer-side bump retires all outstanding entries at once, so the 60 s entry TTL is only a safety cap for a failed invalidation — normal writes invalidate immediately. `collect_people_stats` resolves generation and entry before consuming the scan iterator, so a hit performs zero Firestore reads; it re-checks the generation before writing. If invalidation happens after that check, a fill may still be written under the retired key, which is unreachable. A `ListReadBudget`-truncated scan is never stored — only a full capped pass is cached. For N repeat loads within one unchanged 60 s generation, one capped scan serves all N: a fully populated first scan means a hit avoids all 1000 conversation reads (raw reads can reach 2000 because tombstones and invisible rows consume the document budget without yielding). Every operation fails open to the uncached scan; generation and invalidation failures log uid + error type and count `other`/`cached`->`uncached`/`connection_lost`/`recovered`.
 
 Durable mutation boundaries bump the generation outside the Firestore transaction, before best-effort search-index observers: conversation lifecycle upsert/persist/create, `update_conversation`, delete, status transition/claim, discard/restore, `finished_at`, manual speaker assignment, segment rewrites (manual, inferred, streaming), sync assignment, per-batch unlocks, smart-merge absorption, empty-generation cleanup, and finalization intent creation (which accepts snapshot-bound extra updates). Intentionally not hooked: deadletter/orphan/BYOK completions that only touch status/title on an already-counted row, first-open obligation patches (folder/apps), sync-bridge/listen-continuation/recording-session marker writes, text/summary/events/photos/translation-only helpers, person CRUD/renaming/pinning/evidence (presentation reads stay fresh), and speech-sample signed URLs. A writer that changes visibility, timestamps, segments, attribution, or delete/merge state must hook in; without one the stale map is evicted only by the 60 s entry TTL.
 
@@ -3576,20 +3576,18 @@ arrival order, keeping existing IDs on append and redirects for genuine bridges.
 Reconnect IDs do not partition membership. Missing explicit targets and empty live
 stubs use ordinary temporal assignment; stubs remain untouched. Explicit targets
 with real live transcript or photo content retain live attachment and identity.
-Source, device and lock state isolate components; unknown device is its own partition.
+Source and device isolate components; unknown device is its own partition.
 
-Compatibility is equality of all three fields: two locked captures are compatible,
-so locked chunks merge, append to a locked explicit target and deduplicate on retry
-exactly as unlocked ones do. A mismatch means a field differs.
+Compatibility is equality of both fields. A mismatch means a field differs.
 
 `SYNC_ASSIGNMENT_RECOVERY_ENABLED` defaults on (unknown/blank values disable it).
-An explicit target whose source, device or lock state differs from the upload falls
+An explicit target whose source or device differs from the upload falls
 back to compatible temporal assignment, and the target remains untouched. This
 can retain speech already present in an incompatible live row as a second conversation:
 dedupe is scoped to compatible selected rows, not cross-device transcript similarity.
 With the flag off the mismatch is rejected (`SyncAssignmentConflict`,
-`provenance_mismatch`). In both modes a stored retry anchor whose source, device or
-lock state changed after it was written is rejected rather than replaced; an
+`provenance_mismatch`). In both modes a stored retry anchor whose source or device
+changed after it was written is rejected rather than replaced; an
 unchanged anchor is an ordinary retry. The flag is pinned on in both runtime
 overlays for every main.py service.
 
@@ -3603,8 +3601,7 @@ even when sibling segments succeeded; differing fingerprints in one batch share 
 `persistence:mixed` token. Sibling checkpoints and partial results are kept, the
 failed-job response retains local WAL audio, and completion is never reported.
 Unknown Firestore 400s, expired transactions, contention and transport failures are
-never strikes. `sync_assignment_target` reports bounded `mismatch` tokens (`lock`
-only when lock state differs); `sync_persistence_exception` reports `firestore_error`
+never strikes. `sync_assignment_target` reports bounded `mismatch` tokens; `sync_persistence_exception` reports `firestore_error`
 and `firestore_doc_kind` (`conversation`, `donor`, `sync_day_index`, `sync_recent`,
 `other` or `none`, derived from the rejected document's collection segments, never
 its ids). Persistence failures use provider/model `unknown` and `sync_persistence_failed`,
@@ -4287,8 +4284,8 @@ advisory elapsed budget and at most 24 model attempts, including failures; no
 late pass repairs enrollment audio. Cancellation of an async waiter cannot free
 admission while its storage thread is still running. SDK/network timeouts are
 not a hard five-second deadline.
-It changes only transcript identity and speaker resolution on completed,
-unlocked pendant/WAL rows. The commit compares the read document revision and
+It changes only transcript identity and speaker resolution on completed
+pendant/WAL rows. The commit compares the read document revision and
 reapplies manual authority; intervening edits defeat it. It performs no notes,
 task or lifecycle replay, and desktop/phone channel paths remain excluded.
 
@@ -4474,8 +4471,8 @@ The funnel `(stage,reason)` pairs are closed:
 | entry | candidate | Known deduplicated candidates, before slot/scan admission; first passes at resolver entry. |
 | eligible | candidate | Late snapshot passed existing retry eligibility and ID check; first pass has a nonempty conversation model. |
 | deferred | slot_limit, coalesced, in_flight | Candidates retained in legacy admission waiters or merged into a UID cohort; retained pending IDs read no snapshot or audio. |
-| skipped | slot_limit, queue_limit, queue_expired, cancelled, cohort_seen, scan_limit, pass_limit, missing, not_completed, deleted, discarded, locked, channel_source, private_cloud_disabled, missing_revision, already_resolved_owner, id_mismatch, empty_transcript, manual_receipt_unavailable, read_error, processing_error, submission_error | One terminal skip; capacity reasons mean the candidate was not scanned, not that its audio was ineligible. |
-| cas_refused | missing, account_deleting, deleted, discarded, locked, not_completed, revision_changed | Late-only terminal verdict from the actual transaction snapshot, emitted after the outer transaction returns. |
+| skipped | slot_limit, queue_limit, queue_expired, cancelled, cohort_seen, scan_limit, pass_limit, missing, not_completed, deleted, discarded, channel_source, private_cloud_disabled, missing_revision, already_resolved_owner, id_mismatch, empty_transcript, manual_receipt_unavailable, read_error, processing_error, submission_error | One terminal skip; capacity reasons mean the candidate was not scanned, not that its audio was ineligible. |
+| cas_refused | missing, account_deleting, deleted, discarded, not_completed, revision_changed | Late-only terminal verdict from the actual transaction snapshot, emitted after the outer transaction returns. |
 | cas_committed | done | Late-only terminal commit, including canonical identity no-op; transaction callback retries do not increment. |
 
 Admission deferral uses the same closed retry funnel: `pass=late,stage=deferred,reason=slot_limit`
@@ -4574,37 +4571,6 @@ coverage. No new flags, indexes, stored fields, routes or app release are needed
 This telemetry adds no retries, audio downloads, embedding calls or profile
 reads. Mixed image versions are safe; older images simply emit no new samples.
 
-## Dark at-cap choice contract
-
-`HELD_CONTENT_ENABLED` defaults to `false`; `X-Omi-Held-Content: 1` is also
-required for `GET` and `PUT /v1/users/budget-choice`. Missing/unknown capabilities
-receive 404 before route auth and any choice or allowance read for a valid body.
-Malformed PUT JSON can return 422 before dependencies; it performs no Firestore reads. This foundation does not change
-sync/listen admission or existing `is_locked` rows.
-
-The API uses the existing UTC calendar-month usage bucket (including annual
-subscriptions). One metadata-only document at
-`users/{uid}/budget_choice/current` holds the period, `on_device` or `upgrade`,
-and `dont_ask_again`. Identical writes are idempotent; conflicting writes in the
-same period return 409. A new period logically expires the old choice and
-replaces the same document, avoiding unbounded history. Delayed older-period
-writes cannot overwrite a newer choice. `upgrade` records intent only; managed
-processing still requires a positive answer from the existing allowance resolver.
-A lookup failure or platform trial paywall is `unavailable`, never a cap hit.
-`X-App-Platform` reaches the allowance resolver. Drifted BYOK recovery clears
-invalid keys before this route; it cannot grant managed access. GET and PUT share
-a boost-exempt six-per-minute UID limit, failing closed before monthly usage
-reads when Redis is unavailable. The plans API alone owns storefront visibility;
-this response makes no upgrade-availability claim. Responses are typed OpenAPI
-models with generated wire DTOs, not manual client JSON adapters. The API adds no entitlement,
-quota, provider, subscription, or captured-content mutation.
-
-Do not enable this flag before capable clients, capture custody, recovery and
-on-device continuation are implemented and verified. In particular, staged sync
-audio expires after one day and is not a safe month-long hold store. Client WAL
-custody must survive a hold until successful processing, within the existing
-retention contract. No new client capability is advertised by this foundation.
-
 ### Flagged shared batch diarization
 
 Production stage B binds David-only authoritative diarization on backend,
@@ -4643,7 +4609,7 @@ Failure retains legacy matching; manual owner reservations remain authoritative.
 Live matching enters through an adapter preserving its clip policy unchanged.
 
 `TRANSCRIPTION_FINAL_PASS_AUTHORITATIVE=false` independently gates record replacement.
-Promotion requires complete audio and a current completed, unlocked conversation
+Promotion requires complete audio and a current completed conversation
 revision. A transaction rechecks rollout, deletion and revision, verifies segment
 correspondence, and changes only speaker fields on stored segments. Stored text,
 IDs, clocks, translations and structured source IDs remain unchanged. Manual

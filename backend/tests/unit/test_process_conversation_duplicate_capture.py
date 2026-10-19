@@ -103,7 +103,6 @@ _STUBBED = [
     'utils.notifications',
     'utils.apps',
     'utils.executors',
-    'utils.subscription',
     'utils.task_intelligence.workstream_association',
 ]
 

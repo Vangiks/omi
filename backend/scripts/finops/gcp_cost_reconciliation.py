@@ -39,12 +39,6 @@ AGGREGATE_CATALOG = {
         "cluster": ["pool"],
         "grain": ["date", "pool"],
     },
-    "plan_revenue_daily": {
-        "partition": "date",
-        "partition_expiry": None,
-        "cluster": ["plan"],
-        "grain": ["date", "plan", "snapshot_date"],
-    },
     "unit_cost_user_day": {
         "partition": "date",
         "partition_expiry": None,
@@ -62,11 +56,6 @@ DIRECT_CONSUMERS = (
     {
         "path": "web/admin/lib/services/gcp-billing.ts",
         "reads": CURRENT_BILLING_TABLE,
-        "needs_posthog_copy": False,
-    },
-    {
-        "path": "web/admin/lib/services/plan-economics.ts",
-        "reads": "based-hardware.omi_finops.unit_cost_daily, plan_revenue_daily, unit_cost_reconciliation",
         "needs_posthog_copy": False,
     },
 )

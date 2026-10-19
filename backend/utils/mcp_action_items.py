@@ -3,7 +3,7 @@
 Both the REST endpoints (``routers/mcp.py``) and the MCP tools
 (``routers/mcp_sse.py``) drive action-item create/complete/update/delete/search
 through these helpers, so the two transports cannot drift in behavior
-(idempotency, vector indexing, paywall handling). Past drift between the SSE and
+(idempotency, vector indexing, not-found handling). Past drift between the SSE and
 REST MCP paths is exactly what required follow-up alignment fixes, so the write
 path is centralized here from the start. Lives in ``utils`` so neither router
 imports the other (routers must never import from other routers).
@@ -40,10 +40,6 @@ class ActionItemError(Exception):
 
 class ActionItemNotFound(ActionItemError):
     """No action item with that id exists for this user."""
-
-
-class ActionItemLocked(ActionItemError):
-    """The item is behind the paywall (``is_locked``); a paid plan is required to mutate it."""
 
 
 def content_idempotency_key(uid: str, description: str) -> str:
@@ -103,15 +99,12 @@ def parse_due_at(value: object) -> Optional[datetime]:
     return parsed
 
 
-def _require_unlocked(uid: str, action_item_id: str) -> Dict[str, Any]:
+def _require_existing(uid: str, action_item_id: str) -> Dict[str, Any]:
     """Fetch the item (uid-scoped, so a foreign id can never resolve) and reject
-    a missing/deleted item with ``ActionItemNotFound`` and a paywalled one with
-    ``ActionItemLocked`` — mirroring the memory write guards."""
+    a missing/deleted item with ``ActionItemNotFound``."""
     item = action_items_db.get_action_item(uid, action_item_id)
     if not item or item.get("deleted", False):
         raise ActionItemNotFound("Action item not found")
-    if item.get("is_locked", False):
-        raise ActionItemLocked("A paid plan is required to modify this action item.")
     return item
 
 
@@ -178,7 +171,7 @@ def create_action_item(
 
 def set_completed(uid: str, action_item_id: str, completed: bool = True) -> Dict[str, Any]:
     """Mark a task complete or reopen it."""
-    _require_unlocked(uid, action_item_id)
+    _require_existing(uid, action_item_id)
     if not action_items_db.mark_action_item_completed(uid, action_item_id, completed=completed):
         raise ActionItemNotFound("Action item not found")
     return clean_action_item(_sync_reminder(uid, _reload(uid, action_item_id)))
@@ -195,7 +188,7 @@ def update_action_item(
     Only the fields provided are changed. Clearing a due date is not supported in
     this version (an omitted ``due_at`` leaves it unchanged rather than nulling it).
     """
-    _require_unlocked(uid, action_item_id)
+    _require_existing(uid, action_item_id)
     update_data: Dict[str, Any] = {}
     new_text: Optional[str] = None
     if description is not None:
@@ -230,7 +223,7 @@ def update_action_item(
 
 def delete_action_item(uid: str, action_item_id: str) -> None:
     """Delete a task and its search vector."""
-    _require_unlocked(uid, action_item_id)
+    _require_existing(uid, action_item_id)
     # Honor the delete result: a False here means the row was already gone (a
     # concurrent delete between the existence check above and now), so report
     # not-found rather than a misleading success.

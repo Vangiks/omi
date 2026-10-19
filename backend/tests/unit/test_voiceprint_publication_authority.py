@@ -105,7 +105,7 @@ def test_legacy_no_contributors_requires_unchanged_receipt(level, changed):
     assert bool(pool(store, segment_ids=None)) is (not changed)
 
 
-@pytest.mark.parametrize('flag', ['deleted', 'discarded', 'is_locked'])
+@pytest.mark.parametrize('flag', ['deleted', 'discarded'])
 def test_owner_publication_source_status(flag):
     conv = owner_source()
     conv[flag] = True

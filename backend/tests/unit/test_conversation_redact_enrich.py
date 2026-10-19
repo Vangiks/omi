@@ -63,7 +63,6 @@ from models.structured import Structured
 def _make_conv_dict(**overrides):
     defaults = dict(
         id="test-id",
-        is_locked=False,
         structured=dict(
             title="Test Title",
             overview="Test overview",
@@ -81,144 +80,36 @@ def _make_conv_dict(**overrides):
 
 
 class TestRedactForList:
-    def test_unlocked_passthrough(self):
-        conv = _make_conv_dict(is_locked=False)
+    def test_passthrough(self):
+        conv = _make_conv_dict()
         result = redact_conversation_for_list(conv)
         assert result['structured']['action_items'] == [{"description": "Do thing"}]
         assert len(result['transcript_segments']) == 1
 
-    def test_locked_strips_details_keeps_title(self):
-        conv = _make_conv_dict(is_locked=True)
-        conv['match_snippets'] = [{'text': 'ACME contract', 'start': 1.0, 'end': 2.0}]
-        result = redact_conversation_for_list(conv)
-        assert result['structured']['title'] == "Test Title"
-        assert result['structured']['overview'] == "Test overview"
-        assert result['structured']['action_items'] == []
-        assert result['structured']['events'] == []
-        assert result['apps_results'] == []
-        assert result['plugins_results'] == []
-        assert result['suggested_summarization_apps'] == []
-        assert result['transcript_segments'] == []
-        assert result['match_snippets'] == []
-
-    def test_unlocked_keeps_match_snippets(self):
-        conv = _make_conv_dict(is_locked=False)
+    def test_keeps_match_snippets(self):
+        conv = _make_conv_dict()
         conv['match_snippets'] = [{'text': 'ACME contract', 'start': 1.0, 'end': 2.0}]
         result = redact_conversation_for_list(conv)
         assert result['match_snippets'] == [{'text': 'ACME contract', 'start': 1.0, 'end': 2.0}]
 
-    def test_locked_no_structured_key(self):
-        conv = {"id": "x", "is_locked": True}
-        result = redact_conversation_for_list(conv)
-        assert 'structured' not in result
-
-    def test_locked_non_dict_structured_coerced(self):
-        """structured can be a Pydantic model (non-dict); redact should coerce to dict."""
-
-        class FakeStructured:
-            def __init__(self):
-                self.title = "Title"
-                self.overview = "Overview"
-                self.action_items = [{"desc": "x"}]
-                self.events = [{"title": "y"}]
-
-            def __iter__(self):
-                return iter(
-                    {
-                        "title": self.title,
-                        "overview": self.overview,
-                        "action_items": self.action_items,
-                        "events": self.events,
-                    }.items()
-                )
-
-        conv = {
-            "id": "x",
-            "is_locked": True,
-            "structured": FakeStructured(),
-            "apps_results": [{"a": 1}],
-            "plugins_results": [{"p": 1}],
-            "suggested_summarization_apps": ["app1"],
-            "transcript_segments": [{"text": "hi"}],
-        }
-        result = redact_conversation_for_list(conv)
-        assert isinstance(result['structured'], dict)
-        assert result['structured']['action_items'] == []
-        assert result['structured']['events'] == []
-
     def test_batch_redact(self):
-        convs = [_make_conv_dict(is_locked=True), _make_conv_dict(is_locked=False)]
-        results = redact_conversations_for_list(convs)
-        assert results[0]['transcript_segments'] == []
-        assert len(results[1]['transcript_segments']) == 1
+        results = redact_conversations_for_list([_make_conv_dict(), _make_conv_dict()])
+        assert [len(r['transcript_segments']) for r in results] == [1, 1]
 
 
 class TestRedactForIntegration:
-    def test_unlocked_passthrough(self):
-        conv = _make_conv_dict(is_locked=False, geolocation={'latitude': 1.0, 'longitude': 2.0})
+    def test_passthrough(self):
+        conv = _make_conv_dict(geolocation={'latitude': 1.0, 'longitude': 2.0})
         result = redact_conversation_for_integration(conv)
         assert result['structured']['title'] == "Test Title"
         assert 'geolocation' not in result
 
-    def test_locked_strips_everything(self):
-        conv = _make_conv_dict(is_locked=True, geolocation={'latitude': 1.0, 'longitude': 2.0})
-        conv['match_snippets'] = [{'text': 'ACME contract', 'start': 1.0, 'end': 2.0}]
-        result = redact_conversation_for_integration(conv)
-        assert result['structured']['title'] == ''
-        assert result['structured']['overview'] == ''
-        assert result['structured']['action_items'] == []
-        assert result['structured']['events'] == []
-        assert result['apps_results'] == []
-        assert result['plugins_results'] == []
-        assert result['suggested_summarization_apps'] == []
-        assert result['transcript_segments'] == []
-        assert result['match_snippets'] == []
-        assert 'geolocation' not in result
-
-    def test_locked_non_dict_structured_coerced(self):
-        """Integration redaction also handles non-dict structured (e.g. Pydantic)."""
-
-        class FakeStructured:
-            def __init__(self):
-                self.title = "Title"
-                self.overview = "Overview"
-                self.action_items = [{"desc": "x"}]
-                self.events = [{"title": "y"}]
-
-            def __iter__(self):
-                return iter(
-                    {
-                        "title": self.title,
-                        "overview": self.overview,
-                        "action_items": self.action_items,
-                        "events": self.events,
-                    }.items()
-                )
-
-        conv = {
-            "id": "x",
-            "is_locked": True,
-            "structured": FakeStructured(),
-            "apps_results": [{"a": 1}],
-            "plugins_results": [{"p": 1}],
-            "suggested_summarization_apps": ["app1"],
-            "transcript_segments": [{"text": "hi"}],
-        }
-        result = redact_conversation_for_integration(conv)
-        assert isinstance(result['structured'], dict)
-        assert result['structured']['title'] == ''
-        assert result['structured']['overview'] == ''
-        assert result['structured']['action_items'] == []
-        assert result['structured']['events'] == []
-
     def test_batch_redact(self):
-        convs = [_make_conv_dict(is_locked=True), _make_conv_dict(is_locked=False)]
-        results = redact_conversations_for_integration(convs)
-        assert results[0]['structured']['title'] == ''
-        assert results[1]['structured']['title'] == "Test Title"
+        results = redact_conversations_for_integration([_make_conv_dict(), _make_conv_dict()])
+        assert [r['structured']['title'] for r in results] == ["Test Title", "Test Title"]
 
     def test_strips_internal_audio_evidence_from_segments(self):
-        conv = _make_conv_dict(is_locked=False)
+        conv = _make_conv_dict()
         conv['transcript_segments'] = [
             {
                 'text': 'hi',
@@ -303,31 +194,9 @@ class TestConversationToDict:
 class TestCallSitesMigrated:
     """Verify production files use redact/enrich/render instead of inline logic."""
 
-    REDACT_CONSUMERS = [
-        'routers/conversations.py',
-        'routers/mcp.py',
-        'routers/mcp_sse.py',
-        'routers/integration.py',
-        'routers/folders.py',
-    ]
-
     ENRICH_CONSUMERS = [
         'routers/developer.py',
     ]
-
-    def test_no_inline_locked_redaction_in_routers(self):
-        """Routers should not have inline is_locked field-stripping loops."""
-        import os
-
-        backend = os.path.join(os.path.dirname(__file__), '../..')
-        for rel_path in self.REDACT_CONSUMERS:
-            path = os.path.join(backend, rel_path)
-            with open(path, encoding='utf-8') as f:
-                content = f.read()
-            # Should not have the old inline pattern of stripping action_items inside an is_locked check
-            assert (
-                "conv['structured']['action_items'] = []" not in content
-            ), f"{rel_path} still has inline locked redaction"
 
     def test_no_duplicate_speaker_enrichment(self):
         """Routers should not define their own _add_speaker_names_to_segments."""

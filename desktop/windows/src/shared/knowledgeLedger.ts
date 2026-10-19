@@ -107,7 +107,6 @@ export type KnowledgeLedgerMemory = {
   reviewed?: boolean
   user_review?: boolean | null
   is_baseline?: boolean
-  is_locked?: boolean
   is_read?: boolean
   is_dismissed?: boolean
   deleted?: boolean
@@ -506,7 +505,6 @@ export function parseKnowledgeLedgerMemory(value: unknown): KnowledgeLedgerMemor
     ...(asBoolean(raw.is_baseline) !== undefined
       ? { is_baseline: raw.is_baseline as boolean }
       : {}),
-    ...(asBoolean(raw.is_locked) !== undefined ? { is_locked: raw.is_locked as boolean } : {}),
     ...(asBoolean(raw.is_read) !== undefined ? { is_read: raw.is_read as boolean } : {}),
     ...(asBoolean(raw.is_dismissed) !== undefined
       ? { is_dismissed: raw.is_dismissed as boolean }

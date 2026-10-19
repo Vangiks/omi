@@ -1118,7 +1118,7 @@ def get_processed_segments(job_id: str) -> Set[str]:
 
 
 def try_mark_once(job_id: str, tag: str) -> bool:
-    """SETNX guard so per-job side effects (fair-use metering, usage recording)
+    """SETNX guard so per-job side effects (usage recording)
     run at most once across Cloud Tasks retries.
 
     Fails OPEN (returns True on Redis error) to match the metering functions'

@@ -47,18 +47,11 @@ export interface ToolResultDisplayEvent {
   output: string
 }
 
-/** The managed-cloud adapter successfully dispatched the prompt to its provider
- *  transport. Local binding/session/concurrency failures never emit this. */
-export interface HostedRequestStartedEvent {
-  type: 'hosted_request_started'
-}
-
 export type AdapterStreamEvent =
   | TextDeltaEvent
   | ThinkingDeltaEvent
   | ToolActivityEvent
   | ToolResultDisplayEvent
-  | HostedRequestStartedEvent
 
 export type AdapterEventSink = (event: AdapterStreamEvent) => void
 

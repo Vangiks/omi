@@ -100,7 +100,7 @@ def _cached_result(uid: str) -> _FlagResult | None:
 
 def enabled(uid: str) -> bool:
     """Cache true/false for 300s and failures for 60s, failing closed on errors."""
-    # Hits never wait for an unrelated user's in-flight lookup in the same stripe.
+    # Hits never wait for an unrelated user's in-flight lookup that shares its lock.
     result = _cached_result(uid)
     if result is None:
         with _lookup_locks[hash(uid) % len(_lookup_locks)]:

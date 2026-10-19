@@ -30,8 +30,6 @@ from utils.conversations.smart_merge_policy import is_donor
 from utils.conversations.meeting_evidence_admission import await_meeting_evidence
 from utils.conversations.meeting_receipt import record_finalized_meeting_receipt
 from utils.conversations.process_conversation import (
-    DerivedEffectsDisposition,
-    TERMINAL_NO_DERIVED_EFFECTS_FIELD,
     extract_memories,
     process_conversation,
     save_structured_vector,
@@ -230,7 +228,6 @@ async def finalize_persisted_conversation(
             _maybe_start_shadow(uid, conversation)
         persistence: dict[str, bool] = {'owned': True}
         derived_effects: list = []
-        derived_disposition: list[DerivedEffectsDisposition] = [DerivedEffectsDisposition.RUN]
         if conversation.status != ConversationStatus.completed:
             conversation = await run_blocking(
                 postprocess_executor,
@@ -245,15 +242,7 @@ async def finalize_persisted_conversation(
                 defer_derived_effects=True,
                 persistence_observer=lambda owned: persistence.__setitem__('owned', owned),
                 derived_effects_observer=derived_effects.append,
-                derived_effects_disposition_observer=lambda d: derived_disposition.__setitem__(0, d),
             )
-        elif conversation_data.get(TERMINAL_NO_DERIVED_EFFECTS_FIELD):
-            # The coordinator already persisted a free-tier terminal minimum.
-            # That write is durable; this request-scoped default is not. A
-            # completed replay skips process_conversation, so restore the
-            # disposition from the unmodeled marker before the empty-bundle
-            # memory-extraction fallback can run.
-            derived_disposition[0] = DerivedEffectsDisposition.TERMINAL_NO_DERIVED_EFFECTS
         # If lifecycle persistence lost to discard/terminal state, no canonical
         # memory or derived side effect may happen.  process_conversation
         # reports this through the observer and returns without side effects;
@@ -341,13 +330,7 @@ async def finalize_persisted_conversation(
         # memory extraction — only behind the winning claim. Summary indexing
         # also runs here, independently of the intelligence bundle.  A processing
         # conversation hands the bundle back from process_conversation; an
-        # already-completed replay re-extracts memories behind the proven claim
-        # unless the durable terminal marker is set (free-tier minimum).
-        # TERMINAL_NO_DERIVED_EFFECTS suppresses only that intelligence bundle,
-        # the empty-bundle memory fallback, and third-party app webhooks. Capture
-        # receipt, keyframes, and arrival intent are not derived intelligence
-        # (§1.7) and must still run so a free-tier desktop meeting wakes Chat.
-        skip_derived_effects = derived_disposition[0] == DerivedEffectsDisposition.TERMINAL_NO_DERIVED_EFFECTS
+        # already-completed replay re-extracts memories behind the proven claim.
         stage = 'derived_effects'
         # Completed-row replays have no coordinator bundle. Summary indexing is
         # independent of JIT folder/apps receipts and terminal intelligence
@@ -385,13 +368,7 @@ async def finalize_persisted_conversation(
                 outcome='degraded',
                 log=logger,
             )
-        if skip_derived_effects:
-            logger.info(
-                'persisted conversation finalization terminal with suppressed intelligence uid=%s conversation=%s',
-                uid,
-                conversation_id,
-            )
-        elif derived_effects:
+        if derived_effects:
             await run_blocking(postprocess_executor, derived_effects[0])
         elif not getattr(conversation, 'discarded', False):
             # A finalization job owns a durable lease. Keep canonical memory
@@ -400,14 +377,13 @@ async def finalize_persisted_conversation(
             stage = 'memory_extraction'
             await run_blocking(postprocess_executor, extract_memories, uid, conversation)
         stage = 'integrations'
-        if not skip_derived_effects:
-            await trigger_external_integrations(
-                uid,
-                conversation,
-                idempotency_key=fanout['fanout_key'],
-                require_delivery=True,
-                last_delivery_attempt=final_attempt,
-            )
+        await trigger_external_integrations(
+            uid,
+            conversation,
+            idempotency_key=fanout['fanout_key'],
+            require_delivery=True,
+            last_delivery_attempt=final_attempt,
+        )
         # Record the meeting treatment verdict; automatic Chat intents are retired.
         stage = 'meeting_receipt'
         await run_blocking(

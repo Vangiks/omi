@@ -78,7 +78,6 @@ def generation(k, **extra):
         'finished_at': at(start + DURATION),
         'source': 'omi',
         'client_device_id': 'pendant',
-        'is_locked': False,
         'discarded': False,
         'status': 'completed',
         'external_data': {
@@ -158,7 +157,6 @@ def plan(store, chunks, stamp=None, **kwargs):
         stamped_target=stamp,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
         **kwargs,
     )
 
@@ -394,7 +392,7 @@ async def test_kill_switch_off_reproduces_the_whole_batch_outcome(monkeypatch, d
     start, end = chunks[0]['started_at'].timestamp() - 1, chunks[-1]['finished_at'].timestamp()
     assert not lineage_resolution_requested('u', ORIGIN, start, end)
     target = await pipeline._resolve_safety_wal_target(
-        'u', gen_id(L), ORIGIN, pipeline.ConversationSource.omi, 'pendant', False, start, end
+        'u', gen_id(L), ORIGIN, pipeline.ConversationSource.omi, 'pendant', start, end
     )
     assert target is None
     before = {row['id'] for row in conversations(store)}
@@ -429,12 +427,12 @@ def test_unique_generation_overrides_a_stale_stamp():
 def test_no_unique_generation_falls_back_to_the_stamp_or_stays_unbound(rows, reason):
     chunks = upload_straddling_next_two()
     stamped = select_segment_targets(
-        rows, ORIGIN, spans(chunks), stamped_target='STAMP', source='omi', client_device_id='pendant', is_locked=False
+        rows, ORIGIN, spans(chunks), stamped_target='STAMP', source='omi', client_device_id='pendant'
     )
     assert stamped.outcome == 'stamp_fallback' and stamped.reason == reason
     assert set(stamped.targets.values()) == {'STAMP'}
     unstamped = select_segment_targets(
-        rows, ORIGIN, spans(chunks), stamped_target=None, source='omi', client_device_id='pendant', is_locked=False
+        rows, ORIGIN, spans(chunks), stamped_target=None, source='omi', client_device_id='pendant'
     )
     assert unstamped.outcome == reason and set(unstamped.targets.values()) == {None}
 
@@ -444,7 +442,7 @@ def test_adjacent_generations_inside_the_edge_allowance_are_ambiguous():
     rows = [generation(1), generation(2, started_at=at(end + 3))]
     chunk = sync_chunk(end - 1, end + 10, 'straddles the rollover')
     result = select_segment_targets(
-        rows, ORIGIN, spans([chunk]), stamped_target=None, source='omi', client_device_id='pendant', is_locked=False
+        rows, ORIGIN, spans([chunk]), stamped_target=None, source='omi', client_device_id='pendant'
     )
     assert result.targets == {chunk['id']: None}
     assert result.binding_reasons == {chunk['id']: 'ambiguous_pending'} and result.reason == 'ambiguous_overlap'
@@ -460,7 +458,6 @@ def test_trailing_allowance_does_not_exceed_sixty_seconds():
         stamped_target=None,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
     )
     assert result.targets == {chunk['id']: None}
 
@@ -476,7 +473,6 @@ def test_overlapping_generations_bind_the_stamped_row_or_stay_pending():
         stamped_target=gen_id(2),
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
     )
     assert stamped.targets == {chunk['id']: gen_id(2)} and stamped.counts['bound'] == 1
     for stamp in (None, 'STAMP'):
@@ -487,7 +483,6 @@ def test_overlapping_generations_bind_the_stamped_row_or_stay_pending():
             stamped_target=stamp,
             source='omi',
             client_device_id='pendant',
-            is_locked=False,
         )
         assert pending.targets == {chunk['id']: None}
         assert pending.binding_reasons == {chunk['id']: 'ambiguous_pending'}
@@ -499,7 +494,6 @@ def test_overlapping_generations_bind_the_stamped_row_or_stay_pending():
     [
         {'client_device_id': 'other-phone'},
         {'source': 'phone'},
-        {'is_locked': True},
         {'external_data': {'recording_session_id': 'SESSION-X', 'recording_origin_id': 'OTHER-ORIGIN'}},
     ],
 )
@@ -512,7 +506,6 @@ def test_other_partitions_and_recordings_never_bind(mutation):
         stamped_target=None,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
     )
     assert result.targets == {chunks[0]['id']: None}
 
@@ -521,7 +514,7 @@ def test_generation_created_before_the_origin_stamp_binds_through_the_origin_row
     legacy = generation(0, external_data={'recording_session_id': ORIGIN})
     chunk = sync_chunk(gen_start(0) + 61, gen_start(0) + 69, live_text(0, 1))
     result = select_segment_targets(
-        [legacy], ORIGIN, spans([chunk]), stamped_target=None, source='omi', client_device_id='pendant', is_locked=False
+        [legacy], ORIGIN, spans([chunk]), stamped_target=None, source='omi', client_device_id='pendant'
     )
     assert result.targets == {chunk['id']: ORIGIN}
 
@@ -660,7 +653,6 @@ def resolve(chunks, stamp=None):
         stamped_target=stamp,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
         job_id='00000000-0000-4000-8000-000000000000',
     )
 
@@ -693,7 +685,6 @@ def test_old_stamp_extended_into_a_later_generation_is_not_hidden_by_the_limit(l
         stamped_target='STAMP',
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
         binding_reasons=reasons,
     )
     assert targets == {chunk['id']: None}
@@ -714,7 +705,6 @@ def test_unread_smart_survivor_can_overlap_without_a_donor_in_the_window(lineage
         stamped_target=None,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
         binding_reasons=reasons,
     )
     assert targets == {chunk['id']: None}
@@ -731,7 +721,6 @@ def test_invalid_audio_span_cannot_prove_a_generation(duration):
         stamped_target='STAMP',
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
     )
     assert result.targets == {'bad': 'STAMP'}
 
@@ -797,7 +786,6 @@ def _drive_plan(monkeypatch, resolve):
         'STAMP',
         'omi',
         'pendant',
-        False,
         'job',
         reasons,
     )
@@ -869,7 +857,6 @@ def test_safe_overlap_off_never_enters_the_pending_recheck(monkeypatch, lineage_
         'STAMP',
         'omi',
         'pendant',
-        False,
         'job',
         {},
     )
@@ -1029,7 +1016,6 @@ def test_lineage_projection_always_carries_deleted_and_discarded(monkeypatch):
         'finished_at': at(T0 + 60),
         'source': 'omi',
         'client_device_id': 'pendant',
-        'is_locked': False,
         'deleted': False,
         'discarded': True,
         'sync_merged_into': 'GEN-MERGED',
@@ -1080,7 +1066,6 @@ def test_projected_discard_flag_reaches_the_planner(monkeypatch):
         'finished_at': at(gen_start(1) + DURATION),
         'source': 'omi',
         'client_device_id': 'pendant',
-        'is_locked': False,
         'deleted': False,
         'external_data': {'recording_session_id': ORIGIN, 'recording_origin_id': ORIGIN},
         'transcript_segments': [{'text': 'hidden'}],
@@ -1102,7 +1087,6 @@ def test_projected_discard_flag_reaches_the_planner(monkeypatch):
         stamped_target=None,
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
         firestore_client=query,
         binding_reasons=reasons,
     )
@@ -1162,7 +1146,7 @@ def _drive(module, stubs, chunks, monkeypatch, *, stamp, s1_claims=None):
     pipeline.record_usage = MagicMock()
     captured = {}
 
-    def capture(path, uid, response, lock, errors, source, is_locked, prefs, cache, target, *args, **kwargs):
+    def capture(path, uid, response, lock, errors, source, prefs, cache, target, *args, **kwargs):
         captured[paths[path]['id']] = target
         response['updated_memories'].add(target or 'sync-row')
         return True
@@ -1186,7 +1170,7 @@ def _drive(module, stubs, chunks, monkeypatch, *, stamp, s1_claims=None):
     if s1_claims:
         mapping = {'claim': next(iter(s1_claims.values())), 'offsets': [0, 16000], 'incomplete': False}
 
-        async def observed_maps(_uid, _source, _lock, _device, _session, _claims, wav_paths, _frames, **_kwargs):
+        async def observed_maps(_uid, _source, _device, _session, _claims, wav_paths, _frames, **_kwargs):
             return wav_paths, {path: dict(mapping) for path in wav_paths}, False
 
         monkeypatch.setattr(pipeline, 'apply_sync_wal_audio_coverage', observed_maps)
@@ -1209,7 +1193,7 @@ async def test_coordinator_forwards_each_segment_its_generation(coordinator, mon
     chunks = upload_straddling_next_two()
     captured, kwargs = _drive(module, stubs, chunks, monkeypatch, stamp=gen_id(L))
     await module._run_full_pipeline_background_async(
-        'job-lineage', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job-lineage', **vars(kwargs)
+        'job-lineage', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job-lineage', **vars(kwargs)
     )
     expected = [gen_id(L + 1)] * 2 + [gen_id(L + 2)] * 2 if flag == '' else [None] * 4
     assert [captured[chunk['id']] for chunk in chunks] == expected
@@ -1231,7 +1215,7 @@ async def test_coordinator_lineage_exception_keeps_stamp_and_processes_siblings(
     monkeypatch.setattr(lineage_module, 'OMI_SYNC_LINEAGE_RESOLVE_TOTAL', metrics)
     caplog.set_level(logging.INFO, logger=lineage_module.__name__)
     await module._run_full_pipeline_background_async(
-        'job-lineage', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job-lineage', **vars(kwargs)
+        'job-lineage', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job-lineage', **vars(kwargs)
     )
     assert captured == {chunk['id']: 'STAMP' for chunk in chunks}
     metrics.labels.assert_called_once_with(outcome='lookup_failed')
@@ -1263,7 +1247,7 @@ async def test_retry_after_append_before_enrichment_reprocesses_the_landed_row(c
 
     pipeline._reprocess_merged_conversations = reprocess
     await module._run_full_pipeline_background_async(
-        'job-lineage', 'uid', ['/tmp/f.opus'], 'omi', False, '/tmp/job-lineage', task_mode=True, **vars(kwargs)
+        'job-lineage', 'uid', ['/tmp/f.opus'], 'omi', '/tmp/job-lineage', task_mode=True, **vars(kwargs)
     )
     assert captured == {}  # landed audio never returns to STT or assignment
     assert enriched == ([{gen_id(L + 1): pipeline._LINEAGE_RETRY_LANGUAGE}] if flag == '' else [{}])

@@ -335,30 +335,6 @@ def get_specific_user_review(app_id: str, uid: str) -> Dict[str, Any]:
     return cast(Dict[str, Any], loaded.get(uid, {}))
 
 
-def set_user_paid_app(app_id: str, uid: str, ttl: int) -> None:
-    r.set(f'users:{uid}:paid_apps:{app_id}', app_id, ex=ttl)
-
-
-def get_user_paid_app(app_id: str, uid: str) -> Optional[str]:
-    val = r.get(f'users:{uid}:paid_apps:{app_id}')
-    if not val:
-        return None
-    return val.decode()
-
-
-def set_user_app_subscription_customer_id(app_id: str, uid: str, customer_id: str) -> None:
-    """Store the Stripe customer ID for a user's app subscription"""
-    r.set(f'users:{uid}:app_subs:{app_id}:customer_id', customer_id)
-
-
-def get_user_app_subscription_customer_id(app_id: str, uid: str) -> Optional[str]:
-    """Get the Stripe customer ID for a user's app subscription"""
-    val = r.get(f'users:{uid}:app_subs:{app_id}:customer_id')
-    if not val:
-        return None
-    return val.decode()
-
-
 def enable_app(uid: str, app_id: str) -> bool:
     return bool(r.sadd(f'users:{uid}:enabled_plugins', app_id))
 
@@ -1037,31 +1013,6 @@ def delete_auth_code(auth_code: str) -> None:
     r.delete(f'auth_code:{auth_code}')
 
 
-# ******************************************************
-# ************** CREDIT LIMIT NOTIFICATIONS ************
-# ******************************************************
-
-
-def set_credit_limit_notification_sent(uid: str, ttl: int = 60 * 60 * 24) -> None:
-    """Cache that credit limit notification was sent to user (24 hours TTL by default)"""
-    r.set(f'users:{uid}:credit_limit_notification_sent', '1', ex=ttl)
-
-
-def has_credit_limit_notification_been_sent(uid: str) -> bool:
-    """Check if credit limit notification was already sent to user recently"""
-    return r.exists(f'users:{uid}:credit_limit_notification_sent')
-
-
-def set_silent_user_notification_sent(uid: str, ttl: int = 60 * 60 * 24) -> None:
-    """Cache that silent user notification was sent to user (24 hours TTL by default)"""
-    r.set(f'users:{uid}:silent_notification_sent', '1', ex=ttl)
-
-
-def has_silent_user_notification_been_sent(uid: str) -> bool:
-    """Check if silent user notification was already sent to user recently"""
-    return r.exists(f'users:{uid}:silent_notification_sent')
-
-
 def try_acquire_byok_llm_error_notification_lock(uid: str, provider: str, reason: str, ttl: int = 60 * 60 * 24) -> bool:
     """Return True once per BYOK provider/error reason per TTL window."""
     return bool(r.set(f'users:{uid}:byok_llm_error:{provider}:{reason}', '1', ex=ttl, nx=True))
@@ -1525,7 +1476,7 @@ def release_notifications_job_run_lock(token: str) -> None:
 def set_credits_invalidation_signal(uid: str, ttl: int = 120) -> None:
     """Signal active WebSocket sessions to refresh credits immediately.
 
-    Called when subscription changes (Stripe webhook, upgrade, etc.).
+    Called when the user's allowance changes (for example, the monthly quota reset).
     Active transcribe loops check this on each 60s tick and force a Firestore refresh.
     TTL is 2 min — long enough for all streams to see it on their next 60s tick.
     Uses GET (not GETDEL) so multiple concurrent streams all see the signal.

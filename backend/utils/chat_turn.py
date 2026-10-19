@@ -41,8 +41,6 @@ from utils.conversation_helpers import extract_memory_ids
 from utils.chat import acquire_chat_session, emit_stream_error_fallback
 from utils.llm.goals import extract_and_update_goal_progress
 from database.redis_db import try_acquire_goal_extraction_lock
-from utils.llm.gateway_client import CHAT_AGENT_ROUTE_DIRECT, get_chat_agent_route
-from utils.subscription import enforce_chat_quota
 from utils.other.chat_file import safe_file_chats
 from utils.retrieval.graph import execute_chat_stream
 from utils.llm.usage_tracker import set_usage_context, reset_usage_context, Features
@@ -89,79 +87,6 @@ def _mobile_chat_stream_failed(frame: str) -> bool:
     """Typed in-band errors are failures even when a fallback done frame follows."""
 
     return frame.lstrip().startswith('error: ')
-
-
-def _build_quota_exceeded_reply(
-    uid: str,
-    data: SendMessageRequest,
-    compat_app_id: Optional[str],
-    detail: dict,
-    chat_session: Optional[ChatSession] = None,
-) -> ResponseMessage:
-    """Persist the user's question + a canned AI reply and return it.
-
-    Both messages join `chat_session` when the request named one. Without it the
-    turn is stored unthreaded: the client shows it optimistically against the
-    session the user is looking at, and then it disappears on the next history
-    load, because that read is scoped to the session and these rows belong to no
-    session at all.
-
-    Mobile clients render the reply as a normal AI message, so users on
-    older builds without structured 402 handling at least see *why* nothing
-    happened instead of a silent failure. Desktop never reaches this path —
-    its client-side quota pre-check in AgentBridge throws BridgeError.quotaExceeded
-    before the request fires.
-    """
-    now = datetime.now(timezone.utc)
-    user_msg = Message(
-        id=str(uuid.uuid4()),
-        text=data.text,
-        created_at=now,
-        sender=MessageSender.human,
-        type=MessageType.text,
-        app_id=compat_app_id,
-        chat_session_id=chat_session.id if chat_session else None,
-    )
-    _persist_message(uid, user_msg.model_dump())
-    if chat_session:
-        chat_db.add_message_to_chat_session(uid, chat_session.id, user_msg.id)
-
-    plan = detail.get('plan') or 'Free'
-    unit = detail.get('unit')
-    limit = detail.get('limit')
-    reset_at = detail.get('reset_at')
-    if unit == 'cost_usd' and isinstance(limit, (int, float)):
-        limit_phrase = f"your ${int(limit)} monthly AI compute budget"
-    elif isinstance(limit, (int, float)):
-        limit_phrase = f"your {int(limit)} monthly chat question limit"
-    else:
-        limit_phrase = "your monthly chat limit"
-    reset_phrase = ''
-    if reset_at:
-        try:
-            reset_dt = datetime.fromtimestamp(int(reset_at), tz=timezone.utc)
-            reset_phrase = f' Your limit resets on {reset_dt.strftime("%B %-d")}.'
-        except (TypeError, ValueError):
-            pass
-
-    canned = (
-        f"You've reached {limit_phrase} on the {plan} plan.{reset_phrase}\n\n"
-        "Upgrade your plan to keep chatting, or bring your own API keys in Settings "
-        "to use Omi free."
-    )
-    ai_msg = Message(
-        id=str(uuid.uuid4()),
-        text=canned,
-        created_at=datetime.now(timezone.utc),
-        sender=MessageSender.ai,
-        type=MessageType.text,
-        app_id=compat_app_id,
-        chat_session_id=chat_session.id if chat_session else None,
-    )
-    _persist_message(uid, ai_msg.model_dump())
-    if chat_session:
-        chat_db.add_message_to_chat_session(uid, chat_session.id, ai_msg.id)
-    return ResponseMessage(**ai_msg.model_dump(), ask_for_nps=False)
 
 
 def _build_quota_accounting_unavailable_reply(compat_app_id: Optional[str]) -> ResponseMessage:
@@ -242,12 +167,6 @@ async def _release_chat_quota_question_best_effort(
         logger.exception('Failed to release chat quota question uid=%s', uid)
 
 
-def _required_chat_quota_provider() -> str | None:
-    # Direct agent chat consumes managed Anthropic unless an Anthropic BYOK key
-    # is on the request. Other BYOK providers must stay metered on this path.
-    return 'anthropic' if get_chat_agent_route() == CHAT_AGENT_ROUTE_DIRECT else None
-
-
 def _run_chat_turn(uid, surface, session, message, reply_sink, *, principal, options=None):
     """Shared turn preparation, quota, persistence and SSE producer; no Request required.
 
@@ -269,47 +188,7 @@ def _run_chat_turn(uid, surface, session, message, reply_sink, *, principal, opt
     plugin_id, app_id = options.plugin_id, options.app_id
     chat_session_id = session
     x_app_platform = options.platform
-    # Catalog hard-cap exhaustion is returned as a canned AI reply instead of a
-    # raw 402 (which older mobile clients render as a generic server error).
-    # Catalog overage plans return normally. Desktop pre-checks via
-    # /v1/users/me/usage-quota and never reaches this path when over.
     typed_failures = options.headers.get('X-Omi-Chat-Failure-Protocol') == '1'
-    try:
-        enforce_chat_quota(uid, platform=x_app_platform, required_llm_provider=_required_chat_quota_provider())
-    except HTTPException as exc:
-        if exc.status_code != 402 or not isinstance(exc.detail, dict):
-            raise
-        if exc.detail.get('error') != 'quota_exceeded':
-            raise
-        _compat_id = app_id or plugin_id
-        if _compat_id in ['null', '']:
-            _compat_id = None
-        # Resolved here rather than at the happy path's `_resolve_chat_session`
-        # below: quota enforcement returns before that line is ever reached, and
-        # the canned reply still belongs in the session the request named.
-        _quota_target = resolve_chat_target(uid, _compat_id, chat_session_id)
-        _assert_target_surface(surface, _quota_target.session, runtime)
-        response_msg = _build_quota_exceeded_reply(
-            uid,
-            data,
-            _quota_target.app_id,
-            exc.detail,
-            ChatSession(**_quota_target.session) if _quota_target.session else None,
-        )
-
-        def _quota_exceeded_stream():
-            if typed_failures:
-                yield 'error: {"error":"quota_exceeded","message":"quota_exceeded"}\n\n'
-            encoded = base64.b64encode(bytes(response_msg.model_dump_json(), 'utf-8')).decode('utf-8')
-            yield f"done: {encoded}\n\n"
-
-        record_product_event(
-            'chat_message_sent',
-            request=request,
-            uid=uid,
-            outcome='quota_exceeded',
-        )
-        return reply_sink.response(_quota_exceeded_stream(), media_type="text/event-stream")
 
     compat_app_id = app_id or plugin_id
     logger.info(f'send_message {sanitize_pii(data.text)} {compat_app_id} {uid}')

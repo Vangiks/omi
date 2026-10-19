@@ -124,7 +124,7 @@ def _write(monkeypatch, trigger):
         SimpleNamespace(**item('Book the meeting room'), owner_name=None),
     ]
     conv = SimpleNamespace(
-        id='survivor', is_locked=False, sync_content_revision=1, structured=SimpleNamespace(action_items=candidates)
+        id='survivor', sync_content_revision=1, structured=SimpleNamespace(action_items=candidates)
     )
     pc._write_action_items(UID, conv, trigger)
     metrics.labels.assert_any_call(reason='other_owner')

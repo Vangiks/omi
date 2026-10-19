@@ -1735,24 +1735,6 @@
       ]
     },
     {
-      "collectionGroup": "fair_use_state",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        {
-          "fieldPath": "stage",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "updated_at",
-          "order": "DESCENDING"
-        },
-        {
-          "fieldPath": "__name__",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
       "collectionGroup": "files",
       "queryScope": "COLLECTION",
       "fields": [
@@ -3521,33 +3503,6 @@
         {
           "queryScope": "COLLECTION_GROUP",
           "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "fair_use_events",
-      "fieldPath": "case_ref",
-      "ttl": false,
-      "indexes": [
-        {
-          "queryScope": "COLLECTION",
-          "order": "ASCENDING"
-        },
-        {
-          "queryScope": "COLLECTION",
-          "order": "DESCENDING"
-        },
-        {
-          "queryScope": "COLLECTION",
-          "arrayConfig": "CONTAINS"
-        },
-        {
-          "queryScope": "COLLECTION_GROUP",
-          "order": "ASCENDING"
-        },
-        {
-          "queryScope": "COLLECTION_GROUP",
-          "order": "DESCENDING"
         }
       ]
     },

@@ -422,12 +422,8 @@ def test_legacy_wire_id_targets_the_same_stored_segment(world):
     assert saved['transcript_segments'][0]['person_id'] == 'new'
 
 
-def test_locked_conversation_and_all_selectors_invalidate_through_real_owner(world):
+def test_all_selectors_invalidate_through_real_owner(world):
     store, path, _ = world
-    store.rows[path]['is_locked'] = True
-    with pytest.raises(PermissionError):
-        db.assign_conversation_speaker('u', 'c', person_id='new', segment_ids=['s1'])
-    store.rows[path]['is_locked'] = False
     for kwargs in (
         dict(segment_index=0),
         dict(segment_ids=['s1']),

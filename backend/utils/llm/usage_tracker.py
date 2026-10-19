@@ -275,7 +275,6 @@ class Features:
     TRANSCRIBE = "transcribe"
     REALTIME_INTEGRATIONS = "realtime_integrations"
     DAILY_SUMMARY = "daily_summary"
-    SUBSCRIPTION_NOTIFICATION = "subscription_notification"
     KNOWLEDGE_GRAPH = "knowledge_graph"
     OTHER = "other"
 

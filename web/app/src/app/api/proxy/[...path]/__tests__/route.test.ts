@@ -74,6 +74,25 @@ describe('authenticated proxy handler', () => {
     expect((await reader.read()).done).toBe(true);
   }, 2000);
 
+  it('caches app reference data publicly but not the removed app plans', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json([])),
+    );
+    const get = (path: string) =>
+      GET(
+        new Request(`https://app.example.com/api/proxy/${path}`, {
+          headers: { Authorization: 'Bearer test-token' },
+        }),
+      );
+
+    const categories = await get('v1/app-categories');
+    const plans = await get('v1/app/plans');
+
+    expect(categories.headers.get('cache-control')).toContain('public');
+    expect(plans.headers.get('cache-control') ?? '').not.toContain('public');
+  });
+
   it('refuses to forward a request without an Authorization header', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);

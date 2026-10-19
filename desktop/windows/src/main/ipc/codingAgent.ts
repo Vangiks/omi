@@ -132,7 +132,7 @@ async function runClaudeAuthOnce(): Promise<CodingAgentStartAuthResult> {
       }
     }
     // Don't spawn a real browser under E2E (keeps the harness hermetic and lets
-    // it screenshot the upsell sheet without a claude.ai tab opening).
+    // the sign-in check from opening a claude.ai tab).
     if (!process.env.OMI_E2E) void shell.openExternal(validated.toString())
     await flow.complete
     return { ok: true, status: claudeAuthStatus() }

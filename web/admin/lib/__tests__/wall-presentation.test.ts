@@ -17,8 +17,6 @@ it("keeps missing values null, dims stale data, and calculates the previous-peri
           ],
           { sourceRefreshedAt: "2026-10-15T11:59Z" }
         ),
-      shopify: fail,
-      stripe: fail,
       billing: fail,
     },
     now
@@ -39,34 +37,6 @@ it("keeps missing values null, dims stale data, and calculates the previous-peri
     state: "UNAVAILABLE",
   });
 });
-it("uses same-cutoff fixture MRR / qualified MAU", async () => {
-  const now = new Date("2026-10-15T12:00Z");
-  const data = await computeWall(
-    {
-      query: async () =>
-        Object.assign([[0, "macos", 10]], {
-          sourceRefreshedAt: "2026-10-15T11:59Z",
-        }),
-      shopify: fail,
-      billing: fail,
-      stripe: async () => ({
-        usd: 100,
-        partial: false,
-        unsupportedItems: 0,
-        unmappedProducts: 0,
-        fixture: true,
-        dataThrough: "2026-10-14",
-        sourceRefreshedAt: "2026-10-15T11:59Z",
-      }),
-    },
-    now
-  );
-  expect(data.metrics.find((m) => m.id === "revenue.arpmau")?.value).toBe(10);
-  expect(wallPresentation(data, now).tiles.revenue_arpmau).toMatchObject({
-    state: "FIXTURE",
-    value: 10,
-  });
-});
 it("refuses fixture mode in production before reading any file", async () => {
   vi.stubEnv("OMI_TV_LOCAL_FIXTURE_PATH", "/must-not-be-read");
   vi.stubEnv("NODE_ENV", "production");
@@ -83,8 +53,6 @@ it("keeps absent refresh metadata dim with human copy", async () => {
   const data = await computeWall(
     {
       query: async () => [[0, "macos", 3]],
-      shopify: fail,
-      stripe: fail,
       billing: fail,
     },
     now

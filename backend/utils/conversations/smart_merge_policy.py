@@ -51,7 +51,6 @@ _USER_MANAGED_FLAGS = (
     'folder_user_set',
     'sync_relevance_user_kept',
     'has_photos',
-    'is_locked',
     'manual_speaker_assignments',
     'has_transcript_corrections',
     'capture_group',
@@ -108,9 +107,9 @@ def refresh_owed(row: Mapping[str, Any]) -> bool:
     return refreshed_revision(row) < revision(row)
 
 
-def partition(row: Mapping[str, Any]) -> tuple[Any, Any, bool]:
+def partition(row: Mapping[str, Any]) -> tuple[Any, Any]:
     """Unknown device is its own partition, never a wildcard (same rule as sync)."""
-    return (row.get('source'), row.get('client_device_id'), bool(row.get('is_locked')))
+    return (row.get('source'), row.get('client_device_id'))
 
 
 def user_managed(row: Mapping[str, Any]) -> bool:

@@ -60,8 +60,6 @@ def persist_speaker_resolution_if_current(
             return False, 'deleted', None
         if current.get('discarded'):
             return False, 'discarded', None
-        if current.get('is_locked'):
-            return False, 'locked', None
         if current.get('status') != 'completed':
             return False, 'not_completed', None
         if firestore_revision_datetime(getattr(snapshot, 'update_time', None)) != expected_updated_at:

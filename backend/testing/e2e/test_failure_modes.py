@@ -59,7 +59,6 @@ class TestLLMFailureDegradation:
             ],
             "discarded": False,
             "status": "in_progress",
-            "is_locked": False,
             "data_protection_level": "standard",
         }
 
@@ -214,7 +213,6 @@ class TestEdgeCases:
             "transcript_segments": [],
             "discarded": False,
             "status": "completed",
-            "is_locked": False,
         }
         seed_conversation("123", conv)
 

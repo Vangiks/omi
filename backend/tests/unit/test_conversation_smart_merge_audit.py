@@ -318,7 +318,7 @@ def test_unreadable_gate_skips_the_audit_but_not_the_merge(world, recorded, monk
     assert len(world.jev_calls) == 1
 
 
-@pytest.mark.parametrize('status', ['pending', 'running', 'failed', 'completed', None, 'bogus'])
+@pytest.mark.parametrize('status', ['pending', 'running', 'failed', 'billing_failed', 'completed', None, 'bogus'])
 def test_durable_deletion_marker_blocks_audit_after_gate_expires(world, recorded, status):
     world.store.rows[MARKER] = {'wipe_status': status}
     world.store.rows[GATE] = _gate(started_at=datetime.now(timezone.utc) - timedelta(hours=7))
@@ -326,7 +326,7 @@ def test_durable_deletion_marker_blocks_audit_after_gate_expires(world, recorded
     assert _audit_path('n') not in world.store.rows and recorded.audit == ['skipped_gate']
 
 
-@pytest.mark.parametrize('status', ['cancelled', 'billing_failed'])
+@pytest.mark.parametrize('status', ['cancelled'])
 def test_cancelled_deletion_allows_audit(world, status):
     world.store.rows[MARKER] = {'wipe_status': status}
     assert _merge(world) is True

@@ -8,21 +8,17 @@ and background processing.
 - `live_continuation.py` coordinates durable reconnect admission through
   `database/listen_continuations.py`. The original recording binding remains
   immutable; its continuation metadata is adopted transactionally. Resume
-  requires the same source/device and an unlocked, nondeleted in-progress row
+  requires the same source/device and a nondeleted in-progress row
   inside the shared continuity window. Expired empty and unexposed losing
   generations use lifecycle's codec-aware transactional deletion; content,
-  lock, tombstone and sync revision prevent deletion.
+  tombstone and sync revision prevent deletion.
 
 - `factory.py`, `location.py`, `search.py`, and `transcript_chunks.py` provide
   serialization, lookup, and read-model helpers; callers retain ownership of
   request authentication and response shaping.
 - `process_conversation.py` is the synchronous enrichment coordinator. It
   persists the completed conversation and delegates expensive child work to the
-  named executor lanes. Custom-STT conversations skip managed-STT credits but
-  still consult `should_skip_omi_paid_postprocessing` before Omi-paid
-  structuring, summary, and memory work (#7690). That gate sits after the
-  unpaid desktop on-device / `store_projection` path (#14513) so it cannot
-  strip a local summary.
+  named executor lanes.
 - `processing_trigger.py` owns *why* a conversation is processed. Every caller
   of `process_conversation` (and every finalization job) names a
   `ProcessingTrigger`; its `PROCESSING_MODES` row fixes run-now, reprocess,

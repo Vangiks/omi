@@ -26,8 +26,6 @@ def _patch_process_conversation_boundaries(monkeypatch):
 
         return DoneFuture()
 
-    monkeypatch.setattr(process_module, "is_trial_paywalled", lambda *args, **kwargs: False)
-    monkeypatch.setattr(process_module, "should_defer_desktop_processing", lambda uid: False)
     monkeypatch.setattr(process_module, "get_user_name", lambda uid, use_default=True: "David")
     monkeypatch.setattr(process_module.notification_db, "get_user_time_zone", lambda uid: "UTC")
     monkeypatch.setattr(process_module.users_db, "get_user_language_preference", lambda uid: "en")
@@ -178,7 +176,6 @@ def test_reprocess_route_persists_deterministic_processing_result(client, auth_h
             ],
             "discarded": False,
             "status": "completed",
-            "is_locked": False,
             "data_protection_level": "standard",
         },
     )
@@ -244,7 +241,6 @@ def test_discarded_conversation_filtered(client, auth_headers):
         "transcript_segments": [],
         "discarded": False,
         "status": "completed",
-        "is_locked": False,
     }
     discarded_conv = dict(active_conv, id="discard-test-discarded", discarded=True)
 

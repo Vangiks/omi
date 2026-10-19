@@ -56,7 +56,6 @@ for _leaf in [
     "utils.conversations.factory",
     "utils.llm.external_integrations",
     "utils.notifications",
-    "utils.subscription",
     "utils.webhooks",
     "database.chat",
     "database.conversations",

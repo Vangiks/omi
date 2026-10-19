@@ -6,10 +6,6 @@ from models.chat import Message
 from models.conversation import Conversation
 from models.transcript_segment import transcript_segment_for_client
 
-# Freemium action constants
-FREEMIUM_ACTION_SETUP_ON_DEVICE_STT = "setup_on_device_stt"
-FREEMIUM_ACTION_NONE = "none"
-
 
 class MessageEvent(BaseModel):
     event_type: str
@@ -204,18 +200,6 @@ class SpeakerLabelSuggestionEvent(MessageEvent):
             j.pop("suggested_person_id", None)
         if not self.retracted:
             j.pop("retracted", None)
-        return j
-
-
-class FreemiumThresholdReachedEvent(MessageEvent):
-    event_type: str = "freemium_threshold_reached"
-    remaining_seconds: int
-    action: str
-
-    def to_json(self):
-        j = self.model_dump(mode="json")
-        j["type"] = self.event_type
-        del j["event_type"]
         return j
 
 

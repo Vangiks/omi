@@ -98,7 +98,6 @@ class TestFakeStoreIdempotency:
             "transcript_segments": [],
             "discarded": False,
             "status": "completed",
-            "is_locked": False,
         }
 
         # First write
@@ -163,7 +162,6 @@ class TestFieldShapeEvolution:
             # Intentionally omit: folder_id, calendar_event, starred, etc.
             "discarded": False,
             "status": "completed",
-            "is_locked": False,
         }
         seed_conversation("123", minimal_conv)
 
@@ -197,7 +195,6 @@ class TestFieldShapeEvolution:
             "transcript_segments": [],
             "discarded": False,
             "status": "completed",
-            "is_locked": False,
             # Extra fields that don't exist on current model
             "future_field_v2": "should be ignored",
             "experimental_flag": 42,

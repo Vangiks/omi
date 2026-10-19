@@ -206,7 +206,6 @@ def validate_binding(
     if (
         conversation.get('deleted')
         or conversation.get('discarded')
-        or conversation.get('is_locked')
         or conversation.get('status') != 'completed'
         or binding.get('answered')
         or binding.get('prompt_id') != prompt_id

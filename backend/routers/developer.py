@@ -820,7 +820,7 @@ def get_action_items(
     offset: int = 0,
 ):
     """
-    Get action items with optional filters. Locked action items are excluded.
+    Get action items with optional filters.
 
     - **conversation_id**: Filter by conversation ID (None for standalone items)
     - **completed**: Filter by completion status
@@ -850,8 +850,6 @@ def get_action_items(
     for item in action_items:
         if not isinstance(item, dict) or not item.get('id'):
             logger.warning('Skipping malformed action item in Developer API action-item list')
-            continue
-        if item.get('is_locked', False):
             continue
         try:
             valid_action_items.append(ActionItemResponse.model_validate(item))
@@ -991,8 +989,6 @@ def delete_action_item(
     action_item = action_items_db.get_action_item(uid, action_item_id)
     if not action_item:
         raise HTTPException(status_code=404, detail="Action item not found")
-    if action_item.get('is_locked', False):
-        raise HTTPException(status_code=402, detail="A paid plan is required to access this action item.")
 
     action_items_db.delete_action_item(uid, action_item_id)
     sync_action_item_reminder(user_id=uid, action_item_id=action_item_id, description='', completed=True, due_at=None)
@@ -1022,8 +1018,6 @@ def update_action_item(
     action_item = action_items_db.get_action_item(uid, action_item_id)
     if not action_item:
         raise HTTPException(status_code=404, detail="Action item not found")
-    if action_item.get('is_locked', False):
-        raise HTTPException(status_code=402, detail="A paid plan is required to access this action item.")
 
     # Build update data from explicitly provided fields so due_at=null can clear the date.
     update_data = {}
@@ -1456,8 +1450,7 @@ def ask_conversations(request: DeveloperAskRequest, uid: str = Depends(get_uid_w
     Semantically searches the user's conversations for the question, then synthesizes a
     cited answer from the most relevant ones — the same retrieval + RAG the chat surface
     uses, exposed for headless / Developer-API callers (CLI, CI, scripts). Read-only:
-    it never writes; discarded conversations are excluded from retrieval and locked
-    conversations are re-checked on the authoritative record before any go to the LLM.
+    it never writes; discarded conversations are excluded from retrieval.
     """
     question = request.question.strip()
     if not question:
@@ -1474,12 +1467,7 @@ def ask_conversations(request: DeveloperAskRequest, uid: str = Depends(get_uid_w
     if not conversation_ids:
         return DeveloperAskResponse(answer=_ASK_NO_CONTEXT, sources=[])
 
-    # Re-check is_locked on the authoritative Firestore records: the search index's
-    # is_locked can lag, so a stale hit could otherwise leak a locked conversation
-    # into the answer. Mirrors the post-hydration filter in /v1/conversations/search.
-    raw_conversations = [
-        c for c in conversations_db.get_conversations_by_id(uid, conversation_ids) if not c.get('is_locked')
-    ]
+    raw_conversations = conversations_db.get_conversations_by_id(uid, conversation_ids)
     conversations = deserialize_conversations(raw_conversations)
     if not conversations:
         return DeveloperAskResponse(answer=_ASK_NO_CONTEXT, sources=[])
@@ -1612,26 +1600,23 @@ def get_conversations(
             next_cursor=next_cursor,
         )
 
-        # Filter out locked conversations completely
-        unlocked_conversations = [conv for conv in conversations if not conv.get('is_locked', False)]
-
-        for conv in unlocked_conversations:
+        for conv in conversations:
             conv.update(conversation_participants(conv))
             conv['transcript_included'] = include_transcript
 
         # Remove transcript_segments if not requested
         if not include_transcript:
-            for conv in unlocked_conversations:
+            for conv in conversations:
                 conv.pop('transcript_segments', None)
         else:
-            populate_speaker_names(uid, unlocked_conversations)
+            populate_speaker_names(uid, conversations)
 
-        populate_folder_names(uid, unlocked_conversations)
+        populate_folder_names(uid, conversations)
 
         # Validate each record individually so a single malformed/legacy doc doesn't fail the whole page
         # with a 500. Mirrors the hardening already applied to GET /v1/dev/user/memories.
         valid_conversations = []
-        for conv in unlocked_conversations:
+        for conv in conversations:
             if not isinstance(conv, dict) or not conv.get('id'):
                 logger.warning('Skipping malformed conversation in Developer API conversation list')
                 continue
@@ -1771,12 +1756,6 @@ def get_conversation_endpoint(
 
         conversation = conversations_db.get_conversation(uid, conversation_id)
         if not conversation:
-            status = 404
-            returned_count = 0
-            raise HTTPException(status_code=404, detail="Conversation ID not found or unknown conversation sub-route")
-
-        # Filter out locked conversations
-        if conversation.get('is_locked', False):
             status = 404
             returned_count = 0
             raise HTTPException(status_code=404, detail="Conversation ID not found or unknown conversation sub-route")
@@ -1941,8 +1920,7 @@ def _accepted_client_projection(
     """Bind a client projection to the stored transcript, or drop it.
 
     Schema failure and hash mismatch are not request errors: the conversation
-    still lands, with the projection discarded and the coordinator storing the
-    deterministic minimum. The warning is content-free (reason plus provenance
+    still lands, with the projection discarded. The warning is content-free (reason plus provenance
     only — never transcript or body). Provenance itself may be missing.
     The digest is over ``segments`` — the canonical rows ingest persists —
     so a client hashing the same canonicalization as ``canonical_segment``
@@ -2228,7 +2206,7 @@ def _create_conversation_from_segments(
             conversations_db.delete_conversation(uid, conversation_id)
         raise
     # Non-idempotent ingest: the coordinator's generic persist stripped the
-    # field (paid / flag-off deferred). Stamp it now. The session-id path
+    # field. Stamp it now. The session-id path
     # already wrote at create_processing and must not write again after a
     # concurrent late-bind.
     if client_projection is not None and not request.client_session_id:
@@ -2407,8 +2385,6 @@ def delete_conversation_endpoint(
     conversation = conversations_db.get_conversation(uid, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    if conversation.get('is_locked', False):
-        raise HTTPException(status_code=402, detail="A paid plan is required to access this conversation.")
 
     # Lazy: keep developer routes off the merge/memory import graph so stubbed
     # ``utils.memory.*`` tests can load this module without a complete retraction_scope.
@@ -2440,8 +2416,6 @@ def update_conversation_endpoint(
     conversation = conversations_db.get_conversation(uid, conversation_id)
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
-    if conversation.get('is_locked', False):
-        raise HTTPException(status_code=402, detail="A paid plan is required to access this conversation.")
 
     if request.title is None and request.discarded is None:
         raise HTTPException(status_code=422, detail="At least one field (title or discarded) must be provided")

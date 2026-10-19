@@ -1,7 +1,6 @@
 import asyncio
 import hashlib
 import math
-import os
 import secrets
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -31,7 +30,6 @@ from database.apps import (
     can_tester_access_app_db,
     get_apps_for_tester_db,
     get_app_chat_message_sent_usage_count_db,
-    update_app_in_db,
     get_audio_apps_count,
     get_persona_by_uid_db,
     update_persona_in_db,
@@ -61,31 +59,21 @@ from database.redis_db import (
     set_app_money_made_amount_cache,
     get_app_money_made_amount_cache,
     set_app_usage_count_cache,
-    set_user_paid_app,
-    get_user_paid_app,
     delete_app_cache_by_id,
     is_username_taken,
-    get_user_app_subscription_customer_id,
-    set_user_app_subscription_customer_id,
     can_update_persona,
     set_persona_update_timestamp,
 )
-from database.users import get_stripe_connect_account_id
 from models.app import App, UsageHistoryItem, UsageHistoryType
 from utils.conversations.factory import deserialize_conversations
 from utils.conversations.render import conversations_to_string
-from utils import stripe
 from utils.llm.persona import condense_conversations, condense_memories, generate_persona_description, condense_tweets
 from utils.llm.usage_tracker import track_usage, Features
 from utils.executors import run_blocking, db_executor, llm_executor
 from utils.social import get_twitter_timeline
-from utils.marketplace_reviewers import parse_marketplace_reviewers, is_marketplace_reviewer
 import logging
 
 logger = logging.getLogger(__name__)
-
-_reviewers_env: Optional[str] = os.getenv('MARKETPLACE_APP_REVIEWERS')
-MarketplaceAppReviewUIDs: List[str] = parse_marketplace_reviewers(_reviewers_env)
 
 
 def _records_with_ids(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -675,126 +663,6 @@ def get_app_money_made(app_id: str) -> dict[str, int | float]:
     return money
 
 
-def upsert_app_payment_link(
-    app_id: str, is_paid_app: bool, price: Any, payment_plan: str, uid: str, previous_price: float | None = None
-):
-    if not is_paid_app:
-        logger.info(f"App is not a paid app, app_id: {app_id}")
-        return None
-
-    if payment_plan not in ['monthly_recurring']:
-        logger.error(f"App payment plan is invalid, app_id: {app_id}")
-        return None
-
-    app_data = get_app_by_id_db(app_id)
-    if not app_data:
-        logger.warning(f"App is not found, app_id: {app_id}")
-        return None
-
-    app = _safe_build_app(app_data)
-    if not app:
-        logger.warning(f"Cannot upsert payment link for malformed app, app_id: {app_id}")
-        return None
-
-    if previous_price and previous_price == price:
-        logger.info(f"App price is existing, app_id: {app_id}")
-        return app
-
-    # A paid app needs a positive numeric price before we can build a Stripe link. update_app passes the
-    # raw request price straight through, so a null price (is_paid toggled on without a price) or a
-    # non-numeric value would reach int(price * 100) below and raise, 500ing the update. Treat any
-    # non-positive or non-numeric price like the existing price==0 case: skip link creation, no crash.
-    if not isinstance(price, (int, float)) or isinstance(price, bool) or price <= 0:
-        logger.error(f"App price is missing or not a positive number, app_id: {app_id}")
-        return app
-
-    # create recurring payment link
-    if payment_plan == 'monthly_recurring':
-        stripe_acc_id: str = get_stripe_connect_account_id(uid) or ''
-
-        # product
-        if not app.payment_product_id:
-            payment_product = stripe.create_product(f"{app.name} Monthly Plan", app.description, app.image)
-            app.payment_product_id = payment_product.id
-
-        # price
-        payment_price = stripe.create_app_monthly_recurring_price(app.payment_product_id, int(round(price * 100)))
-        app.payment_price_id = payment_price.id
-
-        # payment link
-        payment_link = stripe.create_app_payment_link(app.payment_price_id, app.id, stripe_acc_id)
-        app.payment_link_id = payment_link.id
-        app.payment_link = payment_link.url
-
-    # updates
-    update_app_in_db(app.model_dump())
-    return app
-
-
-def get_is_user_paid_app(app_id: str, uid: str):
-    if is_marketplace_reviewer(uid) or uid in MarketplaceAppReviewUIDs:
-        return True
-    return get_user_paid_app(app_id, uid) is not None
-
-
-def is_permit_payment_plan_get(uid: str):
-    if is_marketplace_reviewer(uid) or uid in MarketplaceAppReviewUIDs:
-        return False
-    return True
-
-
-_PAID_APP_RENEWAL_GRACE_SECONDS = 60 * 60 * 24
-
-
-def paid_app(app_id: str, uid: str, current_period_end: Optional[int] = None):
-    expired_seconds = 60 * 60 * 24 * 30  # 30 days
-    if current_period_end:
-        period_remaining = current_period_end - int(datetime.now(timezone.utc).timestamp())
-        expired_seconds = max(period_remaining, 0) + _PAID_APP_RENEWAL_GRACE_SECONDS
-    set_user_paid_app(app_id, uid, expired_seconds)
-
-
-def set_user_app_sub_customer_id(app_id: str, uid: str, customer_id: str):
-    set_user_app_subscription_customer_id(app_id, uid, customer_id)
-
-
-def find_app_subscription(app_id: str, uid: str, status_filter: str = 'all') -> Dict[str, Any] | None:
-    """
-    Find a user's subscription for a specific app using cached customer ID or metadata search.
-
-    Args:
-        app_id: The app ID to search for
-        uid: The user ID
-        status_filter: Stripe subscription status filter ('all', 'active', etc.)
-
-    Returns:
-        Dictionary representation of the subscription or None if not found
-    """
-    try:
-        cached_customer_id = get_user_app_subscription_customer_id(app_id, uid)
-        latest_subscription = None
-
-        if cached_customer_id:
-            latest_subscription = stripe.find_app_subscription_by_customer_id(
-                cached_customer_id, app_id, uid, status_filter
-            )
-
-            if latest_subscription is None:
-                cached_customer_id = None
-
-        if not latest_subscription and not cached_customer_id:
-            latest_subscription = stripe.find_app_subscription_by_metadata(app_id, uid, status_filter)
-
-            # Cache the customer ID for future lookups
-            if latest_subscription and latest_subscription.get('customer'):
-                set_user_app_subscription_customer_id(app_id, uid, str(latest_subscription.get('customer')))
-
-        return latest_subscription
-    except Exception as e:
-        logger.error(f"Error finding app subscription: {e}")
-        return None
-
-
 def is_audio_bytes_app_enabled(uid: str):
     enabled_apps = get_enabled_apps(uid)
     # https://firebase.google.com/docs/firestore/query-data/queries#in_and_array-contains-any
@@ -832,12 +700,12 @@ async def generate_persona_prompt(uid: str, persona: Dict[str, Any]):
         limit=250,
         offset=0,
     )
-    memories = [m.dict() for m in universal_memories if not m.is_locked]
+    memories = [m.dict() for m in universal_memories]
     user_name = await run_blocking(db_executor, get_user_name, uid)
 
-    # Get and condense recent conversations — exclude locked content
+    # Get and condense recent conversations
     all_conversations = await run_blocking(db_executor, get_conversations, uid, limit=10)
-    conversations = deserialize_conversations([c for c in all_conversations if not c.get('is_locked')])
+    conversations = deserialize_conversations(all_conversations)
     conversation_history = conversations_to_string(conversations)
     with track_usage(uid, Features.PERSONA):
         conversation_history = await run_blocking(llm_executor, condense_conversations, [conversation_history])
@@ -1145,7 +1013,7 @@ def normalize_app_numeric_fields(app_dict: Dict[str, Any]) -> Dict[str, Any]:
             return value
 
     # Normalize fields that should be floats
-    for field in ['rating_avg', 'money_made', 'price']:
+    for field in ['rating_avg', 'money_made']:
         if field in app_dict and app_dict[field] is not None:
             app_dict[field] = _to_float(app_dict[field])
 

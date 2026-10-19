@@ -73,7 +73,7 @@ def _replace_tree(value: Any, before: str, after: str) -> Any:
 def validate_summary_edit(edit, row, *, full=False, authority='dream'):
     if edit.kind not in {'title', 'overview'}:
         return
-    if row.get('is_locked') or not conversations.is_visible_conversation(row):
+    if not conversations.is_visible_conversation(row):
         raise review_store.ReviewConflict('Dream conversation unavailable')
     if authority == 'user' and isinstance(edit, HarnessEdit):
         current = (
@@ -212,7 +212,7 @@ def revalidate_proposal(uid, source):
         except (review_store.ReviewNotFound, LookupError, ValueError) as exc:
             raise review_store.ReviewConflict('Dream proposal evidence unavailable') from exc
         except HTTPException as exc:
-            if exc.status_code not in {402, 404}:
+            if exc.status_code != 404:
                 raise
             raise review_store.ReviewConflict('Dream proposal evidence unavailable') from exc
         if review_store.fingerprint(current) != review_store.fingerprint(snapshot):
@@ -523,7 +523,7 @@ def validate_edit(edit, records, *, authority='dream'):
     _collection, _separator, key_id = base_ref(edit.target).partition('/')
     if not _separator or not key_id or '/' in key_id:
         raise ValueError('agent_invalid_target')
-    if row.get('is_locked') or row.get('deleted') or row.get('discarded') or row.get('is_dismissed'):
+    if row.get('deleted') or row.get('discarded') or row.get('is_dismissed'):
         raise review_store.ReviewConflict('Dream target unavailable')
     from utils.agent_capabilities.registry import get_kind
 
@@ -723,7 +723,7 @@ def apply_edit(uid, edit, records, *, expected_records=None, authority='dream'):
 def apply_fields(uid, edit, records, change, key, row, *, expected_records=None, authority='dream'):
     collection, key_id = base_ref(edit.target).split('/', 1)
     raw = review_store.user(uid).collection(collection).document(key_id).get().to_dict()
-    if not raw or raw.get('is_locked'):
+    if not raw:
         raise review_store.ReviewConflict('Dream target unavailable')
     from utils.agent_capabilities.registry import get_kind
 

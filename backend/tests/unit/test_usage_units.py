@@ -91,7 +91,7 @@ def test_read_joins_hourly_and_gateway_rollups_without_attempt_scan(units):
     assert result['budget_units'] is None
     assert result['by_feature']['chat'] > 0 and result['by_feature']['transcription'] > 0
     assert result['completeness']['status'] == 'partial'
-    assert store.writes == 0 and store.reads == 33
+    assert store.writes == 0 and store.reads == 32
     planned = units.get_usage_units(
         uid,
         month,

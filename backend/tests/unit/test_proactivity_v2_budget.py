@@ -4,7 +4,7 @@ from uuid import uuid4
 
 import pytest
 
-from config.proactivity_v2 import AttemptEnvelope, ProactivityDenied, daily_cap
+from config.proactivity_v2 import DAILY_CAP_MICRO_USD, AttemptEnvelope, ProactivityDenied
 from database import proactivity as ledger
 from database import proactivity_budget as money
 from tests.unit.fixtures.strict_firestore_transaction import StrictFirestore
@@ -95,29 +95,19 @@ def event(reservation, cost=1000):
     )
 
 
-@pytest.mark.parametrize(
-    'plan,cap',
-    [
-        ('basic', 0),
-        ('free', 0),
-        ('operator', 163333),
-        ('architect', 663333),
-        ('unlimited_v2', 99966),
-        ('unlimited', 66666),
-        ('plus', 66666),
-    ],
-)
-def test_cap_arithmetic(plan, cap):
-    assert daily_cap(plan) == (cap, False)
+def test_daily_cap_is_one_constant_for_every_user():
+    # The former architect cap: 19900 cents * 1000 // 30 days.
+    assert DAILY_CAP_MICRO_USD == 663333
 
 
 def test_exact_cap_shared_across_producers_and_redis_loss(store):
     authority = money.BudgetAuthority(firestore_client=store, redis_client=Redis(), clock=lambda: NOW)
-    first = reserve(authority, claim(store), 66666)
+    cap = DAILY_CAP_MICRO_USD
+    first = reserve(authority, claim(store), cap)
     authority.redis.values.clear()
     with pytest.raises(ProactivityDenied, match='budget_exhausted'):
         reserve(authority, claim(store, 'mentor', 'conversation_mentor_v2'), 1)
-    assert authority.settle(reservation=first, event=event(first, 66665))
+    assert authority.settle(reservation=first, event=event(first, cap - 1))
     assert reserve(authority, claim(store, 'mentor2', 'conversation_mentor_v2'), 1).reserved_micro_usd == 1
 
 
@@ -178,14 +168,3 @@ def test_deleted_owner_cannot_be_resurrected_by_settlement(store):
     store.rows[('account_deletions', 'u')] = {'wipe_status': 'completed'}
     with pytest.raises(ProactivityDenied, match='not_found'):
         authority.settle(reservation=first, event=event(first))
-
-
-def test_future_unpriced_paid_plan_uses_lowest_known_cap(monkeypatch):
-    from config import proactivity_v2 as config
-
-    policy = dict(config.PROACTIVITY_V2_BUDGET)
-    policy['monthly_reference_cents'] = {k: v for k, v in policy['monthly_reference_cents'].items() if k != 'plus'}
-    monkeypatch.setattr(config, 'PROACTIVITY_V2_BUDGET', policy)
-    assert daily_cap('plus') == (66666, True)
-    with pytest.raises(ProactivityDenied, match='unknown_plan'):
-        daily_cap('unrecognized')

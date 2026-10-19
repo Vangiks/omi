@@ -210,7 +210,6 @@ async def test_finalizer_completion_schedules_learning_retry(monkeypatch):
         source=SimpleNamespace(value='omi'),
         external_data=None,
         discarded=False,
-        is_locked=False,
         started_at=datetime(2026, 8, 19, 12, tzinfo=timezone.utc),
         finished_at=datetime(2026, 8, 19, 12, tzinfo=timezone.utc) + timedelta(minutes=10),
         transcript_segments=[SimpleNamespace(text='substantive exchange', start=0, end=60)],
@@ -281,7 +280,6 @@ async def test_finalizer_fenced_or_failed_fanout_never_schedules(monkeypatch, fa
         status=ConversationStatus.completed,
         language='en',
         discarded=False,
-        is_locked=False,
         transcript_segments=[],
         structured=SimpleNamespace(title='t', overview='o'),
     )

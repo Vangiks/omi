@@ -244,9 +244,6 @@ def get_conversation_by_id(
     if conversation is None:
         raise ToolExecutionError("Conversation not found", code=-32001)
 
-    if conversation.get('is_locked', False):
-        raise ToolExecutionError("A paid plan is required to access this conversation.", code=-32002)
-
     transcript_segments, truncated = bounded_transcript_segments(
         conversation.get("transcript_segments"),
         max_segments=max_segments,
@@ -288,9 +285,7 @@ def get_conversations_by_ids(
 
     One ``get_all`` Firestore batch read serves the whole id list. Each
     returned item mirrors ``get_conversation_by_id`` (card + bounded
-    transcript + per-item ``truncated``); a locked conversation yields a
-    per-item paid-plan error so its transcript never reaches the response,
-    and ids that resolve to nothing land in ``not_found``. Items are appended
+    transcript + per-item ``truncated``), and ids that resolve to nothing land in ``not_found``. Items are appended
     in request order until the serialized response would exceed
     ``MCP_CONVERSATION_BATCH_RESPONSE_MAX_CHARS`` — later items are then
     omitted (NOT marked not_found) and the top-level ``truncated`` flag is
@@ -336,23 +331,14 @@ def get_conversations_by_ids(
         conversation = by_id.get(conversation_id)
         if conversation is None:
             continue
-        if conversation.get("is_locked", False):
-            item: Dict[str, Any] = {
-                "id": conversation_id,
-                "error": {
-                    "code": "paid_plan_required",
-                    "message": "A paid plan is required to access this conversation.",
-                },
-            }
-        else:
-            transcript_segments, truncated = bounded_transcript_segments(
-                conversation.get("transcript_segments"),
-                max_segments=max_segments,
-                max_chars=max_chars,
-            )
-            card = conversation_card(conversation)
-            card["transcript_segments"] = transcript_segments
-            item = {"id": conversation_id, "conversation": card, "truncated": truncated}
+        transcript_segments, truncated = bounded_transcript_segments(
+            conversation.get("transcript_segments"),
+            max_segments=max_segments,
+            max_chars=max_chars,
+        )
+        card = conversation_card(conversation)
+        card["transcript_segments"] = transcript_segments
+        item: Dict[str, Any] = {"id": conversation_id, "conversation": card, "truncated": truncated}
         # The transport emits the result twice (text + structuredContent)
         # inside the JSON-RPC envelope, so the budget is measured against the
         # largest serialized form, not the inner object. `truncated: false`
@@ -496,18 +482,16 @@ def search_conversations(
     results: List[Dict[str, Any]] = []
     for conv in conversations:
         redact_conversation_for_list(conv)
-        snippets: List[Dict[str, Any]] = []
-        if not conv.get("is_locked", False):
-            snippets = (
-                attach_match_snippets_to_conversations(
-                    [conv],
-                    query,
-                    max_chars=MCP_CONVERSATION_SEARCH_SNIPPET_CHARS,
-                )[
-                    0
-                ].get("match_snippets")
-                or []
-            )
+        snippets: List[Dict[str, Any]] = (
+            attach_match_snippets_to_conversations(
+                [conv],
+                query,
+                max_chars=MCP_CONVERSATION_SEARCH_SNIPPET_CHARS,
+            )[
+                0
+            ].get("match_snippets")
+            or []
+        )
         card = conversation_card(conv)
         card["match_snippets"] = snippets
         results.append(card)

@@ -58,7 +58,7 @@ def require_duplicate_capture(left, right, *, authority='dream'):
             )
         ):
             raise ValueError('agent_conversation_user_protected')
-        if not conversations.is_visible_conversation(row) or row.get('is_locked'):
+        if not conversations.is_visible_conversation(row):
             raise ValueError('agent_invalid_conversation_merge')
     spans = [(timestamp(row.get('started_at')), timestamp(row.get('finished_at'))) for row in (left, right)]
     (a, b), (c, d) = spans
@@ -87,7 +87,7 @@ def validate_cleanup(edit, records, *, authority='dream'):
             'agent_unread_ref', field='target', ref=edit.target, expected='Read this owner record before editing'
         )
     row = records[ref]
-    if any(row.get(field) for field in ('deleted', 'is_locked', 'is_dismissed', 'discarded')):
+    if any(row.get(field) for field in ('deleted', 'is_dismissed', 'discarded')):
         raise ValueError('agent_target_unavailable')
     collection = ref.partition('/')[0]
     if edit.kind == 'dismiss_person':

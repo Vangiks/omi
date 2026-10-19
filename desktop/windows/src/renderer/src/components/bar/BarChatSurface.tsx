@@ -257,16 +257,11 @@ export type BarChatSurfaceProps = {
   onClose: () => void
   draft: string
   setDraft: React.Dispatch<React.SetStateAction<string>>
-  /** Send the typed draft (typed turn — spoken=false). Resolves to the
-   *  usage-limit notice when the send was REFUSED, else null. */
-  onSubmit: (text: string) => Promise<string | null>
-  /** The chat usage limit refused the last send — show the line inline, above the
-   *  input (Mac drops the same copy into the bar as a local assistant message).
-   *  The main window raises the shared upgrade modal in parallel. */
-  limitNotice?: string | null
+  /** Send the typed draft (typed turn — spoken=false). */
+  onSubmit: (text: string) => void
   /** A push-to-talk hold that FAILED while the panel is open (e.g. holding Space in
    *  the textarea): the friendly hint / error from usePushToTalk. Shown inline above
-   *  the input, next to the limit notice. Collapsed-pill holds surface it below the
+   *  the input. Collapsed-pill holds surface it below the
    *  pill instead (BarHintStrip). Self-clearing via the hook's own timers — null in
    *  the common success case, so nothing renders. */
   pttNotice?: string | null
@@ -287,9 +282,6 @@ export function BarChatSurface(props: BarChatSurfaceProps): React.JSX.Element {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<HTMLDivElement>(null)
-  // Monotonic submit id — a refused send may only restore its text if it is still
-  // the last thing the user asked (see submit()).
-  const submitSeq = useRef(0)
   // Latest-ref so the composer handlers below can be STABLE (memoized once) yet
   // always read current props — that stability is what lets the memoized
   // ChatComposer skip the projected-chat ticks that re-render this parent.
@@ -342,27 +334,10 @@ export function BarChatSurface(props: BarChatSurfaceProps): React.JSX.Element {
     if (!text) return
     p.setDraft('')
     resumeFollow()
-    // Flip to the conversation BEFORE awaiting the send so the reply streams into
-    // the response state (always the shared Omi thread). A send refused by the
-    // usage limit still lands here and surfaces its notice + restored text inline,
-    // exactly as an in-conversation refusal does.
+    // Flip to the conversation BEFORE the send so the reply streams into the
+    // response state (always the shared Omi thread).
     if (p.view === 'list') p.onOpenConversation()
-    const seq = ++submitSeq.current
-    void p.onSubmit(text).then((notice) => {
-      // A REFUSED send never reaches the transcript, so clearing the input would
-      // just eat the user's question behind the amber notice — they'd have to
-      // retype it (Mac keeps the turn visible as a bubble instead). Put the text
-      // back so they can upgrade and resend.
-      //
-      // Only the LATEST submit may restore. Nothing disables the textarea while a
-      // check is in flight, so Enter can fire a second send while the first
-      // cold-start probe still awaits; both then refuse, and a first-come restore
-      // would drop its stale text into the input the second submit just cleared —
-      // the newer question would be the one lost. Belt-and-braces, never clobber
-      // text the user typed after the clear.
-      if (!notice || seq !== submitSeq.current) return
-      p.setDraft((current) => (current.trim() ? current : text))
-    })
+    p.onSubmit(text)
   }, [resumeFollow])
 
   // Textarea key handling, one stable handler per surface flavor. Both let PTT
@@ -511,12 +486,6 @@ export function BarChatSurface(props: BarChatSurfaceProps): React.JSX.Element {
       {props.pttNotice ? (
         <div role="status" className="px-4 pb-1 pt-1 text-xs leading-relaxed text-amber-300/90">
           {props.pttNotice}
-        </div>
-      ) : null}
-
-      {props.limitNotice ? (
-        <div role="status" className="px-4 pb-1 pt-1 text-xs leading-relaxed text-amber-300/90">
-          {props.limitNotice}
         </div>
       ) : null}
 

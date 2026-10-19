@@ -87,7 +87,6 @@ _stubs = [
     'database.daily_summaries',
     'database.screen_activity',
     'database.x_posts',
-    'database.fair_use',
     'database.auth',
     'database.dev_api_key',
     'firebase_admin',
@@ -112,8 +111,6 @@ _stubs = [
     'utils.other.endpoints',
     'utils.stt.pre_recorded',
     'utils.stt.vad',
-    'utils.fair_use',
-    'utils.subscription',
     'utils.conversations.process_conversation',
     'utils.conversations.render',
     'utils.notifications',
@@ -160,7 +157,7 @@ NOW = datetime(2026, 6, 11, tzinfo=timezone.utc)
 UID = "user-1"
 
 
-def _action_item(item_id='a1', desc='Email Bob', completed=False, deleted=False, locked=False, due_at=NOW):
+def _action_item(item_id='a1', desc='Email Bob', completed=False, deleted=False, due_at=NOW):
     return {
         'id': item_id,
         'description': desc,
@@ -170,7 +167,6 @@ def _action_item(item_id='a1', desc='Email Bob', completed=False, deleted=False,
         'completed_at': None,
         'conversation_id': None,
         'deleted': deleted,
-        'is_locked': locked,
     }
 
 
@@ -247,12 +243,6 @@ class TestMutationGuards:
         mock_db.get_action_item.return_value = None
         with pytest.raises(actions.ActionItemNotFound):
             actions.set_completed(UID, 'missing')
-
-    @patch('utils.mcp_action_items.action_items_db')
-    def test_complete_locked(self, mock_db):
-        mock_db.get_action_item.return_value = _action_item('a1', locked=True)
-        with pytest.raises(actions.ActionItemLocked):
-            actions.set_completed(UID, 'a1')
 
     @patch('utils.mcp_action_items.action_items_db')
     def test_complete_marks_and_returns(self, mock_db):
@@ -494,13 +484,6 @@ class TestRestTransport:
             rest.complete_action_item(action_item_id='missing', uid=UID)
         assert ei.value.status_code == 404
 
-    @patch('utils.mcp_action_items.action_items_db')
-    def test_rest_complete_locked_is_402(self, mock_db):
-        mock_db.get_action_item.return_value = _action_item('a1', locked=True)
-        with pytest.raises(HTTPException) as ei:
-            rest.complete_action_item(action_item_id='a1', uid=UID)
-        assert ei.value.status_code == 402
-
     @patch('utils.mcp_action_items.delete_action_item_vector')
     @patch('utils.mcp_action_items.action_items_db')
     def test_rest_delete_ok(self, mock_db, _mock_vec):
@@ -582,13 +565,6 @@ class TestSseDispatch:
         with pytest.raises(sse.ToolExecutionError) as ei:
             sse.execute_tool(UID, 'complete_action_item', {'action_item_id': 'missing'})
         assert ei.value.code == -32001
-
-    @patch('utils.mcp_action_items.action_items_db')
-    def test_tool_update_locked(self, mock_db):
-        mock_db.get_action_item.return_value = _action_item('a1', locked=True)
-        with pytest.raises(sse.ToolExecutionError) as ei:
-            sse.execute_tool(UID, 'update_action_item', {'action_item_id': 'a1', 'description': 'New'})
-        assert ei.value.code == -32002
 
     @patch('utils.mcp_action_items.delete_action_item_vector')
     @patch('utils.mcp_action_items.action_items_db')

@@ -397,7 +397,7 @@ def _gather_memories(uid: str, roster: MeetingRoster) -> tuple[str, ...]:
     except Exception as exc:  # noqa: BLE001 - best effort
         _log_source_failure('memories', uid, exc)
         return ()
-    memories = [record.dict() for record in universal_memories if not record.is_locked]
+    memories = [record.dict() for record in universal_memories]
     lines: list[str] = []
     for memory in memories:
         content = memory.get('content')

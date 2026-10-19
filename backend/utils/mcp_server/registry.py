@@ -68,7 +68,7 @@ _CONVERSATION_CARD_FIELDS: Dict[str, Any] = {
     **_CONVERSATION_TIMESTAMPS,
     "participants_included": {
         "type": "boolean",
-        "description": "Whether stored transcript speaker mappings were loaded; false also for locked content",
+        "description": "Whether stored transcript speaker mappings were loaded",
     },
     "participants": {
         "type": "array",

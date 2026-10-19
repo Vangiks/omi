@@ -194,7 +194,7 @@ async def test_observed_map_count_mismatch_emits_one_s1_refusal(coordinator, mon
     lineage_module = getattr(pipeline, 'sync_recording_lineage', recording_lineage)
     monkeypatch.setattr(lineage_module, 'emit_s1_refusal', lambda reason: refusals.append(reason))
 
-    async def coverage(uid, source, should_lock, client_device_id, session, claims, wav_paths, decoded_frames, **kw):
+    async def coverage(uid, source, client_device_id, session, claims, wav_paths, decoded_frames, **kw):
         return (list(wav_paths), {}, False)
 
     pipeline.apply_sync_wal_audio_coverage = coverage

@@ -22,14 +22,11 @@ def _conversation(cid='c1', hours_ago=2, segments=None, **extra):
     }
 
 
-def _select(
-    conversations, *, owner_has_voice=True, named_allowed=True, answered=None, people=None, limit=4, owner_evidence=None
-):
+def _select(conversations, *, owner_has_voice=True, answered=None, people=None, limit=4, owner_evidence=None):
     return selection.select_prompts(
         conversations,
         now=NOW,
         owner_has_voice=owner_has_voice,
-        named_allowed=named_allowed,
         answered=answered or set(),
         people=people or {},
         limit=limit,
@@ -50,24 +47,6 @@ def test_evidenced_unnamed_voice_can_ask_owner_question():
     assert prompts[0].origin == SpeakerTagPromptOrigin.unnamed
     assert prompts[0].speaker_id == 0
     assert prompts[0].conversation_title == 'Coffee chat'
-
-
-def test_named_prompts_hidden_without_entitlement_but_owner_check_stays_free():
-    conversation = _conversation(
-        segments=[
-            _segment('a', 0, 0, 8, is_user=True),
-            _segment('b', 1, 8, 16),
-            _segment('c', 2, 16, 24, person_id='p1'),
-        ]
-    )
-    prompts = _select(
-        [conversation],
-        owner_evidence=lambda c, runs: (runs[0], 0.50) if runs else None,
-        named_allowed=False,
-        people={'p1': 'Sam'},
-    )
-    assert {p.kind for p in prompts} == {SpeakerTagPromptKind.owner_check}
-    assert prompts[0].origin == SpeakerTagPromptOrigin.auto_user
 
 
 def test_auto_person_match_becomes_confirm_prompt_with_name():
@@ -193,8 +172,7 @@ def test_overlapping_same_speaker_segments_keep_the_full_span():
 def test_conversations_outside_48h_or_without_audio_are_skipped():
     old = _conversation('old', hours_ago=49, segments=[_segment('a', 0, 0, 9)])
     silent = _conversation('silent', segments=[_segment('a', 0, 0, 9)], audio_files=[])
-    locked = _conversation('locked', segments=[_segment('a', 0, 0, 9)], is_locked=True)
-    assert _select([old, silent, locked]) == []
+    assert _select([old, silent]) == []
 
 
 def test_answered_prompts_are_not_repeated():
@@ -332,7 +310,6 @@ def test_misaligned_merged_sync_candidate_requires_content_verification():
         [conversation],
         now=NOW,
         owner_has_voice=False,
-        named_allowed=True,
         answered=set(),
         people={},
         verify=lambda row, prompt, text: attempts.append((prompt.clip_start, prompt.clip_end, text)) or False,
@@ -348,7 +325,6 @@ def test_verification_attempts_are_bounded():
         conversations,
         now=NOW,
         owner_has_voice=False,
-        named_allowed=True,
         answered=set(),
         people={},
         verify=lambda row, prompt, text: attempts.append(row['id']) or False,
@@ -357,20 +333,18 @@ def test_verification_attempts_are_bounded():
     assert prompts == [] and len(attempts) == 4
 
 
-def test_contended_owner_is_an_unnamed_free_owner_check_even_with_a_stale_projection():
+def test_contended_owner_is_an_unnamed_owner_check_even_with_a_stale_projection():
     conversation = _conversation(
         segments=[
             _segment('a', 0, 0, 8, is_user=True, speaker_identity_status='ambiguous'),
             _segment('b', 1, 8, 16, is_user=False, speaker_identity_status='ambiguous'),
         ]
     )
-    prompts = _select(
-        [conversation], owner_evidence=lambda c, runs: (runs[0], 0.50) if runs else None, named_allowed=False
-    )
-    assert len(prompts) == 1
-    assert prompts[0].kind == SpeakerTagPromptKind.owner_check
-    assert prompts[0].origin == SpeakerTagPromptOrigin.unnamed
-    assert prompts[0].suggested_person_id is None
+    prompts = _select([conversation], owner_evidence=lambda c, runs: (runs[0], 0.50) if runs else None)
+    owner = [p for p in prompts if p.kind == SpeakerTagPromptKind.owner_check]
+    assert len(owner) == 1
+    assert owner[0].origin == SpeakerTagPromptOrigin.unnamed
+    assert owner[0].suggested_person_id is None
 
 
 def _select_with(conversations, **extra):
@@ -378,7 +352,6 @@ def _select_with(conversations, **extra):
         conversations,
         now=NOW,
         owner_has_voice=True,
-        named_allowed=True,
         answered=set(),
         prior_enabled=extra.pop('prior_enabled', True),
         **extra,

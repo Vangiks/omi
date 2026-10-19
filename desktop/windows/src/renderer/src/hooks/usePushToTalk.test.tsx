@@ -236,67 +236,6 @@ describe('space gesture', () => {
   })
 })
 
-describe('pre-capture usage veto (macOS isBlockedByUsageLimit)', () => {
-  it('OVER LIMIT: a hold is refused before the mic opens — no capture, no STT, popup raised once', async () => {
-    const checkUsageLimit = vi.fn(() => ({ blocked: true, message: 'over the cap' }))
-    const onUsageLimitBlocked = vi.fn()
-    const { result, onHoldStart, onCommit } = setup({ checkUsageLimit, onUsageLimitBlocked })
-    pressSpace()
-    await advance(HOLD_THRESHOLD_MS)
-    // The gesture never opened the mic or the stream — the whole record→STT round
-    // trip is skipped.
-    expect(h.startPttCapture).not.toHaveBeenCalled()
-    expect(h.startPttStream).not.toHaveBeenCalled()
-    expect(result.current.recording).toBe(false)
-    // Popup raised exactly once, with the limit line; barge-in suppressed (a
-    // blocked hold must not cut off a playing reply); nothing is ever committed.
-    expect(onUsageLimitBlocked).toHaveBeenCalledTimes(1)
-    expect(onUsageLimitBlocked).toHaveBeenCalledWith('over the cap')
-    expect(onHoldStart).not.toHaveBeenCalled()
-    // Release does nothing — there was no hold to finalize (no second popup at send).
-    releaseSpace()
-    await advance(1000)
-    expect(onCommit).not.toHaveBeenCalled()
-    expect(onUsageLimitBlocked).toHaveBeenCalledTimes(1)
-  })
-
-  it('IN LIMIT: the veto lets the hold through unchanged — no regression, no added await', async () => {
-    const checkUsageLimit = vi.fn(() => ({ blocked: false as const }))
-    const onUsageLimitBlocked = vi.fn()
-    const { result, onHoldStart } = setup({ checkUsageLimit, onUsageLimitBlocked })
-    pressSpace()
-    await advance(HOLD_THRESHOLD_MS)
-    expect(result.current.recording).toBe(true)
-    expect(h.startPttCapture).toHaveBeenCalledOnce()
-    expect(onHoldStart).toHaveBeenCalledTimes(1)
-    expect(onUsageLimitBlocked).not.toHaveBeenCalled()
-  })
-
-  it('COLD START (no snapshot ⇒ verdict not blocked): fails open, the user can speak', async () => {
-    // The gate's checkSync returns { blocked:false } when it has no snapshot yet;
-    // the hold must proceed rather than be refused on a probe that hasn't landed.
-    const checkUsageLimit = vi.fn(() => ({ blocked: false as const }))
-    const { result } = setup({ checkUsageLimit })
-    pressSpace()
-    await advance(HOLD_THRESHOLD_MS)
-    expect(result.current.recording).toBe(true)
-    expect(h.startPttCapture).toHaveBeenCalledOnce()
-  })
-
-  it('a quick TAP is never vetoed — the veto only runs when a real hold begins', async () => {
-    // A tap types a space; it must not consult the quota or raise the popup.
-    const checkUsageLimit = vi.fn(() => ({ blocked: true, message: 'over the cap' }))
-    const onUsageLimitBlocked = vi.fn()
-    setup({ checkUsageLimit, onUsageLimitBlocked })
-    pressSpace()
-    await advance(HOLD_THRESHOLD_MS - 100)
-    releaseSpace()
-    await advance(1000)
-    expect(checkUsageLimit).not.toHaveBeenCalled()
-    expect(onUsageLimitBlocked).not.toHaveBeenCalled()
-  })
-})
-
 describe('release paths', () => {
   it('release with no stream connection → batch → commit clears the draft', async () => {
     const { result, onCommit, onTranscript, onCaptureEnd } = setup()

@@ -35,12 +35,6 @@ vi.mock("@/lib/auth", () => ({
   verifyAdmin: vi.fn(async () => ({ uid: "t" })),
 }));
 vi.mock("@/lib/posthog", () => ({ withRowLimit: (q: string) => q }));
-vi.mock("@/lib/stripe", () => ({ getOptionalStripe: () => null }));
-vi.mock("@/lib/stripe-subscriptions", () => ({
-  MRR_STATUSES: ["active"],
-  fetchOmiSubscriptions: vi.fn(async () => ({ subscriptions: [] })),
-  monthlyAmount: () => 0,
-}));
 vi.mock("@/lib/firebase/admin", () => ({
   getDb: () => ({
     collectionGroup: () => ({
@@ -64,7 +58,6 @@ vi.mock("@/lib/services/gateway-ledger", () => ({
 }));
 
 import { MAX_PRECOMPUTED_AGE_MS } from "@/lib/payload-cache";
-import { GET as profitabilityGET } from "@/app/api/omi/stats/profitability/route";
 import { GET as infraCostsGET } from "@/app/api/omi/stats/infra-costs/route";
 
 const GCP_SNAPSHOT = {
@@ -88,50 +81,6 @@ beforeEach(() => {
   delete process.env.POSTHOG_PROJECT_ID;
   delete process.env.MIXPAL_SECRET;
   mockGcp.mockResolvedValue(GCP_SNAPSHOT);
-});
-
-describe("profitability GET staleness bound", () => {
-  const KEY = "profitability:v1:30:0.2:0.2";
-
-  it("reads the cache with the freshness bound", async () => {
-    await profitabilityGET(request("/api/omi/stats/profitability?days=30"));
-
-    expect(getPayloadMock).toHaveBeenCalledWith(KEY, {
-      maxAgeMs: MAX_PRECOMPUTED_AGE_MS,
-    });
-  });
-
-  it("serves a doc within the bound verbatim, without recomputing", async () => {
-    const freshAt = Date.now() - 60 * 60 * 1000;
-    getPayloadMock.mockResolvedValue({
-      data: { days: 30, marker: "precomputed" },
-      freshAt,
-    });
-
-    const res = await profitabilityGET(
-      request("/api/omi/stats/profitability?days=30")
-    );
-    const body = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(body).toEqual({ days: 30, marker: "precomputed", freshAt });
-    expect(setPayloadMock).not.toHaveBeenCalled();
-  });
-
-  it("recomputes inline and refreshes the cache when the doc is stale or missing", async () => {
-    // getPayload → null is also what a doc older than the bound returns, so
-    // this is the frozen-legacy-key path (stale doc) as much as the cold path.
-    const res = await profitabilityGET(
-      request("/api/omi/stats/profitability?days=30")
-    );
-    const body = await res.json();
-
-    expect(res.status).toBe(200);
-    expect(body.marker).toBeUndefined();
-    expect(body.days).toBe(30);
-    expect(setPayloadMock).toHaveBeenCalledTimes(1);
-    expect(setPayloadMock.mock.calls[0][0]).toBe(KEY);
-  });
 });
 
 describe("infra-costs GET staleness bound", () => {

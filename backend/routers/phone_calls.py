@@ -12,7 +12,6 @@ from twilio.base.exceptions import TwilioRestException
 from twilio.twiml.voice_response import VoiceResponse, Dial
 
 import database.phone_calls as phone_calls_db
-from utils.phone_calls import check_call_access, check_destination_allowed, get_quota_snapshot, reserve_phone_call_quota
 from utils.other import endpoints as auth
 from utils.other.endpoints import rate_limit_dependency
 from utils.executors import critical_executor, db_executor, run_blocking
@@ -113,7 +112,6 @@ def verify_phone_number(
     _: None = Depends(rate_limit_dependency(endpoint="phone_verify", requests_per_window=5, window_seconds=3600)),
 ):
     """Initiate phone number verification via Twilio caller ID validation."""
-    check_call_access(uid)
     phone_number = request.phone_number.strip()
     if not E164_PATTERN.match(phone_number):
         raise HTTPException(status_code=400, detail="Phone number must be in E.164 format (e.g., +15551234567)")
@@ -160,7 +158,6 @@ def check_phone_verification(
     ),
 ):
     """Check if a phone number has been verified. Poll this endpoint every 2s (60s timeout)."""
-    check_call_access(uid)
     phone_number = request.phone_number.strip()
 
     # Check if already stored locally (avoid duplicates from repeated polling)
@@ -199,7 +196,6 @@ def check_phone_verification(
 @router.get("/v1/phone/numbers", response_model=PhoneNumbersResponse, tags=['phone-calls'])
 def list_phone_numbers(uid: str = Depends(auth.get_current_user_uid)):
     """List all verified phone numbers for the user."""
-    check_call_access(uid)
     numbers = phone_calls_db.get_phone_numbers(uid)
     return {'numbers': numbers}
 
@@ -207,7 +203,6 @@ def list_phone_numbers(uid: str = Depends(auth.get_current_user_uid)):
 @router.delete("/v1/phone/numbers/{phone_number_id}", response_model=PhoneMutationResponse, tags=['phone-calls'])
 def remove_phone_number(phone_number_id: str, uid: str = Depends(auth.get_current_user_uid)):
     """Remove a verified phone number."""
-    check_call_access(uid)
     phone_number = phone_calls_db.get_phone_number(uid, phone_number_id)
     if not phone_number:
         raise HTTPException(status_code=404, detail="Phone number not found")
@@ -229,7 +224,6 @@ def remove_phone_number(phone_number_id: str, uid: str = Depends(auth.get_curren
 @router.post("/v1/phone/token", response_model=TokenResponse, tags=['phone-calls'])
 def get_phone_token(uid: str = Depends(auth.get_current_user_uid)):
     """Generate a Twilio access token for making VoIP calls."""
-    check_call_access(uid)
     # Verify user has at least one verified number
     primary = phone_calls_db.get_primary_phone_number(uid)
     if not primary:
@@ -310,19 +304,6 @@ async def twiml_voice_webhook(request: Request):
         _say(response, 'Invalid destination number format. Goodbye.')
         return Response(content=str(response), media_type='text/xml')
 
-    # Final quota + destination check before placing the call. Free-tier users
-    # on exhausted monthly buckets or disallowed destinations are turned away
-    # here so Twilio never actually dials; we then refuse to count the attempt.
-    snapshot = await run_blocking(db_executor, get_quota_snapshot, uid)
-    if not snapshot.has_access:
-        _say(response, 'Monthly phone call limit reached. Goodbye.')
-        return Response(content=str(response), media_type='text/xml')
-    try:
-        check_destination_allowed(snapshot, to_number)
-    except HTTPException:
-        _say(response, 'This destination is not available on your plan. Goodbye.')
-        return Response(content=str(response), media_type='text/xml')
-
     # Verify the number is still a valid outgoing caller ID in Twilio
     is_verified = await run_blocking(critical_executor, check_caller_id_verified, caller_number)
     print(
@@ -334,19 +315,7 @@ async def twiml_voice_webhook(request: Request):
         _say(response, 'Your caller ID is not verified. Please re-verify your phone number.')
         return Response(content=str(response), media_type='text/xml')
 
-    # Reserve quota immediately before handing Twilio the dial instructions.
-    # The reservation is atomic so concurrent TwiML requests cannot all pass
-    # the same stale quota snapshot.
-    if not snapshot.is_paid:
-        snapshot = await run_blocking(db_executor, reserve_phone_call_quota, uid)
-        if not snapshot.has_access:
-            _say(response, 'Monthly phone call limit reached. Goodbye.')
-            return Response(content=str(response), media_type='text/xml')
-
-    dial_kwargs: Dict[str, Any] = {'caller_id': caller_number}
-    if snapshot.max_duration_seconds and snapshot.max_duration_seconds > 0:
-        dial_kwargs['time_limit'] = int(snapshot.max_duration_seconds)
-    dial = Dial(**dial_kwargs)
+    dial = Dial(caller_id=caller_number)
     _dial_number(dial, to_number)
     _append_dial(response, dial)
 

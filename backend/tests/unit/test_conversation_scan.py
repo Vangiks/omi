@@ -360,20 +360,20 @@ def test_invisible_rows_advance_the_cursor_without_ending_the_scan():
         + [_stored('visible-2', 2)]
         + [_stored('discarded-1', 3, discarded=True)]
         + [no_discarded_field]
-        + [_stored('locked-visible', 5, is_locked=True)]
-        + [_stored('visible-3', 6)]
+        + [_stored('visible-3', 5)]
+        + [_stored('visible-4', 6)]
     )
     client, conversations = _scan(docs, limit=10, batch=2)
     ids = [c['id'] for c in conversations]
-    assert ids == ['visible-1', 'visible-2', 'locked-visible', 'visible-3']
+    assert ids == ['visible-1', 'visible-2', 'visible-3', 'visible-4']
     # 5 raw rows over 3 pages: discarded/missing-field rows are filtered
     # server-side, the deleted tombstone streams and is skipped in Python.
     assert client.raw_reads == 5
     assert len(client.queries) == 3
     # Aggregation excludes every invisible row: the tombstone and discarded row
-    # never arrive, and the yielded locked row is ignored by the aggregator.
+    # never arrive.
     stats = aggregate_people_stats(conversations)
-    assert stats['p1']['conversation_count'] == 3
+    assert stats['p1']['conversation_count'] == 4
 
 
 def test_stats_reads_only_to_the_raw_budget_through_mostly_deleted_rows():
@@ -610,7 +610,7 @@ def test_projected_scan_matches_full_reads_across_storage_shapes():
     rows with no protection level in both compressed and plain form — all
     through the real codec helpers, no mocked decoding.
     """
-    base = {'created_at': T0, 'discarded': False, 'is_locked': False}
+    base = {'created_at': T0, 'discarded': False}
     receipt = {'speakers': {'0': {'person_id': 'p2', 'is_user': False, 'generation': 1}}}
 
     # encode_conversation_for_write encodes the fields; the stored row's level
@@ -701,7 +701,7 @@ def test_projected_scan_matches_full_reads_across_storage_shapes():
 @pytest.mark.parametrize('level', ['standard', 'enhanced'])
 def test_manual_receipt_overrides_under_every_protection_level(level):
     """The encrypted+compressed manual receipt decodes and re-labels under both levels."""
-    base = {'created_at': T0, 'discarded': False, 'is_locked': False}
+    base = {'created_at': T0, 'discarded': False}
     receipt = {'speakers': {'0': {'person_id': 'p2', 'is_user': False, 'generation': 1}}}
     stored = [
         {
@@ -765,14 +765,13 @@ def test_browse_pages_through_the_real_reader():
 def test_browse_honors_discarded_and_date_window_through_the_real_reader(include_discarded, with_date_window):
     """The actual browse function over the real reader honors both dimensions.
 
-    Tombstones are invisible to the scan and locked rows are visible but
-    filtered by browse; window bounds are inclusive at both edges.
+    Tombstones are invisible to the scan; window bounds are inclusive at both
+    edges.
     """
     docs = [
         _stored('too-new', 0),  # T0: after the window end
         _stored('edge-end', 1),  # T0-1: exactly the inclusive window end
         _stored('tomb', 50, deleted=True),  # inside the window, never yielded
-        _stored('locked', 60, is_locked=True),  # inside, yielded, browse drops it
         _stored('disc', 100, discarded=True),  # inside, server-side filtered
         _stored('edge-start', 200),  # T0-200: exactly the inclusive window start
         _stored('too-old', 300),  # before the window start
@@ -807,7 +806,7 @@ def test_browse_honors_discarded_and_date_window_through_the_real_reader(include
     # 'disc' is filtered server-side when include_discarded is False.
     assert (
         client.raw_reads
-        == {(False, False): 6, (False, True): 7, (True, False): 4, (True, True): 5}[
+        == {(False, False): 5, (False, True): 6, (True, False): 3, (True, True): 4}[
             (with_date_window, include_discarded)
         ]
     )

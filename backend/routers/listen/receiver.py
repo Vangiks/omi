@@ -136,7 +136,6 @@ from utils.transcribe_decisions import (
     TARGET_SAMPLE_RATE,
     custom_stt_clock_origin,
     decide_multi_channel_mix,
-    decide_multi_channel_stt_send,
     decide_stt_buffer_flush,
     should_flush_final_multi_channel_mix,
     should_initialize_vad_gate,
@@ -1887,18 +1886,8 @@ class ListenReceiver(ReplayFilterMixin):
                 force=force,
                 socket_dead=socket_dead,
                 socket_available=self.stt_socket is not None,
-                fair_use_dg_budget_exhausted=self.host.state.fair_use_dg_budget_exhausted,
-                fair_use_track_dg_usage=self.host.state.fair_use_track_dg_usage,
-                sample_rate=request.sample_rate,
             )
             if not decision.should_flush:
-                return
-            if self.host.state.fair_use_dg_budget_exhausted:
-                buffer.clear()
-                # Fair use cleared queued STT bytes: the capture samples they
-                # carried were never sent, so the next buffer starts at the
-                # cursor and those samples simply have no provider mapping.
-                self._stt_buffer_start_sample = None
                 return
             socket = self.stt_socket
             if socket is not None and not isinstance(socket, ReplayTailSocket) and not socket_is_finishing(socket):
@@ -1943,7 +1932,6 @@ class ListenReceiver(ReplayFilterMixin):
                 if (ring := self._window_ring()) is not None:
                     ring.append(outbound_audio, outbound_start_sample)
                 self._capture('capture_outbound_stt', outbound_audio)
-                self.host.state.dg_usage_ms_pending += decision.dg_usage_ms
                 self._stt_buffer_start_sample = None
                 return
             if self.host.state.stt_terminal_failure:
@@ -2021,13 +2009,7 @@ class ListenReceiver(ReplayFilterMixin):
         # Custom-STT clients own transcript production.  Their channel sockets are intentionally
         # absent, but captured audio still proceeds to the pusher mix path.
         if not self.host.use_custom_stt:
-            should_send, dg_usage_ms = decide_multi_channel_stt_send(
-                socket_available=bool(self.stt_sockets_multi[channel_index]),
-                fair_use_dg_budget_exhausted=self.host.state.fair_use_dg_budget_exhausted,
-                pcm_len=len(pcm),
-                fair_use_track_dg_usage=self.host.state.fair_use_track_dg_usage,
-            )
-            if should_send:
+            if self.stt_sockets_multi[channel_index]:
                 sent = await send_live_stt_audio(
                     request.websocket,
                     self.host.state,
@@ -2038,7 +2020,6 @@ class ListenReceiver(ReplayFilterMixin):
                 )
                 if sent:
                     self._capture('capture_outbound_stt', pcm)
-                    self.host.state.dg_usage_ms_pending += dg_usage_ms
         # Only accumulate channel audio for the pusher mix when an audio-bytes consumer is attached.
         # decide_multi_channel_mix and the teardown flush both gate on this same condition, so
         # without a consumer nothing ever drains these per-channel buffers. Appending regardless (the

@@ -139,7 +139,6 @@ def test_summary_applies_only_owned_fields_through_journal(monkeypatch, kind):
 @pytest.mark.parametrize(
     'update',
     [
-        {'is_locked': True},
         {'discarded': True},
         {'deleted': True},
         {'user_title': 'User choice'},
@@ -147,7 +146,7 @@ def test_summary_applies_only_owned_fields_through_journal(monkeypatch, kind):
         {'structured': {'title': 'User correction'}},
     ],
 )
-def test_summary_rechecks_current_visibility_locks_and_snapshot(monkeypatch, update):
+def test_summary_rechecks_current_visibility_and_snapshot(monkeypatch, update):
     source = row()
     current = {**deepcopy(source), **update}
     ref = SimpleNamespace(get=lambda: SimpleNamespace(to_dict=lambda: current))

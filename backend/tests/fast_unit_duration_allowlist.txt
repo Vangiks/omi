@@ -101,12 +101,8 @@ tests/unit/test_desktop_transcribe.py::TestVoiceMessageTranscribeEndpoint::test_
 tests/unit/test_desktop_transcribe.py::TestVoiceMessageTranscribeEndpoint::test_octet_stream_returns_transcript
 tests/unit/test_desktop_transcribe.py::TestVoiceMessagesBudgetHappyPath::test_voice_messages_budget_consumed_on_success
 tests/unit/test_dev_api_folder_filters.py::TestDevGetFolders::test_dev_get_folders_returns_folder_list
-tests/unit/test_dg_usage_batch.py::TestDgUsageBatchingBehavior::test_batched_60s_single_redis_write
-tests/unit/test_dg_usage_batch.py::TestDgUsageBatchingBehavior::test_large_accumulation_no_overflow
-tests/unit/test_dg_usage_batch.py::TestRedisOpsReduction::test_reduction_factor
 tests/unit/test_diarizer_embedding_decoder_bypass.py::test_embedding_endpoint_passes_preloaded_audio_to_inference
 tests/unit/test_experience_summary_date_grounding.py::test_summarize_experience_falls_back_to_utc_on_invalid_timezone
-tests/unit/test_fair_use_classifier.py::TestPrepareConversationSummaries::test_extracts_metadata_correctly
 tests/unit/test_google_calendar_auth_recovery.py::test_refresh_google_token_marks_missing_refresh_token_reauth_required
 tests/unit/test_high_priority_usage_tracking.py::TestExternalIntegrationsTracking::test_get_conversation_summary_sets_context
 tests/unit/test_high_priority_usage_tracking.py::TestKnowledgeGraphTracking::test_extract_knowledge_sets_context
@@ -154,9 +150,6 @@ tests/unit/test_speaker_sample.py::test_verify_and_transcribe_sample_transcripti
 tests/unit/test_speaker_sample_migration.py::test_get_migration_lock_reuses_same_key
 tests/unit/test_streaming_deepgram_backoff.py::test_gated_socket_death_reason_delegates_to_safe_socket
 tests/unit/test_sync_cloud_tasks.py::TestVerifyCloudTasksOidc::test_env_unset_fails_closed
-tests/unit/test_sync_fair_use_gate.py::TestCreateConversationLockPropagation::test_create_conversation_default_unlocked
-tests/unit/test_sync_fair_use_gate.py::TestHardRestrictionRetryAfter::test_returns_none_when_restrict_until_is_missing_or_expired
-tests/unit/test_sync_fair_use_gate.py::TestSpeechDurationComputation::test_duration_from_raw_vad_segments
 tests/unit/test_sync_silent_failure.py::TestProcessSegmentReal::test_success_adds_to_new_memories
 tests/unit/test_sync_transcription_prefs.py::TestProcessSegmentPreferences::test_private_cloud_sync_flag_passed_to_new_conversation
 tests/unit/test_sync_v2.py::TestAsyncCoordinatorBehavioral::test_decode_generic_exception_marks_failed
@@ -220,7 +213,7 @@ tests/unit/test_memory_offset_read_cost.py::test_status_lookups_are_not_repeated
 tests/unit/test_list_read_budget_contract.py::test_conversations_large_offsets_are_served_and_charged[20000-19000-1000]
 # First test in the file-isolated memories router suite amortizes the module import.
 tests/unit/test_memories_archive_and_read_contracts.py::test_get_memories_forwards_include_archive
-# Full listen-runtime bootstrap (STT selection, fair-use, onboarding admission)
+# Full listen-runtime bootstrap (STT selection, onboarding admission)
 # sits exactly at the 0.30s CPU budget under a saturated pre-push fanout.
 tests/unit/test_listen_runtime_regressions.py::test_bootstrap_forces_single_language_before_selecting_stt_for_onboarding
 # Builds a real Conversation, then parses process_conversation to exec the

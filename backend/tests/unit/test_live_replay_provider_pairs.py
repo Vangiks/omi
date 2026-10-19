@@ -170,9 +170,6 @@ async def setup_receiver(monkeypatch, order, *, fail_first=False, router_on=Fals
     host.request.sample_rate = 16000
     host.request.websocket = SimpleNamespace(send_json=AsyncMock(), close=AsyncMock())
     host.state.stt_terminal_failure = False
-    host.state.fair_use_dg_budget_exhausted = False
-    host.state.fair_use_track_dg_usage = False
-    host.state.dg_usage_ms_pending = 0
     host.client_device_context = SimpleNamespace(platform='ios')
     host.transcripts = SimpleNamespace(enqueue=base.emitted.extend)
     host.spawn = lambda coro, **kw: (

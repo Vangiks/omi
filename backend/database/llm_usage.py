@@ -11,7 +11,6 @@ from typing import Any, Callable, Dict, List, Optional, cast
 
 from google.cloud import firestore
 
-from config.plan_catalog import PlanType, WIRE_PLAN_ALIASES
 from ._client import db
 
 transactional = getattr(firestore, 'transactional', lambda fn: fn)  # pyright: ignore[reportUnknownMemberType]
@@ -27,55 +26,14 @@ def _typed_doc(doc: Any) -> Dict[str, Any]:
 
 
 _UNATTRIBUTED_PLAN = '_unattributed'
+# The fork has no plans (#3): every usage event carries this one label.
+USAGE_PLAN_ID = 'default'
 _COST_STATUSES = {'complete', 'partial', 'missing', 'excluded'}
 
 
-def _canonical_plan_id(value: object) -> str | None:
-    """Return a catalog plan id, or ``None`` for an unknown wire value."""
-    raw = value.value if isinstance(value, PlanType) else value
-    if not isinstance(raw, str):
-        return None
-    raw = raw.strip()
-    if raw == 'free':
-        raw = PlanType.basic.value
-    try:
-        return PlanType(raw).value
-    except ValueError:
-        alias = WIRE_PLAN_ALIASES.get(raw)
-        return alias.value if alias is not None else None
-
-
 def resolve_usage_plan_id(uid: str, *, firestore_client: Any | None = None) -> str | None:
-    """Resolve the server-owned catalog plan used for a usage event.
-
-    A missing or unreadable subscription is deliberately returned as ``None``.
-    It must become an explicitly unattributed report row, never an assumed
-    ``basic`` row: otherwise a read failure would move paid cost into the free
-    plan and make the resulting COGS report look complete.
-    """
-    if not uid:
-        return None
-    client = _usage_client(firestore_client)
-    try:
-        snapshot = client.collection('users').document(uid).get(['subscription'])
-    except TypeError:
-        # Small test doubles and older Firestore adapters do not accept a field
-        # projection. The full read remains bounded to this one user document.
-        try:
-            snapshot = client.collection('users').document(uid).get()
-        except Exception:
-            return None
-    except Exception:
-        return None
-    if not getattr(snapshot, 'exists', False):
-        return None
-    raw = snapshot.to_dict()
-    if not isinstance(raw, dict):
-        return None
-    subscription = raw.get('subscription')
-    if not isinstance(subscription, dict):
-        return None
-    return _canonical_plan_id(subscription.get('plan'))
+    """The usage label for an event: ``USAGE_PLAN_ID`` for every user, ``None`` without a uid."""
+    return USAGE_PLAN_ID if uid else None
 
 
 def _plan_key(uid: str, firestore_client: Any | None) -> str:

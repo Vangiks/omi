@@ -1,13 +1,6 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import {
-  beginClaudeSignIn,
-  dismissClaudeSignIn,
-  onClaudeSignIn,
-  __resetClaudeSignIn,
-  OMI_PRICING_URL,
-  CLAUDE_SIGN_IN_FAILED
-} from './claudeSignIn'
+import { beginClaudeSignIn, __resetClaudeSignIn, CLAUDE_SIGN_IN_FAILED } from './claudeSignIn'
 import type { CodingAgentStartAuthResult } from '../../../shared/types'
 
 const codingAgentStartAuth = vi.fn<() => Promise<CodingAgentStartAuthResult>>()
@@ -26,14 +19,6 @@ function deferred<T>(): {
   return { promise, resolve, reject }
 }
 
-/** Latest sheet-open value from the store. */
-function openState(): boolean {
-  let open = false
-  const unsub = onClaudeSignIn((s) => (open = s.open))
-  unsub()
-  return open
-}
-
 beforeEach(() => {
   codingAgentStartAuth.mockReset()
   ;(globalThis as unknown as { window: { omi: unknown } }).window.omi = { codingAgentStartAuth }
@@ -42,15 +27,12 @@ beforeEach(() => {
 
 afterEach(() => __resetClaudeSignIn())
 
-// beginClaudeSignIn is the MID-TURN auth_required entry point (Mac's
-// isClaudeAuthRequired sheet) — it opens the upsell sheet + launches the parallel
-// OAuth. It is NOT the Settings sign-in button (that path does plain OAuth with
-// no sheet — see AgentsTab.test).
+// beginClaudeSignIn is the MID-TURN auth_required entry point. The Settings
+// sign-in button calls codingAgentStartAuth directly (see AgentsTab.test).
 describe('beginClaudeSignIn (mid-turn auth_required)', () => {
-  it('opens the sheet AND launches the OAuth in parallel', () => {
+  it('launches the OAuth', () => {
     codingAgentStartAuth.mockReturnValue(deferred<CodingAgentStartAuthResult>().promise)
     beginClaudeSignIn()
-    expect(openState()).toBe(true)
     expect(codingAgentStartAuth).toHaveBeenCalledTimes(1)
   })
 
@@ -59,24 +41,21 @@ describe('beginClaudeSignIn (mid-turn auth_required)', () => {
     beginClaudeSignIn()
     beginClaudeSignIn()
     expect(codingAgentStartAuth).toHaveBeenCalledTimes(1)
-    expect(openState()).toBe(true)
   })
 
-  it('auto-closes and reports granted when the parallel OAuth completes (bypass, no purchase)', async () => {
+  it('reports the result when the OAuth completes', async () => {
     const d = deferred<CodingAgentStartAuthResult>()
     codingAgentStartAuth.mockReturnValue(d.promise)
     const onResult = vi.fn()
     beginClaudeSignIn(onResult)
-    expect(openState()).toBe(true)
 
     d.resolve({ ok: true, status: { connected: true, expiresAt: 123 } })
     await d.promise
 
-    expect(openState()).toBe(false)
     expect(onResult).toHaveBeenCalledWith({ ok: true, status: { connected: true, expiresAt: 123 } })
   })
 
-  it('fail-closed: closes the sheet and reports the error when the flow fails', async () => {
+  it('fail-closed: reports the error when the flow fails', async () => {
     const d = deferred<CodingAgentStartAuthResult>()
     codingAgentStartAuth.mockReturnValue(d.promise)
     const onResult = vi.fn()
@@ -90,7 +69,6 @@ describe('beginClaudeSignIn (mid-turn auth_required)', () => {
     d.resolve(failure)
     await d.promise
 
-    expect(openState()).toBe(false)
     expect(onResult).toHaveBeenCalledWith(failure)
   })
 
@@ -101,31 +79,21 @@ describe('beginClaudeSignIn (mid-turn auth_required)', () => {
     // Let the rejection microtask settle.
     await Promise.resolve()
     await Promise.resolve()
-    expect(openState()).toBe(false)
     expect(onResult).toHaveBeenCalledWith(
       expect.objectContaining({ ok: false, error: CLAUDE_SIGN_IN_FAILED })
     )
   })
 
-  it('dismiss (Cancel/Upgrade) closes the sheet and suppresses a late result callback', async () => {
+  it('launches a new flow once the previous one has finished', async () => {
     const d = deferred<CodingAgentStartAuthResult>()
-    codingAgentStartAuth.mockReturnValue(d.promise)
-    const onResult = vi.fn()
-    beginClaudeSignIn(onResult)
+    codingAgentStartAuth.mockReturnValueOnce(d.promise)
+    beginClaudeSignIn()
+    d.resolve({ ok: false, error: 'timeout', status: { connected: false, expiresAt: null } })
+    // Let the then/catch/finally chain release the in-flight flag.
+    await new Promise((r) => setTimeout(r, 0))
 
-    dismissClaudeSignIn()
-    expect(openState()).toBe(false)
-
-    // OAuth completes AFTER dismissal — no stale callback, sheet stays closed.
-    d.resolve({ ok: true, status: { connected: true, expiresAt: 1 } })
-    await d.promise
-    expect(onResult).not.toHaveBeenCalled()
-    expect(openState()).toBe(false)
-  })
-})
-
-describe('constants', () => {
-  it('exposes the omi.me pricing URL for the Upgrade CTA', () => {
-    expect(OMI_PRICING_URL).toBe('https://omi.me/pricing')
+    codingAgentStartAuth.mockReturnValueOnce(deferred<CodingAgentStartAuthResult>().promise)
+    beginClaudeSignIn()
+    expect(codingAgentStartAuth).toHaveBeenCalledTimes(2)
   })
 })

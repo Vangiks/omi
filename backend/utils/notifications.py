@@ -10,20 +10,9 @@ from config.action_item_reminder_policy import should_schedule_action_item_remin
 from firebase_admin import messaging, auth
 import database.notifications as notification_db
 from utils.executors import db_executor, postprocess_executor, run_blocking
-from database.redis_db import (
-    set_credit_limit_notification_sent,
-    has_credit_limit_notification_been_sent,
-    set_silent_user_notification_sent,
-    has_silent_user_notification_been_sent,
-)
 from database.auth import get_user_from_uid
 from utils.integration_telemetry import emit_posthog_event
 from utils.notification_text import to_plain_text
-from .llm.notifications import (
-    generate_notification_message,
-    generate_credit_limit_notification,
-    generate_silent_user_notification,
-)
 import logging
 
 logger = logging.getLogger(__name__)
@@ -450,91 +439,6 @@ async def send_client_displayed_notification_async(
         display_title=title,
         display_body=body,
     )
-
-
-async def send_subscription_paid_personalized_notification(user_id: str, data: Optional[Dict[str, Any]] = None) -> None:
-    """Send a personalized notification to all user's devices when unlimited subscription is purchased"""
-    # Get user name from Firebase Auth
-    name: str = "there"
-    try:
-        user = await run_blocking(postprocess_executor, _get_user, user_id)
-        name = user.display_name
-        if not name and user.email:
-            name = user.email.split('@')[0].capitalize()
-        if not name:
-            name = "there"
-    except Exception as e:
-        logger.error(f"Error getting user info from Firebase Auth: {e}")
-        name = "there"
-
-    # Generate welcome message for unlimited plan with user context
-    title, body = await generate_notification_message(user_id, name, "unlimited")
-
-    await send_notification_async(user_id, title, body, data)
-
-
-async def send_credit_limit_notification(user_id: str) -> None:
-    """Send a personalized credit limit notification if not sent recently"""
-    # Check if notification was sent recently (within 6 hours). Offloaded: the Redis read is sync
-    # and blocks the event loop in this async path.
-    if await run_blocking(db_executor, has_credit_limit_notification_been_sent, user_id):
-        logger.info(f"Credit limit notification already sent recently for user {user_id}")
-        return
-
-    name: str = "there"
-    try:
-        user = await run_blocking(postprocess_executor, _get_user, user_id)
-        name = user.display_name
-        if not name and user.email:
-            name = user.email.split('@')[0].capitalize()
-        if not name:
-            name = "there"
-    except Exception as e:
-        logger.error(f"Error getting user info from Firebase Auth: {e}")
-        name = "there"
-
-    # Generate personalized credit limit message
-    title, body = await generate_credit_limit_notification(user_id, name)
-
-    # Send notification
-    await send_notification_async(user_id, title, body)
-
-    # Cache that notification was sent (6 hours TTL). Offloaded: the Redis write is sync and blocks
-    # the event loop in this async path.
-    await run_blocking(db_executor, set_credit_limit_notification_sent, user_id)
-    logger.info(f"Credit limit notification sent to user {user_id}")
-
-
-async def send_silent_user_notification(user_id: str) -> None:
-    """Send a notification if a basic-plan user is silent for too long."""
-    # Check if notification was sent recently (within 24 hours). Offloaded: the Redis read is sync
-    # and blocks the event loop in this async path.
-    if await run_blocking(db_executor, has_silent_user_notification_been_sent, user_id):
-        logger.info(f"Silent user notification already sent recently for user {user_id}")
-        return
-
-    name: str = "there"
-    try:
-        user = await run_blocking(postprocess_executor, _get_user, user_id)
-        name = user.display_name
-        if not name and user.email:
-            name = user.email.split('@')[0].capitalize()
-        if not name:
-            name = "there"
-    except Exception as e:
-        logger.error(f"Error getting user info from Firebase Auth: {e}")
-        name = "there"
-
-    # Generate personalized credit limit message
-    title, body = generate_silent_user_notification(name)
-
-    # Send notification
-    await send_notification_async(user_id, title, body)
-
-    # Cache that notification was sent (24 hours TTL). Offloaded: the Redis write is sync and blocks
-    # the event loop in this async path.
-    await run_blocking(db_executor, set_silent_user_notification_sent, user_id)
-    logger.info(f"Silent user notification sent to user {user_id}")
 
 
 def send_training_data_submitted_notification(user_id: str) -> None:

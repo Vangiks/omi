@@ -621,9 +621,8 @@ class TestMeetingContextPack:
         import utils.conversations.meeting_context_pack as pack_module
 
         class _Record:
-            def __init__(self, content, locked=False):
-                self._payload = {'content': content, 'is_locked': locked}
-                self.is_locked = locked
+            def __init__(self, content):
+                self._payload = {'content': content}
 
             def dict(self):
                 return dict(self._payload)
@@ -632,7 +631,7 @@ class TestMeetingContextPack:
 
         def _read(uid, *, limit=100, offset=0):
             seen['limit'] = limit
-            return [_Record('Ash Kalb prefers async updates'), _Record('locked: do not surface', locked=True)]
+            return [_Record('Ash Kalb prefers async updates')]
 
         monkeypatch.setattr(pack_module, 'MemoryService', lambda **kw: SimpleNamespace(read=_read))
         # Every other source stays hermetic: without these the pack reached live Firestore
@@ -649,7 +648,6 @@ class TestMeetingContextPack:
 
         assert pack is not None
         assert any('async updates' in line for line in pack.memories)
-        assert not any('do not surface' in line for line in pack.memories)
         assert seen['limit'] == 40
 
     def test_gather_gate(self):

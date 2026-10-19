@@ -450,11 +450,7 @@ async def produce_followup(uid: str, action_item_id: str, due_revision: str) -> 
     task = await run_blocking(db_executor, tasks.get_action_item, uid, action_item_id)
     if not task or task.get('deleted') or task.get('completed') or task.get('status', 'active') != 'active':
         return
-    if (
-        not task.get('conversation_id')
-        or task.get('is_locked')
-        or task.get('source', 'legacy') not in {'legacy', 'conversation'}
-    ):
+    if not task.get('conversation_id') or task.get('source', 'legacy') not in {'legacy', 'conversation'}:
         return
     due = task.get('due_at')
     if isinstance(due, str):
@@ -569,10 +565,9 @@ def mentor_context(uid: str, frequency: int, threshold: float) -> dict:
     goals = integration.get_user_goals(uid, limit=3)
     # Stored recent context costs no additional unbudgeted embedding/provider call.
     past = integration.conversations_db.get_conversations(uid, limit=5, offset=0)
-    visible = [c for c in past if not c.get('is_locked')]
     rendered = [
         integration.conversations_to_string([conversation]).replace('Conversation #1\n', f'Conversation #{i + 1}\n', 1)
-        for i, conversation in enumerate(integration.deserialize_conversations(visible))
+        for i, conversation in enumerate(integration.deserialize_conversations(past))
     ]
     return dict(
         user_name=user_name,

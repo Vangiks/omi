@@ -1,8 +1,8 @@
 """Pure selection of a bounded daily set of speaker questions.
 
 Owner checks use supplied pooled voice evidence nearest distance .50 and its
-centroid representative, with one complete excerpt per conversation. Paid
-person cards retain longest-run selection and the optional pinned prior.
+centroid representative, with one complete excerpt per conversation.
+Person cards retain longest-run selection and the optional pinned prior.
 """
 
 from __future__ import annotations
@@ -222,7 +222,7 @@ def _excerpt(text: str) -> str:
 
 
 def _eligible(conversation: Mapping[str, Any], now: datetime) -> Optional[datetime]:
-    if conversation.get('deleted') or conversation.get('discarded') or conversation.get('is_locked'):
+    if conversation.get('deleted') or conversation.get('discarded'):
         return None
     if conversation.get('status') not in (None, 'completed'):
         return None
@@ -293,7 +293,6 @@ def select_prompts(
     *,
     now: datetime,
     owner_has_voice: bool,
-    named_allowed: bool,
     answered: set,
     people: Mapping[str, str],
     limit: int = DEFAULT_LIMIT,
@@ -404,7 +403,7 @@ def select_prompts(
                 add(run, SpeakerTagPromptKind.owner_check, origin, 4.0 - abs(distance - 0.50))
 
         for (_, identity), run in best_run.items():
-            if identity.startswith('person:') and named_allowed:
+            if identity.startswith('person:'):
                 person_id = identity.split(':', 1)[1]
                 if person_id in people:
                     add(
@@ -421,7 +420,7 @@ def select_prompts(
             near = next(
                 (pid for pid, entry in voice.items() if entry['suggest'] and pid in pinned and pid in people), None
             )
-            if named_allowed and near is not None and near not in labeled_here:
+            if near is not None and near not in labeled_here:
                 add(
                     run,
                     SpeakerTagPromptKind.confirm_person,
@@ -430,7 +429,7 @@ def select_prompts(
                     suggested_person_id=near,
                     suggested_person_name=people[near],
                 )
-            elif named_allowed:
+            else:
                 offered = ranked_candidates(voice, recent_people, people=people, pinned=pinned, exclude=labeled_here)
                 add(
                     run,

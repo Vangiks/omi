@@ -29,8 +29,6 @@ def aggregate_people_stats(conversations: Iterable[Dict[str, Any]]) -> Dict[str,
     """
     stats: Dict[str, Dict[str, Any]] = {}
     for conversation in conversations:
-        if conversation.get('is_locked'):
-            continue
         if conversation.get('discarded'):
             # The scan reader filters discarded rows server-side by default, but
             # include_discarded callers can still deliver them; stats never count them.

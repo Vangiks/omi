@@ -2,6 +2,7 @@ backend/google-credentials.json
 # Local artifacts a clean checkout does not have. A developer's virtualenv
 # breaks the image's compileall step; .env files hold real keys.
 **/.venv
+**/.openapi-venv
 **/__pycache__
 **/.pytest_cache
 **/node_modules

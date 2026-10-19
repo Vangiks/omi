@@ -249,7 +249,10 @@ describe('spoken-language feed-forward (A3)', () => {
 
 describe('batchErrorMessage', () => {
   it('maps each backend rejection to its friendly strip message', () => {
-    expect(batchErrorMessage(axiosErrorWithStatus(402))).toMatch(/omi plan/i)
+    expect(batchErrorMessage(axiosErrorWithStatus(402))).toMatch(
+      /server refused voice transcription/i
+    )
+    expect(batchErrorMessage(axiosErrorWithStatus(402))).not.toMatch(/plan|trial/i)
     expect(batchErrorMessage(axiosErrorWithStatus(413))).toMatch(/too long/i)
     expect(batchErrorMessage(axiosErrorWithStatus(429))).toMatch(/limit/i)
     expect(batchErrorMessage(axiosErrorWithStatus(401))).toMatch(/sign.?in/i)

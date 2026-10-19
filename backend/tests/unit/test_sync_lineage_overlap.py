@@ -63,7 +63,6 @@ def select(rows, chunk, **kwargs):
         stamped_target=kwargs.pop('stamp', None),
         source='omi',
         client_device_id='pendant',
-        is_locked=False,
         **kwargs,
     )
 

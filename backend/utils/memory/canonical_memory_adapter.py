@@ -315,7 +315,6 @@ def search_result_to_memorydb(uid: str, item: Dict[str, Any]) -> MemoryDB:
         updated_at=updated_at,
         manually_added=False,
         reviewed=False,
-        is_locked=bool(item.get("is_locked", False)),
         visibility=item.get("visibility") or "private",
         memory_tier=tier,
         valid_at=updated_at,
@@ -370,7 +369,6 @@ def memory_item_to_memorydb(item: MemoryItem) -> MemoryDB:
     tags = list(promotion.get("tags") or [])
     reviewed = bool(promotion.get("reviewed", False))
     is_baseline = bool(promotion.get("is_baseline", False))
-    is_locked = bool(promotion.get("is_locked", False))
     is_read = bool(promotion.get("is_read", False))
     is_dismissed = bool(promotion.get("is_dismissed", False))
     user_review = promotion.get("user_review")
@@ -393,7 +391,6 @@ def memory_item_to_memorydb(item: MemoryItem) -> MemoryDB:
         manually_added=item.user_asserted,
         reviewed=reviewed,
         is_baseline=is_baseline,
-        is_locked=is_locked,
         is_read=is_read,
         is_dismissed=is_dismissed,
         user_review=user_review,
@@ -511,7 +508,7 @@ def _canonical_explicit_history_visible(
 
     Suppression is a consumer-use fence, so the owner can inspect the retained
     record through an explicit history view.  The inspection path still keeps
-    the canonical privacy, source, lifecycle, lock, and archive fences.
+    the canonical privacy, source, lifecycle, and archive fences.
     """
     from utils.memory.ledger_history_policy import is_temporal_history_access_eligible
 
@@ -524,9 +521,6 @@ def _canonical_explicit_history_visible(
         or item.valid_to is not None
         or (item.promotion or {}).get('user_review') is False
     ):
-        return False
-    row = memory_item_to_memorydb(item)
-    if row.is_locked:
         return False
     return True
 
@@ -711,7 +705,7 @@ def _canonical_scan_item_visible(
         if item.tier.value == "archive" and not include_archive:
             return False
         # Reuse the explicit history admission policy: it preserves dated or
-        # superseded ledger rows while retaining source, sensitivity, lock,
+        # superseded ledger rows while retaining source, sensitivity,
         # processing, and lifecycle access fences.
         row = memory_item_to_memorydb(item)
         visible = is_ledger_history_item(item, row) or _canonical_explicit_history_visible(
@@ -1116,8 +1110,7 @@ def search_canonical_memories(
             visible_memories = [
                 memory
                 for memory in memories
-                if not memory.is_locked
-                and memory.user_review is not False
+                if memory.user_review is not False
                 and not memory_use_suppressed(memory)
                 and temporal_view_allows_record(
                     memory,
@@ -1142,7 +1135,6 @@ def search_canonical_memories(
                         else memory.updated_at.isoformat()
                     ),
                     "visibility": memory.visibility,
-                    "is_locked": memory.is_locked,
                     **public_belief_overlay_json(memory, now=temporal_clock),
                 }
                 for memory in visible_memories[:capped_limit]
@@ -1163,7 +1155,6 @@ def search_canonical_memories(
                 "tier": memory.memory_tier.value if memory.memory_tier is not None else MemoryLayer.short_term.value,
                 "date": memory.updated_at.isoformat(),
                 "visibility": memory.visibility,
-                "is_locked": memory.is_locked,
                 **public_belief_overlay_json(memory, now=temporal_clock),
             }
             for memory in memories[:capped_limit]
@@ -1315,7 +1306,6 @@ def search_canonical_memories(
                 "tier": item.tier.value,
                 "date": item.updated_at.isoformat(),
                 "visibility": item.visibility,
-                "is_locked": bool((item.promotion or {}).get("is_locked", False)),
                 "ledger_schema_version": item.ledger_schema_version,
                 "kind": item.kind.value if item.ledger_schema_version else None,
                 "subject_scope": item.subject_scope.value if item.ledger_schema_version else None,
@@ -1479,8 +1469,6 @@ def _product_metadata_from_payload(data: Dict[str, Any]) -> Dict[str, Any]:
     tags = data.get("tags")
     if tags:
         metadata["tags"] = list(tags)
-    if "is_locked" in data:
-        metadata["is_locked"] = bool(data.get("is_locked"))
     raw_attribution = data.get("subject_attribution")
     attribution = (
         raw_attribution.value if isinstance(raw_attribution, SubjectAttribution) else str(raw_attribution or "")

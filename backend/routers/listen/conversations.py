@@ -484,9 +484,7 @@ class LiveConversationController:
                     if (
                         existing.get('source') == normalize_listen_source(request.source)
                         and existing.get('client_device_id') == self.host.client_device_context.client_device_id
-                        and not any(
-                            existing.get(key) for key in ('transcript_segments', 'photos', 'has_content', 'is_locked')
-                        )
+                        and not any(existing.get(key) for key in ('transcript_segments', 'photos', 'has_content'))
                     ):
                         await self.process_conversation(conversation_id)
                     await self.create_new_in_progress_conversation(rollover=True)
@@ -580,7 +578,6 @@ class LiveConversationController:
                 previous
                 and not previous.get('deleted')
                 and not previous.get('discarded')
-                and not previous.get('is_locked')
                 and self._active_speaker_scope() == carry_from[1]
             ):
                 carry = carried_receipt(previous, carry_from[1])
@@ -668,7 +665,7 @@ class LiveConversationController:
             await self.create_new_in_progress_conversation()
             return None
         if (
-            any(existing.get(key) for key in ('deleted', 'discarded', 'is_locked'))
+            any(existing.get(key) for key in ('deleted', 'discarded'))
             or existing.get('client_device_id') != self.host.client_device_context.client_device_id
         ):
             await self.create_new_in_progress_conversation()
@@ -703,7 +700,7 @@ class LiveConversationController:
             if (
                 not current
                 or current.get('status') != ConversationStatus.in_progress.value
-                or any(current.get(key) for key in ('deleted', 'discarded', 'is_locked'))
+                or any(current.get(key) for key in ('deleted', 'discarded'))
             ):
                 await self.create_new_in_progress_conversation(rollover=True)
                 return None

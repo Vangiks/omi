@@ -82,8 +82,6 @@ def read_summary_task_row(
     data = snapshot.to_dict() if snapshot.exists else None
     if not data or data.get('deleted'):
         raise SummaryTaskNotFoundError('Conversation not found')
-    if data.get('is_locked'):
-        raise SummaryTaskConflictError('Conversation is locked')
     structured = data.get('structured')
     items = structured.get('action_items') if isinstance(structured, dict) else None
     if not isinstance(items, list) or selected.action_item_index >= len(items):

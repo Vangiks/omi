@@ -725,9 +725,9 @@ class TestRetryPrimitives:
     def test_try_mark_once_first_and_second_call(self):
         sync_jobs, mock_redis = _load_sync_jobs()
         mock_redis.set.return_value = True
-        assert sync_jobs.try_mark_once('job-1', 'speech_ms') is True
+        assert sync_jobs.try_mark_once('job-1', 'usage') is True
         mock_redis.set.return_value = None
-        assert sync_jobs.try_mark_once('job-1', 'speech_ms') is False
+        assert sync_jobs.try_mark_once('job-1', 'usage') is False
 
     def test_try_mark_once_fails_open(self):
         """Metering guard prefers occasional double-count over never counting."""
@@ -759,7 +759,6 @@ def _valid_sync_task_payload(**overrides):
             'uid': 'uid-1',
             'raw_blob_paths': ['gs://bucket/job-1.opus'],
             'source': 'omi',
-            'should_lock': False,
             'lane': 'fresh',
         }
     )
@@ -1144,7 +1143,7 @@ def _load_sync_router_for_fast_path():
     from utils.stt import speaker_match as actual_speaker_match
     from utils.stt import speaker_identity as actual_speaker_identity
     from utils import manual_speaker_assignments as actual_manual_assignments
-    from utils.sync import lanes as actual_sync_lanes, rate_limit as actual_rl
+    from utils.sync import lanes as actual_sync_lanes
     from utils import capture_evidence as actual_capture_evidence
 
     saved_modules = {}
@@ -1195,14 +1194,11 @@ def _load_sync_router_for_fast_path():
         'utils.stt',
         'utils.stt.pre_recorded',
         'utils.stt.vad',
-        'utils.fair_use',
-        'utils.subscription',
         'utils.observability',
         'utils.observability.fallback',
         'utils.metrics',
         'utils.product_metrics',
         'utils.journey_metrics_contract',
-        'utils.sync.rate_limit',
         'utils.sync.lanes',
         'utils.sync.provenance',
         'utils.sync.capture_manifest',
@@ -1217,7 +1213,6 @@ def _load_sync_router_for_fast_path():
         'utils.sync.backfill_cutover',
         'utils.sync.content_id',
         'utils.speaker_assignment',
-        'utils.speaker_permissions',
         'utils.speaker_identification',
         'utils.speaker_learning_jobs',
         'utils.stt.speaker_embedding',
@@ -1261,7 +1256,6 @@ def _load_sync_router_for_fast_path():
         return executor.submit(ctx.run, fn, *args, **kwargs)
 
     mock_executors = MagicMock()
-    mock_executors.critical_executor = MagicMock()
     mock_executors.sync_executor = MagicMock()
     mock_executors.postprocess_executor = MagicMock()
     mock_executors.storage_executor = MagicMock()
@@ -1289,21 +1283,12 @@ def _load_sync_router_for_fast_path():
     mock_sync_jobs.try_acquire_job_run_lock = MagicMock(return_value='legacy-lock-token')
     sys.modules['database.sync_jobs'] = mock_sync_jobs
 
-    sys.modules['utils.fair_use'].is_hard_restricted = MagicMock(return_value=False)
-    sys.modules['utils.fair_use'].get_hard_restriction_status = MagicMock(return_value=(False, None))
-    sys.modules['utils.fair_use'].is_daily_audio_ceiling_exceeded = MagicMock(return_value=False)
-    sys.modules['utils.fair_use'].is_dg_budget_exhausted = MagicMock(return_value=False)
-    sys.modules['utils.fair_use'].get_enforcement_stage = MagicMock(return_value='off')
-    sys.modules['utils.fair_use'].FAIR_USE_ENABLED = False
-    sys.modules['utils.fair_use'].FAIR_USE_RESTRICT_DAILY_DG_MS = 0
-    sys.modules['utils.subscription'].has_transcription_credits = MagicMock(return_value=True)
     sys.modules['utils.request_validation'].parse_sync_filename_timestamp = MagicMock(return_value=time.time())
     saved_modules['utils.sync'] = prior_utils_sync
     sync_pkg = types.ModuleType('utils.sync')
     sync_pkg.__path__ = [os.path.join(BACKEND_DIR, 'utils', 'sync')]
     sys.modules['utils.sync'] = sync_pkg
     sys.modules['utils.sync'].files = sys.modules['utils.sync.files']
-    sys.modules['utils.sync.rate_limit'].retry_after_until_next_utc_day = actual_rl.retry_after_until_next_utc_day
     sys.modules['utils.sync'].playback = sys.modules['utils.sync.playback']
     sys.modules['utils.sync.playback'].build_playback_artifact = MagicMock(return_value=b'')
     sys.modules['utils.sync.playback'].PlaybackBuildError = type('PlaybackBuildError', (Exception,), {})
@@ -1791,6 +1776,44 @@ def test_polling_active_terminal_retries_claim_cleanup_before_exposing_result():
             ]
         )
         module.delete_sync_job_run_lock_epoch.assert_called_once_with('job-1')
+    finally:
+        sys.modules.pop('routers.sync', None)
+        sys.modules.pop('utils.sync.pipeline', None)
+        for mod_name, original in saved_modules.items():
+            if original is None:
+                sys.modules.pop(mod_name, None)
+            else:
+                sys.modules[mod_name] = original
+
+
+@pytest.mark.asyncio
+async def test_queued_task_with_legacy_should_lock_field_runs_and_ignores_it():
+    """Tasks enqueued before #31 still carry should_lock; the worker runs them unlocked."""
+
+    module, saved_modules, _, _, _, _ = _load_sync_router_for_fast_path()
+    request = _configure_task_handler(
+        module,
+        pipeline_error=None,
+        latest_job={'job_id': 'job-1', 'status': 'completed'},
+    )
+    legacy_payload = {**request.json.return_value, 'should_lock': True}
+    request.json = AsyncMock(return_value=legacy_payload)
+
+    try:
+        response = await module.run_sync_job(request, task_retry_count=0)
+
+        assert response.status_code == 200
+        module._run_full_pipeline_background_async.assert_awaited_once()
+        call = module._run_full_pipeline_background_async.await_args
+        assert call.args[:5] == (
+            'job-1',
+            'test-uid',
+            ['staged/audio.opus'],
+            module.ConversationSource('omi'),
+            'syncing/test-uid/job-1',
+        )
+        assert True not in call.args
+        assert 'should_lock' not in call.kwargs
     finally:
         sys.modules.pop('routers.sync', None)
         sys.modules.pop('utils.sync.pipeline', None)
@@ -2563,60 +2586,11 @@ async def test_sync_post_enqueue_cleanup_does_not_unstage(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_fresh_admission_daily_ceiling_prevents_staging_or_dispatch():
-    """A fresh V2 upload over the hard ceiling must leave its WAL audio untouched."""
+async def test_backfill_admission_does_not_consume_retired_backfill_slot():
+    """Historical recovery bypasses the retired Redis slot with the kill switch off."""
     from starlette.datastructures import UploadFile
 
     module, saved_modules, mock_sync_jobs, BytesIO, _, _ = _load_sync_router_for_fast_path()
-    module.is_daily_audio_ceiling_exceeded = MagicMock(return_value=True)
-    module._fair_use_restriction_response = AsyncMock(
-        return_value=module.JSONResponse(status_code=429, content={'code': 'fair_use_restricted'})
-    )
-    module.start_background_task = MagicMock()
-    module.classify_sync_lane = MagicMock(
-        return_value=types.SimpleNamespace(
-            lane=module.SyncLane.FRESH,
-            trust=types.SimpleNamespace(value='device_bound'),
-            reason='recent_capture',
-            maximum_age_seconds=60,
-            automatic_recovery_allowed=True,
-        )
-    )
-
-    try:
-        upload = UploadFile(filename='test.opus', file=BytesIO(b'\x00' * 10))
-        response = await module.sync_local_files_v2(files=[upload], uid='test-uid')
-
-        assert response.status_code == 429
-        assert json.loads(response.body) == {'code': 'fair_use_restricted'}
-        module.is_daily_audio_ceiling_exceeded.assert_called_once_with('test-uid')
-        module._fair_use_restriction_response.assert_awaited_once()
-        restriction_kwargs = module._fair_use_restriction_response.await_args.kwargs
-        assert restriction_kwargs['uid'] == 'test-uid'
-        assert restriction_kwargs['retry_after'] > 0
-        module._retrieve_file_paths_v2.assert_not_called()
-        mock_sync_jobs.create_sync_job.assert_not_called()
-        module.claim_sync_content.assert_not_called()
-        module.enqueue_sync_job.assert_not_called()
-        module.start_background_task.assert_not_called()
-        module.has_transcription_credits.assert_not_called()
-    finally:
-        sys.modules.pop('routers.sync', None)
-        sys.modules.pop('utils.sync.pipeline', None)
-        for mod_name, orig in saved_modules.items():
-            if orig is None:
-                sys.modules.pop(mod_name, None)
-            else:
-                sys.modules[mod_name] = orig
-
-
-@pytest.mark.asyncio
-async def test_backfill_admission_does_not_consume_fresh_daily_ceiling():
-    """Historical recovery bypasses fresh ceiling and retired Redis slot with the kill switch off."""
-    from starlette.datastructures import UploadFile
-
-    module, saved_modules, mock_sync_jobs, BytesIO, _, _ = _load_sync_router_for_fast_path()
-    module.is_daily_audio_ceiling_exceeded = MagicMock(return_value=True)
     module.try_acquire_backfill_slot = MagicMock(side_effect=ConnectionError('retired slot unavailable'))
     module.start_background_task = MagicMock()
     module.classify_sync_lane = MagicMock(
@@ -2634,7 +2608,6 @@ async def test_backfill_admission_does_not_consume_fresh_daily_ceiling():
         response = await module.sync_local_files_v2(files=[upload], uid='test-uid')
 
         assert response.status_code == 202
-        module.is_daily_audio_ceiling_exceeded.assert_not_called()
         module.try_acquire_backfill_slot.assert_not_called()
         mock_sync_jobs.create_sync_job.assert_called_once()
     finally:
@@ -2698,6 +2671,28 @@ async def test_sync_dispatch_carries_device_provenance_into_cloud_task(monkeypat
         payload = module.enqueue_sync_job.call_args.args[0]
         assert payload['client_device_id'] == 'ios_a1b2c3d4'
         assert payload['client_platform'] == 'ios'
+    finally:
+        sys.modules.pop('routers.sync', None)
+        for mod_name, orig in saved_modules.items():
+            if orig is None:
+                sys.modules.pop(mod_name, None)
+            else:
+                sys.modules[mod_name] = orig
+
+
+@pytest.mark.asyncio
+async def test_sync_dispatch_never_locks_conversations():
+    from starlette.datastructures import UploadFile
+
+    module, saved_modules, _, BytesIO, _, _ = _load_sync_router_for_fast_path()
+    module.start_background_task = MagicMock()
+
+    try:
+        upload = UploadFile(filename='test.opus', file=BytesIO(b'\x00' * 10))
+        response = await module.sync_local_files_v2(files=[upload], uid='test-uid')
+
+        assert response.status_code == 202
+        assert 'should_lock' not in module.enqueue_sync_job.call_args.args[0]
     finally:
         sys.modules.pop('routers.sync', None)
         for mod_name, orig in saved_modules.items():
@@ -3462,10 +3457,10 @@ async def test_legacy_fresh_budget_decides_persisted_and_dispatched_lane(monkeyp
 
 
 @pytest.mark.parametrize(
-    'reply,gate,expected',
-    [(1, None, 'fresh'), (0, None, 'backfill'), (1, 'hard_restriction', 'backfill'), (1, 'daily_ceiling', 'backfill')],
+    'reply,expected',
+    [(1, 'fresh'), (0, 'backfill')],
 )
-def test_legacy_fresh_http_multipart_measures_bytes_and_returns_lane(monkeypatch, reply, gate, expected):
+def test_legacy_fresh_http_multipart_measures_bytes_and_returns_lane(monkeypatch, reply, expected):
     """HTTP multipart -> actual handler -> persisted task, with synthetic storage/auth."""
     from fastapi import FastAPI, File, UploadFile
     from fastapi.testclient import TestClient
@@ -3482,9 +3477,6 @@ def test_legacy_fresh_http_multipart_measures_bytes_and_returns_lane(monkeypatch
     module.legacy_fresh = legacy_fresh
     module.classify_sync_lane = lanes.classify_sync_lane
     module.verify_capture_manifest = MagicMock(return_value=None)
-    module.get_hard_restriction_status = MagicMock(return_value=(gate == 'hard_restriction', 600))
-    module.is_daily_audio_ceiling_exceeded = MagicMock(return_value=gate == 'daily_ceiling')
-    module._fair_use_restriction_response = AsyncMock()
     try:
         # Restore the real multipart parser at the transport boundary; all other
         # test seams remain synthetic. This verifies UploadFile.size provenance.
@@ -3503,123 +3495,6 @@ def test_legacy_fresh_http_multipart_measures_bytes_and_returns_lane(monkeypatch
         assert response.json()['lane'] == expected
         assert module.enqueue_sync_job.call_args.args[0]['lane'] == expected
         assert redis.eval.call_args.args[-1] == 1
-        module._fair_use_restriction_response.assert_not_awaited()
-    finally:
-        sys.modules.pop('routers.sync', None)
-        sys.modules.pop('utils.sync.pipeline', None)
-        for mod_name, orig in saved_modules.items():
-            if orig is None:
-                sys.modules.pop(mod_name, None)
-            else:
-                sys.modules[mod_name] = orig
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize('trust', ['legacy', 'device_bound'])
-@pytest.mark.parametrize('gate', ['hard_restriction', 'daily_ceiling'])
-async def test_fresh_only_refusal_demotes_legacy_but_keeps_device_bound_429(monkeypatch, trust, gate):
-    """Optional LEGACY promotion must never turn backfill acceptance into 429."""
-    from starlette.datastructures import UploadFile
-    from utils.sync import lanes, legacy_fresh
-
-    monkeypatch.setenv('OMI_ENV_STAGE', 'prod')
-    monkeypatch.setenv('SYNC_LEGACY_FRESH_ENABLED', 'true')
-    monkeypatch.setenv('SYNC_LEGACY_FRESH_PERCENT', '100')
-    monkeypatch.setenv('SYNC_BACKFILL_ENABLED', 'true')
-    monkeypatch.setattr(lanes, 'parse_sync_filename_timestamp', lambda _: time.time() - 60)
-    redis = MagicMock()
-    redis.eval.return_value = 1
-    monkeypatch.setattr(legacy_fresh, 'redis_client', redis)
-    module, saved_modules, _, BytesIO, _, _ = _load_sync_router_for_fast_path()
-    module.legacy_fresh = legacy_fresh
-    module.classify_sync_lane = lanes.classify_sync_lane
-    module.verify_capture_manifest = MagicMock(return_value=None if trust == 'legacy' else {})
-    module.get_hard_restriction_status = MagicMock(return_value=(gate == 'hard_restriction', 600))
-    module.is_daily_audio_ceiling_exceeded = MagicMock(return_value=gate == 'daily_ceiling')
-    module._fair_use_restriction_response = AsyncMock(
-        return_value=module.JSONResponse(status_code=429, content={'code': 'fair_use_restricted'})
-    )
-    module.OMI_SYNC_LANE_ADMISSIONS_TOTAL = MagicMock()
-    module.logger = MagicMock()
-    module.start_background_task = MagicMock()
-    try:
-        upload = UploadFile(filename='recent.bin', file=BytesIO(b'abc'), size=3)
-        response = await module.sync_local_files_v2(files=[upload], uid='test-uid')
-        if trust == 'legacy':
-            assert response.status_code == 202
-            assert json.loads(response.body)['lane'] == 'backfill'
-            assert module.create_sync_job.call_args.kwargs['lane'] == 'backfill'
-            assert module.create_sync_job.call_args.kwargs['capture_time_trust'] == 'legacy'
-            payload = module.enqueue_sync_job.call_args.args[0]
-            assert payload['lane'] == 'backfill'
-            assert payload['capture_time_trust'] == 'legacy'
-            module._retrieve_file_paths_v2.assert_called_once()
-            module._fair_use_restriction_response.assert_not_awaited()
-            reason = 'legacy_fresh_hard_restricted' if gate == 'hard_restriction' else 'legacy_fresh_daily_ceiling'
-            module.OMI_SYNC_LANE_ADMISSIONS_TOTAL.labels.assert_called_once_with(
-                lane='backfill', trust='legacy', reason=reason
-            )
-            admission_log = next(
-                c for c in module.logger.info.call_args_list if c.args[0].startswith('sync_lane_admission')
-            )
-            assert admission_log.args[-1] == reason
-        else:
-            assert response.status_code == 429
-            assert json.loads(response.body) == {'code': 'fair_use_restricted'}
-            module._fair_use_restriction_response.assert_awaited_once()
-            retry = module._fair_use_restriction_response.await_args.kwargs['retry_after']
-            assert retry == 600 if gate == 'hard_restriction' else retry > 0
-            module._retrieve_file_paths_v2.assert_not_called()
-            module.create_sync_job.assert_not_called()
-            module.enqueue_sync_job.assert_not_called()
-            redis.eval.assert_not_called()
-            module.OMI_SYNC_LANE_ADMISSIONS_TOTAL.labels.assert_called_once_with(
-                lane='fresh', trust='device_bound', reason='recent_capture'
-            )
-        if gate == 'hard_restriction':
-            module.is_daily_audio_ceiling_exceeded.assert_not_called()
-        else:
-            module.is_daily_audio_ceiling_exceeded.assert_called_once_with('test-uid')
-        module.start_background_task.assert_not_called()
-    finally:
-        sys.modules.pop('routers.sync', None)
-        sys.modules.pop('utils.sync.pipeline', None)
-        for mod_name, orig in saved_modules.items():
-            if orig is None:
-                sys.modules.pop(mod_name, None)
-            else:
-                sys.modules[mod_name] = orig
-
-
-@pytest.mark.asyncio
-async def test_legacy_fresh_refusal_preserves_backfill_pause_instead_of_429(monkeypatch):
-    from starlette.datastructures import UploadFile
-    from utils.sync import lanes, legacy_fresh
-
-    monkeypatch.setenv('OMI_ENV_STAGE', 'prod')
-    monkeypatch.setenv('SYNC_LEGACY_FRESH_ENABLED', 'true')
-    monkeypatch.setenv('SYNC_LEGACY_FRESH_PERCENT', '100')
-    monkeypatch.setenv('SYNC_BACKFILL_ENABLED', 'false')
-    monkeypatch.setattr(lanes, 'parse_sync_filename_timestamp', lambda _: time.time() - 60)
-    redis = MagicMock()
-    redis.eval.return_value = 1
-    monkeypatch.setattr(legacy_fresh, 'redis_client', redis)
-    module, saved_modules, _, BytesIO, _, _ = _load_sync_router_for_fast_path()
-    module.legacy_fresh = legacy_fresh
-    module.classify_sync_lane = lanes.classify_sync_lane
-    module.verify_capture_manifest = MagicMock(return_value=None)
-    module.get_hard_restriction_status = MagicMock(return_value=(True, 600))
-    module._fair_use_restriction_response = AsyncMock()
-    try:
-        response = await module.sync_local_files_v2(
-            files=[UploadFile(filename='recent.bin', file=BytesIO(b'abc'), size=3)], uid='test-uid'
-        )
-        assert response.status_code == 503
-        assert json.loads(response.body)['code'] == 'backfill_capacity'
-        module._fair_use_restriction_response.assert_not_awaited()
-        module._retrieve_file_paths_v2.assert_not_called()
-        module.create_sync_job.assert_not_called()
-        module.enqueue_sync_job.assert_not_called()
     finally:
         sys.modules.pop('routers.sync', None)
         sys.modules.pop('utils.sync.pipeline', None)

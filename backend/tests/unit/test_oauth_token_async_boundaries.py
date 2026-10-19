@@ -32,7 +32,6 @@ class _App:
         self.capabilities = []
         self.private = False
         self.uid = None
-        self.is_paid = False
         self.external_integration = SimpleNamespace(
             app_home_url='https://app.test/complete',
             setup_completed_url=None,
@@ -63,7 +62,6 @@ def _loaded_oauth_router() -> Iterator[tuple[ModuleType, ModuleType, ModuleType]
     apps = _module(
         'utils.apps',
         is_user_app_enabled=lambda _uid, _app_id: True,
-        get_is_user_paid_app=lambda _app_id, _uid: True,
         is_tester=lambda _uid: False,
     )
     app_model = _module(

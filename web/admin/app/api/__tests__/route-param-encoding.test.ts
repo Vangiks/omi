@@ -8,7 +8,6 @@ const mocks = vi.hoisted(() => {
     docIds: [] as string[],
     fetchUrls: [] as string[],
     revokeTvLink: vi.fn(),
-    invalidateEnforcementCache: vi.fn(),
     getUser: vi.fn(),
   };
 });
@@ -38,17 +37,8 @@ vi.mock('@/lib/firebase/admin', () => ({
   getDb: () => ({ collection: vi.fn(() => makeFirestoreNode()) }),
   getAdminAuth: () => ({ getUser: mocks.getUser }),
 }));
-vi.mock('@/lib/stripe', () => ({ getStripe: vi.fn() }));
-vi.mock('@/lib/utils/user-subscription', () => ({
-  updateUserSubscriptionDetails: vi.fn(),
-}));
-vi.mock('@/lib/redis', () => ({
-  invalidateEnforcementCache: mocks.invalidateEnforcementCache,
-}));
 vi.mock('@/lib/tv-links', () => ({ revokeTvLink: mocks.revokeTvLink }));
 
-import { GET as fairUseGET } from '../omi/fair-use/user/[uid]/route';
-import { POST as resolveEventPOST } from '../omi/fair-use/user/[uid]/resolve-event/[eventId]/route';
 import {
   DELETE as promptDELETE,
   PATCH as promptPATCH,
@@ -79,27 +69,6 @@ describe('admin API routes reject decoded ids that split Firestore paths', () =>
         return new Response('{}', { status: 200 });
       }),
     );
-  });
-
-  it('fair-use user GET rejects a uid containing a slash', async () => {
-    const res = await fairUseGET(fakeRequest, paramsOf({ uid: 'a/b' }));
-    expect(res.status).toBe(400);
-    expect(mocks.docIds).toEqual([]);
-  });
-
-  it('fair-use user GET accepts uids with non-slash special characters', async () => {
-    // Firebase custom-auth uids may contain ':' or '@'; the stored doc id must
-    // match the raw uid, so these must reach doc() unmodified.
-    const res = await fairUseGET(fakeRequest, paramsOf({ uid: 'google:abc@x' }));
-    expect(res.status).toBe(200);
-    expect(mocks.docIds).toContain('google:abc@x');
-  });
-
-  it('fair-use resolve-event rejects a slash in either param', async () => {
-    const req = { json: vi.fn(), url: 'https://admin.test/x?notes=n' } as never;
-    const res = await resolveEventPOST(req, paramsOf({ uid: 'u/1', eventId: 'e/2' }));
-    expect(res.status).toBe(400);
-    expect(mocks.docIds).toEqual([]);
   });
 
   it('desktop-prompts DELETE rejects a slash-bearing prompt id', async () => {
