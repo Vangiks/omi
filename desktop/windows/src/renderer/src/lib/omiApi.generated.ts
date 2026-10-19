@@ -3711,7 +3711,6 @@ export interface PlanIdentitySubscription {
   limits?: PlanLimits;
   plan?: PlanType;
   status?: SubscriptionStatus;
-  stripe_subscription_id?: string | null;
 }
 
 export interface PlanIdentityUserSubscriptionResponse {
@@ -4852,7 +4851,6 @@ export interface Subscription {
   limits?: PlanLimits;
   plan?: PlanType;
   status?: SubscriptionStatus;
-  stripe_subscription_id?: string | null;
 }
 
 export interface SubscriptionPlan {

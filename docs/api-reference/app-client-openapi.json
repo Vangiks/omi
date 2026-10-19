@@ -23130,17 +23130,6 @@
           "status": {
             "$ref": "#/components/schemas/SubscriptionStatus",
             "default": "active"
-          },
-          "stripe_subscription_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Stripe Subscription Id"
           }
         },
         "title": "PlanIdentitySubscription",
@@ -29712,17 +29701,6 @@
           "status": {
             "$ref": "#/components/schemas/SubscriptionStatus",
             "default": "active"
-          },
-          "stripe_subscription_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Stripe Subscription Id"
           }
         },
         "title": "Subscription",
