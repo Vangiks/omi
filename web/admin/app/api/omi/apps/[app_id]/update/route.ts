@@ -59,20 +59,12 @@ export async function POST(req: NextRequest, props: { params: Promise<{ app_id: 
           case 'chat_prompt':
           case 'persona_prompt':
           case 'category':
-          case 'payment_plan':
-          case 'payment_product_id':
-          case 'payment_price_id':
-          case 'payment_link_id':
-          case 'payment_link':
           case 'author':
             data[key] = value;
             return;
           case 'image_url':
             // If a direct URL was provided, map to image field (will be overridden by file if present)
             data['image'] = value;
-            return;
-          case 'price':
-            data['price'] = value === '' ? undefined : Number(value);
             return;
           case 'private':
           case 'enabled':

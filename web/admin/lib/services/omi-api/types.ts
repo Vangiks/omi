@@ -33,12 +33,6 @@ export type OmiAppCapability =
 export type OmiAppStatus = 'approved' | 'pending' | 'rejected' | 'under-review' | (string & {});
 
 /**
- * App payment plan. The backend `App.payment_plan` is typed as `string`;
- * this union narrows to the known values the admin UI renders.
- */
-export type OmiPaymentPlan = 'free' | 'one-time' | 'monthly' | 'yearly' | (string & {});
-
-/**
  * Request-body builder for create/update app. Client-side shape derived from
  * the generated `App` response schema; the backend accepts a subset of fields.
  */
@@ -56,11 +50,6 @@ export type OmiAppInput = Partial<
     | 'deleted'
     | 'installs'
     | 'created_at'
-    | 'payment_product_id'
-    | 'payment_price_id'
-    | 'payment_link_id'
-    | 'payment_link'
-    | 'is_user_paid'
     | 'thumbnail_urls'
     | 'is_popular'
     | 'is_influencer'
