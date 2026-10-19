@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from config.rate_card_versions import RATE_CARD_SHA256
-from config.plan_catalog_generated import ENTITLEMENT_VERSIONS
 from config.stt_provider_policy import DEEPGRAM_CLOUD_PROVIDER, provider_for_model_token
 
 EXCLUDED_FUNDING = frozenset({'byok', 'custom', 'on_device'})
@@ -216,10 +215,6 @@ def standard_chat_units() -> Decimal:
         {**standard, 'payer': 'omi', 'configured_model': standard['model'], 'usage_status': 'confirmed'}
     )
     return Decimal(priced['micro_units']) / 1_000_000
-
-
-def free_budget_units() -> int:
-    return _mix_budget_units(ENTITLEMENT_VERSIONS['ladder_v1']['monthly_budgets']['basic'])
 
 
 def budget_units(entitlements: Mapping[str, Any]) -> int | None:

@@ -181,8 +181,8 @@ def test_record_writes_one_immutable_row_with_the_tier_snapshot(ledger_client) -
 
     rows = ledger_client.spend_rows(uid=UID, feature='desktop_proactivity')
     assert len(rows) == 1
-    assert rows[0]['subscription_tier'] == 'architect'
-    assert rows[0]['plan_id'] == 'architect'
+    assert rows[0]['subscription_tier'] == 'default'
+    assert rows[0]['plan_id'] == 'default'
     assert rows[0]['caller'] == 'desktop_proxy'
 
 

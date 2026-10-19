@@ -19,9 +19,8 @@ from typing import Any
 from google.api_core.exceptions import AlreadyExists
 from google.cloud import firestore
 
-from config.plan_catalog import FULL_ACCESS_PLAN
 from database._client import get_firestore_client
-from database.llm_usage import resolve_usage_plan_id
+from database.llm_usage import USAGE_PLAN_ID, resolve_usage_plan_id
 from database.usage_units import gateway_shadow
 
 ATTEMPTS_COLLECTION = 'llm_gateway_attempts'
@@ -77,7 +76,7 @@ def record_llm_gateway_attempt(
 def _subscription_tier(client: Any, uid: object) -> str:
     if not isinstance(uid, str) or not uid:
         return 'unattributed'
-    return FULL_ACCESS_PLAN.value
+    return USAGE_PLAN_ID
 
 
 def _required_string(event: Mapping[str, Any], key: str) -> str:

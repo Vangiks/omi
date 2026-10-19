@@ -239,10 +239,10 @@ def test_hub_telemetry_lands_on_the_question_transactions_own_day_and_plan(store
 
     monkeypatch.setattr(llm_usage_db, 'usage_bucket_update', spy)
     _hub_report(turn_id='turn-1')
-    assert seen == [('architect', '2026-09-02')]
+    assert seen == [('default', '2026-09-02')]
     day = store.rows[('users', UID, 'llm_usage', '2026-09-02')]
-    assert day['plan_usage']['architect']['desktop_chat']['input_tokens'] == 10
-    assert day['plan_usage']['architect']['backend_chat']['quota_questions'] == 1
+    assert day['plan_usage']['default']['desktop_chat']['input_tokens'] == 10
+    assert day['plan_usage']['default']['backend_chat']['quota_questions'] == 1
 
 
 def test_a_hub_report_that_fails_to_commit_records_neither_question_nor_cost_and_retries_cleanly(store) -> None:

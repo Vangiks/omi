@@ -74,17 +74,14 @@ class _FakeCollection:
 
 
 class _FakeUserRef:
-    def __init__(self, collection, subscription_plan=None):
+    def __init__(self, collection):
         self._collection = collection
-        self._subscription_plan = subscription_plan
 
     def collection(self, name):
         return self._collection
 
     def get(self, *_args):
-        if self._subscription_plan is None:
-            return _FakeDocSnapshot({}, exists=False)
-        return _FakeDocSnapshot({'subscription': {'plan': self._subscription_plan}})
+        return _FakeDocSnapshot({}, exists=False)
 
 
 def test_record_llm_usage_sanitizes_model_with_dots():
@@ -116,10 +113,10 @@ def test_record_llm_usage_sanitizes_model_with_dots():
     assert set(call["data"]["chat"]["gpt-4_1-mini"]) >= {"input_tokens", "output_tokens"}
 
 
-def test_bucket_attribution_maps_legacy_pro_and_omits_unmeasured_cost():
+def test_bucket_attribution_uses_default_label_and_omits_unmeasured_cost():
     doc_ref = _FakeDocRef()
     collection = _FakeCollection(doc_ref)
-    user_ref = _FakeUserRef(collection, subscription_plan='pro')
+    user_ref = _FakeUserRef(collection)
 
     with patch.object(llm_usage, 'db') as patched_db:
         patched_db.collection.return_value.document.return_value = user_ref
@@ -128,16 +125,16 @@ def test_bucket_attribution_maps_legacy_pro_and_omits_unmeasured_cost():
     data = doc_ref.set_calls[0]['data']
     assert 'cost_usd' not in data.get('desktop_chat', {})
     assert 'cost_usd' not in data.get('desktop_chat_omi', {})
-    architect = data['plan_usage']['architect']
-    assert architect['desktop_chat']['input_tokens'] == 10
-    assert architect['desktop_chat']['output_tokens'] == 5
-    assert architect['_metadata']['cost_status_counts']['missing'] == 1
+    default = data['plan_usage']['default']
+    assert default['desktop_chat']['input_tokens'] == 10
+    assert default['desktop_chat']['output_tokens'] == 5
+    assert default['_metadata']['cost_status_counts']['missing'] == 1
 
 
-def test_bucket_complete_cost_is_joinable_to_catalog_plan():
+def test_bucket_complete_cost_lands_under_default_label():
     doc_ref = _FakeDocRef()
     collection = _FakeCollection(doc_ref)
-    user_ref = _FakeUserRef(collection, subscription_plan='operator')
+    user_ref = _FakeUserRef(collection)
 
     with patch.object(llm_usage, 'db') as patched_db:
         patched_db.collection.return_value.document.return_value = user_ref
@@ -151,9 +148,9 @@ def test_bucket_complete_cost_is_joinable_to_catalog_plan():
 
     data = doc_ref.set_calls[0]['data']
     assert data['desktop_chat']['cost_usd'] == 0.25
-    operator = data['plan_usage']['operator']
-    assert operator['desktop_chat']['cost_usd'] == 0.25
-    assert operator['_metadata']['cost_status_counts']['complete'] == 1
+    default = data['plan_usage']['default']
+    assert default['desktop_chat']['cost_usd'] == 0.25
+    assert default['_metadata']['cost_status_counts']['complete'] == 1
 
 
 def test_record_llm_usage_sanitizes_model_with_slash():

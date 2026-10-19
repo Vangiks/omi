@@ -1,11 +1,9 @@
 """A user with no subscription record gets full access (#11).
 
-The fork has no billing: usage accounting attributes every user to the full-access plan.
+The fork has no billing: usage accounting writes one constant label for every user (#55).
 """
 
 from unittest.mock import MagicMock
-
-from config.plan_catalog import FULL_ACCESS_PLAN
 
 
 def _client_without_user_doc() -> MagicMock:
@@ -14,11 +12,12 @@ def _client_without_user_doc() -> MagicMock:
     return client
 
 
-def test_usage_accounting_attributes_full_access_plan():
+def test_usage_accounting_writes_constant_label():
     from database.llm_gateway_accounting import _subscription_tier
-    from database.llm_usage import resolve_usage_plan_id
+    from database.llm_usage import USAGE_PLAN_ID, resolve_usage_plan_id
 
     client = _client_without_user_doc()
 
-    assert resolve_usage_plan_id('local-dev-user', firestore_client=client) == FULL_ACCESS_PLAN.value
-    assert _subscription_tier(client, 'local-dev-user') == FULL_ACCESS_PLAN.value
+    assert USAGE_PLAN_ID == 'default'
+    assert resolve_usage_plan_id('local-dev-user', firestore_client=client) == 'default'
+    assert _subscription_tier(client, 'local-dev-user') == 'default'

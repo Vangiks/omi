@@ -11,7 +11,6 @@ from typing import Any, Callable, Dict, List, Optional, cast
 
 from google.cloud import firestore
 
-from config.plan_catalog import FULL_ACCESS_PLAN
 from ._client import db
 
 transactional = getattr(firestore, 'transactional', lambda fn: fn)  # pyright: ignore[reportUnknownMemberType]
@@ -27,12 +26,14 @@ def _typed_doc(doc: Any) -> Dict[str, Any]:
 
 
 _UNATTRIBUTED_PLAN = '_unattributed'
+# The fork has no plans (#3): every usage event carries this one label.
+USAGE_PLAN_ID = 'default'
 _COST_STATUSES = {'complete', 'partial', 'missing', 'excluded'}
 
 
 def resolve_usage_plan_id(uid: str, *, firestore_client: Any | None = None) -> str | None:
-    """The catalog plan for a usage event: full access for every user (#3), ``None`` without a uid."""
-    return FULL_ACCESS_PLAN.value if uid else None
+    """The usage label for an event: ``USAGE_PLAN_ID`` for every user, ``None`` without a uid."""
+    return USAGE_PLAN_ID if uid else None
 
 
 def _plan_key(uid: str, firestore_client: Any | None) -> str:
