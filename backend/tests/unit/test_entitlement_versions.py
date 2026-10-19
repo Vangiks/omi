@@ -1,13 +1,7 @@
-"""Golden captured through main's runtime resolver before any W3 changes.
+"""Entitlement versions resolved by the plan catalog."""
 
-Baseline: b8076bab847fa35f3924ca456b88216cae851e9f. The generation
-ran through backend/test.sh; snapshot.py is the capture procedure.
-"""
-
-import json
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
-from pathlib import Path
 
 import pytest
 
@@ -17,31 +11,8 @@ from config.plan_catalog import (
     resolve_price_entitlements,
     resolve_subscription_entitlements,
 )
-from config.plan_catalog import RECOGNIZED_STRIPE_PRICE_PLAN_TYPES
 from config.plan_catalog_generated import LADDER_V1_STRIPE_PRICES
 from scripts.generate_plan_catalog import load_catalog, validate_catalog, validate_compatibility
-from tests.unit.fixtures.entitlements.snapshot import legacy_snapshot
-
-GOLDEN = Path(__file__).parent / 'fixtures/entitlements/main_b8076bab847.json'
-
-
-@pytest.fixture(scope="module")
-def captured_legacy():
-    # Import the heavy subscription graph in setup, as test_subscription_restructure does.
-    return legacy_snapshot()
-
-
-def test_all_main_legacy_price_entitlements_are_byte_identical(captured_legacy):
-    captured = captured_legacy
-    assert json.dumps(captured, sort_keys=True, separators=(',', ':')) + '\n' == GOLDEN.read_text()
-    expected = json.loads(GOLDEN.read_text())
-    assert set(expected) == set(RECOGNIZED_STRIPE_PRICE_PLAN_TYPES)
-    for price, snapshot in expected.items():
-        resolved = resolve_price_entitlements(price, {})
-        assert resolved['entitlement_version'] == 'legacy'
-        assert resolved['budget'] is None
-        assert resolved['policy'] == snapshot['definition']
-
 
 def _period(days: int) -> float:
     return (datetime.now(timezone.utc) + timedelta(days=days)).timestamp()

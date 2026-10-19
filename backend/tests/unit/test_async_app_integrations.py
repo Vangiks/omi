@@ -57,7 +57,6 @@ _utils_stubs = [
     "utils.mentor_notifications",
     "utils.log_sanitizer",
     "utils.http_client",
-    "utils.subscription",
     "utils.executors",
 ]
 _RESTORED_MODULES = tuple(_database_stubs + _utils_stubs + ["utils.app_integrations"])

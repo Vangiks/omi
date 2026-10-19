@@ -167,9 +167,6 @@ def _build_fakes() -> dict[str, ModuleType]:
         lambda segments: (None, None)
     )
 
-    subscription = add('utils.subscription', AutoMockModule('utils.subscription'))
-    subscription.request_has_llm_byok_key = MagicMock(return_value=False)
-
     byok = ModuleType('utils.byok')
     byok.get_byok_key = lambda _provider: None
     byok.has_validated_byok_keys = lambda: False

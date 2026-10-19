@@ -107,7 +107,6 @@ _stubs = [
     'utils.other.storage',
     'utils.stt.pre_recorded',
     'utils.stt.vad',
-    'utils.subscription',
     'utils.conversations.process_conversation',
     'utils.conversations.location',
     'utils.notifications',

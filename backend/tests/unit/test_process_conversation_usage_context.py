@@ -266,8 +266,6 @@ def _build_fakes() -> dict[str, ModuleType]:
     subjects = add("utils.conversations.subjects", AutoMockModule("utils.conversations.subjects"))
     subjects.infer_subject_from_segments = lambda segments: (None, None)
 
-    add("utils.subscription", AutoMockModule("utils.subscription"))
-
     executors = add("utils.executors", AutoMockModule("utils.executors"))
     executors.db_executor = MagicMock()
     executors.llm_executor = MagicMock()

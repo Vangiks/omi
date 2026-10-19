@@ -22,12 +22,10 @@ from database import (
     llm_usage as llm_usage_db,
     users as users_db,
 )
-from database._client import get_customer_firestore_client
 from database.sync_jobs import release_job_run_lock, try_acquire_job_run_lock
 from services.users.data_export import iter_user_data_export, iter_user_data_export_streaming
 from services.users.data_export_response import DataExportStreamingResponse
 from services.users.account_deletion import run_deletion_wipe_with_lease, start_account_deletion
-from database.app_review_config import should_hide_subscription_ui
 from database.webhook_health import record_dev_webhook_success
 from database.conversation_scan import conversation_scan_budget, people_stats_scan
 from database.conversations import get_in_progress_conversation, get_conversation
@@ -61,7 +59,6 @@ from models.users import AvailableLanguage, AvailableLanguagesResponse
 from utils.user_language import PRIMARY_LANGUAGE_OPTIONS, normalize_user_language
 from utils.feedback import record_chat_message_feedback
 from utils.product_metrics import sanitize_app_build
-from utils.marketplace_reviewers import is_marketplace_reviewer
 from database.users import *
 from models.conversation import Conversation
 from models.geolocation import Geolocation, GeolocationInput, validated_geolocation_or_none
@@ -72,39 +69,12 @@ from models.user_usage import UserUsageResponse, UsagePeriod
 from datetime import datetime, time, timedelta
 
 from models.users import (
-    ChatUsageQuota,
-    ChatQuotaUnit,
     WebhookType,
     webhook_url_from_setting,
-    UserSubscriptionResponse,
-    Subscription,
-    SubscriptionPlan,
-    SubscriptionStatus,
-    PlanLimits,
-    PlanType,
-    PhoneCallQuota,
-    TrialMetadata,
     LocationContextConsentResponse,
     LocationContextConsentUpdate,
 )
 from utils.apps import get_available_app_by_id
-from config.plan_catalog import plan_uses_overage
-from utils.subscription import (
-    DESKTOP_CHAT_BYOK_PROVIDER,
-    request_has_llm_byok_key,
-    request_has_byok_provider,
-    get_chat_quota_snapshot,
-    get_basic_plan_limits,
-    get_default_basic_subscription,
-    get_plan_display_name,
-    get_plan_limits,
-    get_plan_features,
-    get_monthly_usage_for_subscription,
-    neo_grandfather_until,
-    should_show_new_plans,
-    wire_plan_for_client,
-    get_trial_metadata,
-)
 from database import user_usage as user_usage_db
 from utils.cloud_tasks import (
     AccountDeletionTaskAuthentication,
@@ -138,7 +108,6 @@ from utils.other.storage import (
 from utils.people_stats import apply_people_stats, collect_people_stats
 from utils.webhooks import button_event_webhook, webhook_first_time_setup
 from utils.byok import (
-    get_byok_key,
     has_byok_keys,
     invalidate_byok_state_cache,
     peppered_fingerprint,
@@ -1170,274 +1139,6 @@ def deactivate_byok_endpoint(uid: str = Depends(auth.get_current_user_uid_no_byo
     users_db.clear_byok_active(uid)
     invalidate_byok_state_cache(uid)
     return {"active": False}
-
-
-def _byok_unlimited_subscription(
-    transcription_seconds: Optional[int] = None, words_transcribed: Optional[int] = None
-) -> Subscription:
-    """BYOK free plan: unlimited limits, marked with the `byok` feature flag.
-
-    LLM-only requests pass the free-tier transcription/words allowances so the
-    snapshot stays metered where Omi still pays for STT; unlimited stays `None`.
-    """
-    return Subscription(
-        plan=PlanType.unlimited,
-        status=SubscriptionStatus.active,
-        features=["byok"],
-        limits=PlanLimits(
-            transcription_seconds=transcription_seconds,
-            words_transcribed=words_transcribed,
-            insights_gained=None,
-        ),
-    )
-
-
-@router.get('/v1/users/me/subscription', tags=['v1'], response_model=UserSubscriptionResponse)
-def get_user_subscription_endpoint(
-    request: Request,
-    # Keep reachable even when BYOK fingerprints drift — broken-BYOK users
-    # must still see their plan so they can recover.
-    uid: str = Depends(auth.get_current_user_uid_no_byok_validation),
-    x_app_platform: Optional[str] = Header(None, alias='X-App-Platform'),
-    x_app_version: Optional[str] = Header(None, alias='X-App-Version'),
-):
-    """Gets the user's subscription plan and usage."""
-    return _user_subscription_response(
-        uid, x_app_platform, x_app_version, request.headers.get('X-Omi-Plan-Identity')
-    )
-
-
-def _user_subscription_response(
-    uid: str,
-    x_app_platform: Optional[str],
-    x_app_version: Optional[str],
-    plan_identity_version: Optional[str],
-) -> UserSubscriptionResponse:
-    """Read subscription and usage for the response."""
-    # BYOK free plan: unlimited chat/insights only for a validated LLM-capability
-    # key. Deepgram-only does not unlock this.
-    # Synthetic paid-tier quota for BYOK / marketplace-reviewer overrides so
-    # these users aren't surprised by a disabled phone-call feature.
-    unlimited_phone_quota = PhoneCallQuota(has_access=True, is_paid=True)
-
-    byok_active = users_db.is_byok_active(uid)
-    if byok_active and request_has_llm_byok_key():
-        # Preserve synthetic Neo feature access.
-        if get_byok_key('deepgram'):
-            return UserSubscriptionResponse(
-                subscription=_byok_unlimited_subscription(),
-                transcription_seconds_used=0,
-                transcription_seconds_limit=0,
-                words_transcribed_used=0,
-                words_transcribed_limit=0,
-                insights_gained_used=0,
-                insights_gained_limit=0,
-                available_plans=[],
-                show_subscription_ui=False,
-                phone_call_quota=unlimited_phone_quota,
-            )
-        usage = get_monthly_usage_for_subscription(uid)
-        basic_limits = get_basic_plan_limits()
-        return UserSubscriptionResponse(
-            subscription=_byok_unlimited_subscription(
-                transcription_seconds=basic_limits.transcription_seconds,
-                words_transcribed=basic_limits.words_transcribed,
-            ),
-            transcription_seconds_used=usage.get('transcription_seconds', 0),
-            # Wire convention (see WIRE BRIDGE below): unlimited remains 0; a
-            # finite allowance must be the real positive limit.
-            transcription_seconds_limit=basic_limits.transcription_seconds or 0,
-            words_transcribed_used=usage.get('words_transcribed', 0),
-            words_transcribed_limit=basic_limits.words_transcribed or 0,
-            insights_gained_used=0,
-            insights_gained_limit=0,
-            available_plans=[],
-            show_subscription_ui=False,
-            phone_call_quota=unlimited_phone_quota,
-        )
-
-    if is_marketplace_reviewer(uid):
-        unlimited_sub = Subscription(
-            plan=PlanType.unlimited,
-            status=SubscriptionStatus.active,
-            limits=PlanLimits(
-                transcription_seconds=None,
-                words_transcribed=None,
-                insights_gained=None,
-            ),
-        )
-        return UserSubscriptionResponse(
-            subscription=unlimited_sub,
-            transcription_seconds_used=0,
-            transcription_seconds_limit=0,
-            words_transcribed_used=0,
-            words_transcribed_limit=0,
-            insights_gained_used=0,
-            insights_gained_limit=0,
-            available_plans=[],
-            show_subscription_ui=False,
-            phone_call_quota=unlimited_phone_quota,
-        )
-    subscription = get_user_valid_subscription(uid)
-    if not subscription:
-        # Return default basic plan if no valid subscription
-        subscription = get_default_basic_subscription()
-
-    # Populate dynamic fields for the response
-    subscription.limits = get_plan_limits(subscription.plan)
-    is_mobile = x_app_platform in ('ios', 'android')
-    subscription.features = get_plan_features(subscription.plan, simplified=is_mobile)
-
-    new_plans_enabled = should_show_new_plans(x_app_platform, x_app_version)
-
-    # Backward-compat: old clients without the `operator` enum value would crash
-    # on deserialization. Only send the real plan type to clients that understand it.
-    if not new_plans_enabled and subscription.plan == PlanType.operator:
-        subscription.plan = PlanType.unlimited
-
-    # Get current usage
-    usage = get_monthly_usage_for_subscription(uid)
-
-    # Calculate usage metrics
-    transcription_seconds_used = usage.get('transcription_seconds', 0)
-    words_transcribed_used = usage.get('words_transcribed', 0)
-    insights_gained_used = usage.get('insights_gained', 0)
-
-    # WIRE BRIDGE: the backend has retired the `0 == unlimited` sentinel — the catalog
-    # represents unlimited as typed `{"kind": "unlimited"}`, projected as `None`. The wire
-    # has NOT been migrated: shipped clients still read `0` as unlimited (e.g. web
-    # SettingsPage `limit <= 0`, macOS `decodeIfPresent(...) ?? 0`), so `None -> 0` here is
-    # deliberate and load-bearing, not a leftover coercion.
-    #
-    # Retiring the wire sentinel is a breaking client change and belongs to work item W1
-    # in .github/agent-docs/plan-source-of-truth.md, gated on released tolerant decoders. Do not
-    # "fix" this to emit None/-1 without that sequence: it silently reinterprets every
-    # unlimited plan as a zero allowance on clients already in the field.
-    #
-    # The inverse hazard, for whoever does W1: `or 0` also launders a *finite zero* into
-    # the unlimited sentinel. No plan declares a finite-zero transcription/words/insights
-    # allowance today (phone-call zero travels a separate has_access=False path), so this
-    # is latent rather than live -- but a catalog that ever declares one would silently
-    # grant unlimited to a plan entitled to nothing. W1 must distinguish the two zeros,
-    # not just move the sentinel.
-    transcription_seconds_limit = subscription.limits.transcription_seconds or 0
-    words_transcribed_limit = subscription.limits.words_transcribed or 0
-    insights_gained_limit = subscription.limits.insights_gained or 0
-
-    # The fork sells no plans.
-    available_plans: List[SubscriptionPlan] = []
-
-    show_subscription_ui = not should_hide_subscription_ui(uid, x_app_platform, x_app_version)
-
-    # Chat quota — reuse the shared snapshot helper
-    chat_snapshot = get_chat_quota_snapshot(uid, platform=x_app_platform)
-    chat_percent = 0.0
-    if chat_snapshot['limit'] is not None and chat_snapshot['limit'] > 0:
-        chat_percent = min(100.0, round(100.0 * chat_snapshot['used'] / chat_snapshot['limit'], 2))
-    chat_allowed = chat_snapshot['allowed']
-
-    # Grandfather is read from the true plan before the label is remapped for
-    # clients whose enum predates `plus`/`unlimited_v2` (see wire_plan_for_client).
-    desktop_grandfather_until = neo_grandfather_until(subscription)
-    subscription.plan = wire_plan_for_client(subscription.plan, x_app_platform, x_app_version, plan_identity_version)
-
-    return UserSubscriptionResponse(
-        subscription=subscription,
-        transcription_seconds_used=transcription_seconds_used,
-        transcription_seconds_limit=transcription_seconds_limit,
-        words_transcribed_used=words_transcribed_used,
-        words_transcribed_limit=words_transcribed_limit,
-        insights_gained_used=insights_gained_used,
-        insights_gained_limit=insights_gained_limit,
-        available_plans=available_plans,
-        show_subscription_ui=show_subscription_ui,
-        chat_quota_used=round(chat_snapshot['used'], 4),
-        chat_quota_unit=chat_snapshot['unit'],
-        chat_quota_percent=chat_percent,
-        chat_quota_allowed=chat_allowed,
-        chat_quota_reset_at=chat_snapshot['reset_at'],
-        phone_call_quota=PhoneCallQuota(has_access=True, is_paid=True),
-        desktop_grandfather_until=desktop_grandfather_until,
-    )
-
-
-@router.get('/v1/users/me/usage-quota', tags=['users'], response_model=ChatUsageQuota)
-def get_user_chat_usage_quota(
-    uid: str = Depends(auth.get_current_user_uid),
-    x_app_platform: Optional[str] = Header(None, alias='X-App-Platform'),
-):
-    """Current-month chat usage for the user, plus their plan's cap.
-
-    Used by the desktop app. Mobile uses the subscription endpoint instead.
-    """
-    # Only the provider actually used by
-    # desktop chat can exempt it. Other enrolled keys still use managed chat.
-    customer_client = get_customer_firestore_client()
-    if users_db.is_byok_active(uid, firestore_client=customer_client) and request_has_byok_provider(
-        DESKTOP_CHAT_BYOK_PROVIDER
-    ):
-        return ChatUsageQuota(
-            plan='Free (BYOK)',
-            plan_type=PlanType.unlimited.value,
-            unit=ChatQuotaUnit.questions,
-            used=0.0,
-            limit=None,
-            percent=0.0,
-            allowed=True,
-            reset_at=None,
-            is_overage_plan=False,
-        )
-
-    # This is the desktop-only quota display (see docstring), so it must read the
-    # same customer Firestore project that desktop chat accounts
-    # against — otherwise a named dev/named bundle shows the dev project's plan
-    # here while /v2/chat/completions gates on the customer project's, and the
-    # two disagree for the same uid (#11199).
-    snapshot = get_chat_quota_snapshot(
-        uid,
-        platform=x_app_platform,
-        firestore_client=customer_client,
-        provision=False,
-        required_llm_provider=DESKTOP_CHAT_BYOK_PROVIDER,
-    )
-    plan = snapshot['plan']
-
-    if snapshot['limit'] is not None and snapshot['limit'] > 0:
-        percent = min(100.0, round(100.0 * snapshot['used'] / snapshot['limit'], 2))
-    else:
-        percent = 0.0
-
-    return ChatUsageQuota(
-        plan=get_plan_display_name(plan),
-        plan_type=plan.value,
-        unit=ChatQuotaUnit(snapshot['unit']),
-        used=round(snapshot['used'], 4),
-        limit=snapshot['limit'],
-        percent=percent,
-        allowed=snapshot['allowed'],
-        reset_at=snapshot['reset_at'],
-        is_overage_plan=plan_uses_overage(plan),
-    )
-
-
-class PaywallStatusResponse(BaseModel):
-    paywalled: bool
-
-
-@router.get('/v1/users/me/paywall', tags=['users'], response_model=PaywallStatusResponse)
-def get_user_paywall_status(
-    uid: str = Depends(auth.get_current_user_uid),
-    x_app_platform: Optional[str] = Header(None, alias='X-App-Platform'),
-    platform: Optional[str] = Query(None),
-):
-    """Trial-paywall status. The fork has no trial, so no user is ever paywalled."""
-    return PaywallStatusResponse(paywalled=False)
-
-
-@router.get('/v1/users/me/trial', tags=['users'], response_model=TrialMetadata)
-def get_user_trial_status(uid: str = Depends(auth.get_current_user_uid)):
-    """Trial metadata for the calling user. The fork has no trial, so it never expires."""
-    return get_trial_metadata(uid)
 
 
 # **************************************

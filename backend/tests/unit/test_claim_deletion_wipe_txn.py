@@ -65,11 +65,6 @@ for _mod_name in ('database.firestore_cache', 'database.redis_db'):
         setattr(_mod, _attr, MagicMock())
     _install_stub(_mod_name, _mod)
 
-# Stub utils.subscription (imported at module level for get_default_basic_subscription)
-_utils_sub = types.ModuleType('utils.subscription')
-setattr(_utils_sub, 'get_default_basic_subscription', MagicMock())
-_install_stub('utils.subscription', _utils_sub)
-
 # database.users is imported against the stubs above, so record its prior
 # sys.modules entry now; the autouse fixture below restores/removes it so the
 # half-stubbed module does not leak into other unit-test modules.

@@ -193,7 +193,6 @@ def router():
         "utils.llm.conversation_processing": _pkg("utils.llm.conversation_processing"),
         "utils.speaker_identification": _pkg("utils.speaker_identification"),
         "utils.speaker_tag_prompts.service": _pkg("utils.speaker_tag_prompts.service"),
-        "utils.subscription": _pkg("utils.subscription"),
         "utils.app_integrations": _pkg("utils.app_integrations"),
         "utils.memory": _pkg("utils.memory"),
         "utils.memory.memory_service": memory_service,

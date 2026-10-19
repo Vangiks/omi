@@ -30,7 +30,6 @@ class Snapshot:
 class Firestore:
     def __init__(self):
         self.access = {'role': 'support:read'}
-        self.subscription = {'plan': 'basic'}
         self.reads, self.writes, self.query_events, self.rows = [], [], [], []
         self.audit_fails = False
 
@@ -54,16 +53,13 @@ class Reference:
         if self.path == ('supportData', 'support-caller'):
             return Snapshot(self.store.access)
         if self.path == ('users', 'target-customer'):
-            assert field_paths in (['subscription'], ['last_active_at', 'last_active_platform'])
+            assert field_paths == ['last_active_at', 'last_active_platform']
             data = {
-                'subscription': self.store.subscription,
                 'last_active_at': NOW,
                 'last_active_platform': 'macos',
                 'phone': 'SECRET-PHONE',
                 'memories': ['SECRET-MEMORY'],
             }
-            if self.store.subscription is None:
-                data.pop('subscription')
             return Snapshot({key: data[key] for key in field_paths if key in data})
         raise AssertionError(f'Unexpected Firestore read: {self.path}')
 
@@ -230,22 +226,11 @@ def test_lookup_allowlist_and_hashed_audit(harness):
     assert EMAIL not in str(row) and 'firebase-token' not in str(row)
 
 
-@pytest.mark.parametrize('plan', ['unlimited', 'architect'])
-def test_unlimited_limit_is_null(harness, plan):
-    harness.store.subscription = {'plan': plan}
+def test_transcription_limit_is_null(harness):
     response = lookup(harness)
     assert response.status_code == 200, response.text
     assert response.json()['transcription_seconds_limit'] is None
     assert response.json()['transcription_seconds_remaining'] is None
-
-
-@pytest.mark.parametrize('stored', [None, {'plan': 'free'}])
-def test_subscription_reader_does_not_create_or_migrate(harness, stored):
-    harness.store.subscription = stored
-    response = lookup(harness)
-    assert response.status_code == 200, response.text
-    assert len(harness.store.writes) == 1
-    assert harness.store.subscription == stored
 
 
 def test_unknown_email(harness):

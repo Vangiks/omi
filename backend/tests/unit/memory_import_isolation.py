@@ -109,12 +109,6 @@ def install_canonical_write_runtime_stubs() -> list[str]:
     sys.modules["firebase_admin"] = firebase_admin
     touched.append("firebase_admin")
 
-    subscription_mod = types.ModuleType("utils.subscription")
-    subscription_mod.get_default_basic_subscription = MagicMock()
-    subscription_mod.request_has_llm_byok_key = lambda: False
-    sys.modules["utils.subscription"] = subscription_mod
-    touched.append("utils.subscription")
-
     users_mod = AutoMockModule("database.users")
     users_mod.get_data_protection_level = MagicMock(return_value="enhanced")
     sys.modules["database.users"] = users_mod
@@ -270,11 +264,6 @@ def install_ws_i_heavy_import_stubs() -> list[str]:
     users_mod.get_data_protection_level = MagicMock(return_value="enhanced")
     _set("database.users", users_mod)
 
-    subscription_mod = types.ModuleType("utils.subscription")
-    subscription_mod.get_default_basic_subscription = MagicMock()
-    subscription_mod.request_has_llm_byok_key = lambda: False
-    _set("utils.subscription", subscription_mod)
-
     vector_db_mod = AutoMockModule("database.vector_db")
     vector_db_mod.find_similar_memories = MagicMock(return_value=[])
     vector_db_mod.delete_memory_vector = MagicMock()
@@ -374,7 +363,6 @@ WS_I_HEAVY_STUB_MODULE_NAMES = (
     "pinecone",
     "database.auth",
     "database.users",
-    "utils.subscription",
     "database.vector_db",
     "database.memories",
     "database.redis_db",
@@ -480,7 +468,6 @@ def install_ws_j_heavy_import_stubs() -> list[str]:
         "utils.speaker_identification",
         "utils.app_integrations",
         "utils.analytics",
-        "utils.subscription",
         "utils.webhooks",
         "utils.billing",
         "utils.llm.conversation_processing",
@@ -551,7 +538,6 @@ def install_ws_m_heavy_import_stubs() -> list[str]:
         "database.redis_db",
         "database.conversations",
         "database.memories",
-        "utils.subscription",
         "utils.executors",
         "utils.llm.knowledge_graph",
         "pytz",
@@ -592,7 +578,6 @@ def install_ws_n_heavy_import_stubs() -> list[str]:
         "database.memories",
         "database.vector_db",
         "database.users",
-        "utils.subscription",
         "utils.executors",
         "utils.llm.knowledge_graph",
         "pytz",
@@ -628,7 +613,6 @@ def install_ws_b_import_stubs() -> list[str]:
 WS_B_STUB_MODULE_NAMES = (
     "database._client",
     "firebase_admin",
-    "utils.subscription",
     "database.users",
     "pinecone",
     "typesense",
@@ -638,7 +622,6 @@ WS_B_STUB_MODULE_NAMES = (
 WS_C_STUB_MODULE_NAMES = (
     "database._client",
     "firebase_admin",
-    "utils.subscription",
     "database.users",
     "pinecone",
     "database.vector_db",
@@ -777,7 +760,6 @@ def install_mcp_search_memories_stubs(backend_dir: str) -> list[str]:
         "utils.other.endpoints",
         "utils.stt.pre_recorded",
         "utils.stt.vad",
-        "utils.subscription",
         "utils.conversations.process_conversation",
         "utils.conversations.render",
         "utils.notifications",

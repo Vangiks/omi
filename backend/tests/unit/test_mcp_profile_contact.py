@@ -103,7 +103,6 @@ _stubs = [
     'utils.other.endpoints',
     'utils.stt.pre_recorded',
     'utils.stt.vad',
-    'utils.subscription',
     'utils.conversations.process_conversation',
     'utils.conversations.render',
     'utils.notifications',

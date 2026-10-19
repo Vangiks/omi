@@ -16,10 +16,9 @@ from fastapi.testclient import TestClient
 
 import desktop_backend
 from database import users as users_db
-from models.users import PlanType
 from routers import desktop_chat
 from tests.unit.test_desktop_backend_cors import _test_client
-from utils import byok, subscription
+from utils import byok
 from utils.byok import get_byok_key
 from utils.other import endpoints
 
@@ -64,7 +63,7 @@ def authenticated_anthropic_chat(monkeypatch):
         'last_seen_at': datetime.now(timezone.utc),
         'fingerprints': {'anthropic': hashlib.sha256(api_key.encode()).hexdigest()},
     }
-    calls = {'clients': [], 'messages': [], 'quota_reads': [], 'cost_exclusions': [], 'quota_questions': []}
+    calls = {'clients': [], 'messages': [], 'cost_exclusions': [], 'quota_questions': []}
     monkeypatch.setenv('ADMIN_KEY', admin_key)
     monkeypatch.setenv('ADMIN_KEY_AUTH_ENABLED', 'true')
     monkeypatch.setattr(byok, '_byok_state_cache', TTLCache(maxsize=1, ttl=30))
@@ -75,18 +74,6 @@ def authenticated_anthropic_chat(monkeypatch):
     monkeypatch.setattr(endpoints, 'record_user_platform', lambda *_args: None)
     monkeypatch.setattr(endpoints, 'record_client_device', lambda *_args, **_kwargs: None)
 
-    def exhausted_managed_quota(*_args, **_kwargs):
-        calls['quota_reads'].append(get_byok_key('anthropic'))
-        return {
-            'allowed': False,
-            'plan': PlanType.basic,
-            'unit': 'questions',
-            'used': 30,
-            'limit': 30,
-            'reset_at': '2030-01-01T00:00:00Z',
-        }
-
-    monkeypatch.setattr(subscription, 'get_chat_quota_snapshot', exhausted_managed_quota)
     monkeypatch.setattr(desktop_chat, 'llm_stub_enabled', lambda: False)
     monkeypatch.setattr(desktop_chat, 'should_route_chat_agent_through_gateway', lambda: True)
     monkeypatch.setattr(desktop_chat, 'get_customer_firestore_client', lambda: None)
@@ -169,7 +156,6 @@ def test_authenticated_enrolled_anthropic_uses_customer_key(
     assert 'Synthetic BYOK response' in response.text
     assert calls['clients'] == [headers['X-BYOK-Anthropic']]
     assert calls['messages'][0]['model'] == 'claude-sonnet-4-6'
-    assert calls['quota_reads'] == []
     assert calls['quota_questions'] == ['desktop-anthropic-byok-fixture']
     assert [entry['cost_exclusion'] for entry in calls['cost_exclusions']] == ['byok_provider_cost']
 
@@ -201,5 +187,4 @@ def test_authenticated_anthropic_fingerprint_mismatch_never_calls_provider(authe
 
     assert response.status_code == 403
     assert response.json()['detail'] == 'BYOK key fingerprint mismatch for provider: anthropic'
-    assert calls['quota_reads'] == []
     assert calls['clients'] == []

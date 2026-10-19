@@ -20,7 +20,7 @@ from models.message_event import (
     MessageEvent,
     MessageServiceStatusEvent,
 )
-from models.users import PlanType, WebhookType
+from models.users import WebhookType
 from database.redis_db import user_webhook_status_db
 from utils.analytics import billable_transcription_seconds, record_usage
 from utils.usage_provenance import live_usage_metadata
@@ -36,7 +36,6 @@ from utils.listen_pusher_session import ListenPusherSession, ListenPusherSession
 from utils.listen_session_bootstrap import finalize_listen_connect_context, load_listen_connect_base
 from utils.listen_reconnect_budget import listen_reconnect_budget
 from utils.metrics import BACKEND_LISTEN_ACTIVE_WS_CONNECTIONS
-from utils.notifications import send_silent_user_notification
 from utils.onboarding import OnboardingHandler
 from utils.observability.journeys import ClientJourneyAttempt
 from utils.observability.routing_cohort import RoutingCohort, current_routing_cohort
@@ -676,23 +675,6 @@ class ListenSessionRuntime:
             if await self.wait(60):
                 break
             await self._flush_usage(final=False)
-            if self.use_custom_stt:
-                continue
-            await self._check_silent_user()
-
-    async def _check_silent_user(self) -> None:
-        subscription = await self.persistence.call(user_db.get_user_valid_subscription, self.request.uid)
-        if not subscription or subscription.plan == PlanType.basic:
-            last_words = self.state.last_transcript_time or self.state.first_audio_byte_timestamp
-            if (
-                self.state.last_audio_received_time
-                and last_words
-                and self.state.last_audio_received_time - last_words > 15 * 60
-            ):
-                try:
-                    await send_silent_user_notification(self.request.uid)
-                except Exception as error:
-                    logger.error('Silent-user notification refresh failed type=%s', type(error).__name__)
 
     async def _flush_usage(self, *, final: bool) -> int:
         if self.use_custom_stt:

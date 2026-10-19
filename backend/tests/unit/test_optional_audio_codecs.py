@@ -137,7 +137,6 @@ def _install_sync_import_stubs(monkeypatch):
         "utils.speaker_assignment",
         "utils.speaker_identification",
         "utils.stt.speaker_embedding",
-        "utils.subscription",
         "utils.log_sanitizer",
         "utils.executors",
         "pydub",

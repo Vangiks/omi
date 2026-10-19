@@ -1194,7 +1194,6 @@ def _load_sync_router_for_fast_path():
         'utils.stt',
         'utils.stt.pre_recorded',
         'utils.stt.vad',
-        'utils.subscription',
         'utils.observability',
         'utils.observability.fallback',
         'utils.metrics',

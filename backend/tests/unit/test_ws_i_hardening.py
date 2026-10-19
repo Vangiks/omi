@@ -39,7 +39,7 @@ from tests.unit.memory_import_isolation import (
 
 @pytest.fixture(scope="module", autouse=True)
 def _ws_i_hardening_import_isolation():
-    saved = snapshot_sys_modules(["database._client", "firebase_admin", "utils.subscription", "database.users"])
+    saved = snapshot_sys_modules(["database._client", "firebase_admin", "database.users"])
     install_database_client_stub()
     install_canonical_write_runtime_stubs()
     yield

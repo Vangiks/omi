@@ -262,9 +262,6 @@ def integration_harness() -> Iterator[SimpleNamespace]:
             get_cached_developer=MagicMock(return_value=None),
             set_cached_developer=MagicMock(),
         ),
-        'utils.subscription': _module(
-            'utils.subscription',
-        ),
         'utils.conversations.factory': _module(
             'utils.conversations.factory',
             deserialize_conversations=MagicMock(return_value=[]),

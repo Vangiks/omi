@@ -2,7 +2,6 @@
 
 import pytest
 
-from models.users import PlanType
 from routers.listen.contracts import ListenSessionState
 from routers.listen.persistence import ListenPersistence
 from routers.listen import runtime as listen_runtime
@@ -34,31 +33,31 @@ async def test_listen_persistence_offloads_and_preserves_call_arguments(monkeypa
     assert captured['kwargs'] == {'value': 'stored'}
 
 
-@pytest.mark.parametrize('plan,notified', [(None, True), (PlanType.basic, True), (PlanType.architect, False)])
 @pytest.mark.anyio
-async def test_silent_user_check_reads_only_the_subscription(monkeypatch, plan, notified):
-    """The periodic check left after the credit refresh was removed (#30): no transcription minutes are read."""
+async def test_periodic_usage_loop_only_flushes_usage():
+    """No plan is read and no silent-user notification is sent (#54): every user has full access."""
     from types import SimpleNamespace
 
     runtime = object.__new__(listen_runtime.ListenSessionRuntime)
-    runtime.request = SimpleNamespace(uid='user-1', source='desktop')
-    runtime.state = ListenSessionState(last_audio_received_time=2000.0, first_audio_byte_timestamp=1000.0)
-    calls = []
-    sent = []
+    runtime.state = ListenSessionState()
+    runtime.state.active = True
+    flushes = []
+    waits = iter([False, True])
+
+    async def wait(seconds):
+        return next(waits)
+
+    async def flush_usage(*, final):
+        flushes.append(final)
+        return 0
 
     async def call(function, *args, **kwargs):
-        calls.append(function)
-        if function is listen_runtime.user_db.get_user_valid_subscription:
-            return SimpleNamespace(plan=plan) if plan else None
         raise AssertionError(f'unexpected persistence call: {function}')
 
-    async def notify(uid):
-        sent.append(uid)
-
+    runtime.wait = wait
+    runtime._flush_usage = flush_usage
     runtime.persistence = SimpleNamespace(call=call)
-    monkeypatch.setattr(listen_runtime, 'send_silent_user_notification', notify)
 
-    await runtime._check_silent_user()
+    await runtime._record_usage_periodically()
 
-    assert calls == [listen_runtime.user_db.get_user_valid_subscription]
-    assert sent == (['user-1'] if notified else [])
+    assert flushes == [False]

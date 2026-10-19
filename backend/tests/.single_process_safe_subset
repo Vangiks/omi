@@ -23,7 +23,6 @@ tests/unit/test_action_items_date_range_validation.py
 tests/unit/test_action_items_pagination_order.py
 tests/unit/test_merge_validation.py
 tests/unit/test_user_usage.py
-tests/unit/test_chat_quota.py
 tests/unit/test_llm_usage_endpoints.py
 tests/unit/test_memories_stale_updates.py
 tests/unit/test_non_active_routes.py
@@ -33,8 +32,6 @@ tests/unit/test_conversations_count.py
 tests/unit/test_phone_calls.py
 tests/unit/test_available_plans_resilience.py
 tests/unit/test_rate_limiting.py
-tests/unit/test_subscription_plans.py
-tests/unit/test_subscription_restructure.py
 tests/unit/test_daily_summary_zero_coordinate_locations.py
 tests/unit/test_storage_opus_encoding.py
 tests/unit/test_webhook_auto_disable.py

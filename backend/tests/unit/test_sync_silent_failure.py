@@ -759,7 +759,6 @@ _STUB_MODULES = [
     'utils.speaker_learning_jobs',
     'utils.stt.speaker_embedding',
     'utils.stt.owner_profile',
-    'utils.subscription',
     'utils.cloud_tasks',
     'utils.sync.content_id',
     'utils.sync.assignment',

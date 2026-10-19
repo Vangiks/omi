@@ -10,14 +10,6 @@ TEST_UID = 'test-uid-123'
 TEST_UID_OTHER = 'test-uid-other'
 
 
-@pytest.fixture(autouse=True)
-def _fail_on_subscription_read(monkeypatch):
-    def _read_subscription(*args, **kwargs):
-        raise AssertionError('phone calls must not read the subscription')
-
-    monkeypatch.setattr('database.users.get_user_valid_subscription', _read_subscription)
-
-
 def _make_app():
     app = FastAPI()
     app.include_router(router)

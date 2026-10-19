@@ -133,8 +133,6 @@ def test_users_module_only_wires_safe_projection_caches():
     assert "namespace='user_ai_profile'" in source
 
     forbidden_sections = [
-        'def get_user_subscription',
-        'def get_user_valid_subscription',
         'def get_byok_state',
         'def get_data_protection_level',
         'def get_user_private_cloud_sync_enabled',

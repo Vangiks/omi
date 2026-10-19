@@ -329,10 +329,6 @@ class _NoFirestore:
         raise AssertionError(f'the relay read Firestore collection {name!r}')
 
 
-def _no_quota_read(*_a, **_k):
-    raise AssertionError('the relay read a chat quota')
-
-
 def _created(response_id: str) -> str:
     return json.dumps({'type': 'response.created', 'response': {'id': response_id}})
 
@@ -357,7 +353,6 @@ def _stub_relay(monkeypatch, *, byok: bool, provider: str, connect: Any) -> tupl
     monkeypatch.setattr(omni_relay, 'extract_byok_from_websocket', lambda _ws: dict(validated))
     monkeypatch.setattr(omni_relay, 'validate_byok_websocket_keys', lambda _uid, keys: (dict(keys), None))
     monkeypatch.setattr(omni_relay, 'set_validated_byok_keys', lambda _keys, _uid: None)
-    monkeypatch.setattr(omni_relay, 'get_chat_quota_snapshot', _no_quota_read, raising=False)
     monkeypatch.setattr(omni_relay, 'get_customer_firestore_client', lambda: _NoFirestore(), raising=False)
     monkeypatch.setattr(llm_usage_db, 'record_chat_quota_question', lambda *a, **k: writes.append('question'))
     monkeypatch.setattr(omni_relay, 'schedule_managed_attempt', lambda attempt: attempts.append(attempt) or True)

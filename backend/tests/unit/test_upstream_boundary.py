@@ -121,7 +121,6 @@ def _ensure_process_conversation_importable():
         "utils.notifications",
         "utils.apps",
         "utils.executors",
-        "utils.subscription",
         "utils.task_intelligence.workstream_association",
     ]
     for mod_name in stubs:

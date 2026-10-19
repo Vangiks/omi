@@ -62,16 +62,11 @@ def users():
         ),
         "models.users": _module(
             "models.users",
-            Subscription=MagicMock(),
-            PlanLimits=MagicMock(),
-            PlanType=MagicMock(),
-            SubscriptionStatus=MagicMock(),
             LOCATION_CONTEXT_DISCLOSED_PROVIDERS=("Google Maps", "the configured AI chat provider"),
             LOCATION_CONTEXT_PURPOSE="chat_city_context",
             LocationContextConsent=MagicMock(),
             LocationContextConsentStatus=MagicMock(),
         ),
-        "utils.subscription": _module("utils.subscription", get_default_basic_subscription=MagicMock()),
         "models.other": _module("models.other", Person=MagicMock()),
     }
     with stub_modules(fakes):

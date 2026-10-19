@@ -56,8 +56,6 @@ def chat():
     """
     redis_db = MagicMock()
     redis_db.try_acquire_user_platform_write_lock = MagicMock()
-    subscription = MagicMock()
-    subscription.get_default_basic_subscription = MagicMock()
     usage_tracker = MagicMock()
     usage_tracker.track_usage = MagicMock()
     usage_tracker.set_usage_context = MagicMock()
@@ -79,7 +77,6 @@ def chat():
         "models.notification_message": MagicMock(),
         "models.app": MagicMock(),
         "models.transcript_segment": MagicMock(),
-        "utils.subscription": subscription,
         "utils.llm.usage_tracker": usage_tracker,
         "utils.notifications": MagicMock(),
         "utils.other.storage": MagicMock(),

@@ -61,7 +61,6 @@ _stub_modules = [
     'utils.speaker_assignment',
     'utils.speaker_identification',
     'utils.stt.speaker_embedding',
-    'utils.subscription',
     'utils.log_sanitizer',
     'utils.executors',
     'pydub',

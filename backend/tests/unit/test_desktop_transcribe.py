@@ -843,7 +843,6 @@ def _stub_router_deps():
     extra_database = ['database.sync_jobs', 'database.user_usage']
     extra_utils = [
         'utils.log_sanitizer',
-        'utils.subscription',
         'utils.social',
         'utils.speaker_assignment',
         'utils.speaker_identification',

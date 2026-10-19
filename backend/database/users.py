@@ -18,14 +18,13 @@ from database.account_deletion_transitions import (
     record_late_agent_vm_cleanup as _record_late_agent_vm_cleanup_txn,
 )
 from database.firestore_cache import CachePolicy, get_or_fetch, invalidate
-from database.firestore_tier_context import invalidate_subscription, observe_subscription
 from database.person_aliases import (
     dismiss_person_soft,
     find_person_by_name,
     list_people,
     rename_person_retaining_aliases,
 )
-from database.read_boundary import parse_snapshot_or_none, parse_snapshot_strict
+from database.read_boundary import parse_snapshot_or_none
 from database.speaker_learning_fields import project_person_learning, speech_sample_source, voice_learning_fields
 from database.speaker_profile_authority import person_teaching_authorized
 from database.redis_db import (
@@ -38,9 +37,6 @@ from models.users import (
     LOCATION_CONTEXT_PURPOSE,
     LocationContextConsent,
     LocationContextConsentStatus,
-    Subscription,
-    PlanType,
-    SubscriptionStatus,
 )
 from models.other import Person
 import logging
@@ -1452,25 +1448,6 @@ def set_chat_message_rating_score(
 
 
 # **************************************
-# ************ Subscriptions ***********
-# **************************************
-
-
-def update_user_subscription(uid: str, subscription_data: dict):
-    """Updates the user's subscription information, removing dynamic fields before storing."""
-    subscription_data_to_store = subscription_data.copy()
-    subscription_data_to_store.pop('features', None)
-    subscription_data_to_store.pop('limits', None)
-
-    user_ref = db.collection('users').document(uid)
-    invalidate_subscription(uid)
-    try:
-        user_ref.update({'subscription': subscription_data_to_store})
-    finally:
-        invalidate_subscription(uid)
-
-
-# **************************************
 # ********* Data Protection ************
 # **************************************
 
@@ -1684,45 +1661,6 @@ def set_user_onboarding_state(uid: str, onboarding_data: dict, *, firestore_clie
     user_ref.set({'onboarding': onboarding_data}, merge=[f'onboarding.{field}' for field in onboarding_data])
 
 
-def get_user_subscription(uid: str, *, firestore_client: Any | None = None, read_only: bool = False) -> Subscription:
-    """Every user has full access (#3); the stored subscription is neither read nor written."""
-    # Imported here, not at module scope: utils.subscription imports this module, so a
-    # module-level import makes utils.subscription unimportable on its own.
-    from utils.subscription import get_full_access_subscription
-
-    subscription = get_full_access_subscription()
-    observe_subscription(uid, subscription)
-    return subscription
-
-
-def get_existing_user_subscription(uid: str, *, firestore_client: Any | None = None) -> Optional[Subscription]:
-    """Gets the user's stored subscription without creating a default record."""
-    user_ref = (firestore_client or db).collection('users').document(uid)
-    user_doc = user_ref.get(['subscription'])
-    if not user_doc.exists:
-        observe_subscription(uid, None)
-        return None
-
-    user_data = user_doc.to_dict()
-    if 'subscription' not in user_data:
-        observe_subscription(uid, None)
-        return None
-
-    sub_data = user_data['subscription']
-
-    def subscription_payload(_snapshot: object) -> dict:
-        if not isinstance(sub_data, dict):
-            raise TypeError('Firestore subscription payload must be a mapping')
-        payload = dict(sub_data)
-        if payload.get('plan') == 'free':
-            payload['plan'] = PlanType.basic.value
-        return payload
-
-    subscription = parse_snapshot_strict(Subscription, user_doc, payload_from_snapshot=subscription_payload)
-    observe_subscription(uid, subscription)
-    return subscription
-
-
 def get_user_training_data_opt_in(uid: str) -> Optional[dict]:
     """Get user's training data opt-in status."""
     user_ref = db.collection('users').document(uid)
@@ -1801,13 +1739,6 @@ def set_user_training_data_opt_in(uid: str, status: str):
             }
         }
     )
-
-
-def get_user_valid_subscription(
-    uid: str, *, firestore_client: Any | None = None, provision: bool = True
-) -> Optional[Subscription]:
-    """The full-access subscription; nothing is written to Firestore in either ``provision`` mode."""
-    return get_user_subscription(uid, firestore_client=firestore_client)
 
 
 # **************************************
