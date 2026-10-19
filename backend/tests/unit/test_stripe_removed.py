@@ -9,10 +9,8 @@ from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[2]
 
-# Removed together with the plan catalog in #26. models/trend.py names Stripe as a company.
+# models/trend.py names Stripe as a company.
 ALLOWED = {
-    'config/plan_catalog.py',
-    'scripts/generate_plan_catalog.py',
     'models/trend.py',
 }
 

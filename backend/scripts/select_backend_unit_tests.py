@@ -151,15 +151,12 @@ def is_firestore_index_guard_path(path: str) -> bool:
 AREA_TESTS = (
     (
         (
-            'backend/config/plan_catalog',
-            'backend/scripts/generate_plan_catalog.py',
             'backend/models/users.py',
             'backend/utils/subscription.py',
             'backend/routers/retired_desktop_proactivity.py',
         ),
         (),
         (
-            'tests/unit/test_plan_catalog_contract.py',
             'tests/unit/test_subscription_*.py',
             'tests/unit/test_user_subscription_wire_contract.py',
             'tests/unit/test_stripe_*.py',
