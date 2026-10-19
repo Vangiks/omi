@@ -70,7 +70,6 @@ from typing import Any, Callable
 
 from prometheus_client import Counter
 
-from database.firestore_tier_context import current_tier
 
 logger = logging.getLogger(__name__)
 
@@ -90,19 +89,19 @@ __all__ = [
 
 FIRESTORE_DOCUMENT_READS = Counter(
     'omi_firestore_document_reads_total',
-    'Firestore document reads by collection pattern, outcome, and request-owner tier. '
+    'Firestore document reads by collection pattern and outcome. '
     'outcome="hit" is a returned document, "miss" is a billed lookup or count that matched nothing, '
     'and "floor" is a billed read with no document (empty query, offset skip, or collection-id list). '
     'Pair with omi_firestore_billed_reads_total for the Cloud Monitoring type split.',
-    ['collection', 'outcome', 'tier'],
+    ['collection', 'outcome'],
 )
 
 
 FIRESTORE_QUERY_OPERATIONS = Counter(
     'omi_firestore_query_operations_total',
-    'Firestore RunQuery operations by collection pattern and request-owner tier. '
+    'Firestore RunQuery operations by collection pattern. '
     'One operation per stream, including streams closed early. Not itself a document-read count.',
-    ['collection', 'tier'],
+    ['collection'],
 )
 
 
@@ -112,15 +111,15 @@ FIRESTORE_QUERY_OPERATIONS = Counter(
 # minimum are QUERY. Do not add this counter to omi_firestore_document_reads_total.
 FIRESTORE_BILLED_READS = Counter(
     'omi_firestore_billed_reads_total',
-    'Billed-equivalent Firestore reads by collection, kind, and request-owner tier. '
+    'Billed-equivalent Firestore reads by collection and kind. '
     'kind is lookup, not_found, or query. This is the coverage numerator against '
     'stackdriver_firestore_instance_firestore_googleapis_com_document_read_count.',
-    ['collection', 'kind', 'tier'],
+    ['collection', 'kind'],
 )
 
 
 # Same reads, split by calling module:function so a DATA_READ-style question is
-# answerable without an audit log. No tier label: tier stays on the counter above.
+# answerable without an audit log.
 FIRESTORE_BILLED_READS_BY_CALLER = Counter(
     'omi_firestore_billed_reads_by_caller_total',
     'Billed-equivalent Firestore reads by collection, kind, and bounded call site. '
@@ -195,11 +194,6 @@ _LEDGER_SERVICE = _ledger_service_name()
 _LEDGER_LOCK = threading.Lock()
 _ledger_day: str | None = None
 _ledger_counts = {'lookup': 0, 'not_found': 0, 'query': 0}
-# Cumulative billed reads per request-owner tier (firestore_tier_context
-# values: plan tiers plus 'unattributed' and 'other'). Filled on first
-# observation; the value set is bounded by TIER_VALUES, so cardinality is
-# the plan catalog, not the user base. Keys absent until first seen.
-_ledger_tier_counts: dict[str, int] = {}
 _ledger_unscoped = 0
 _ledger_seq = 0
 _ledger_last_emit = 0.0
@@ -210,7 +204,7 @@ def _ledger_emit_locked(day: str) -> None:
     _ledger_seq += 1
     payload = {
         'event': 'firestore_read_ledger',
-        'schema': 2,
+        'schema': 3,
         'service': _LEDGER_SERVICE,
         'epoch': _LEDGER_EPOCH,
         'seq': _ledger_seq,
@@ -218,7 +212,6 @@ def _ledger_emit_locked(day: str) -> None:
         'lookup': _ledger_counts['lookup'],
         'not_found': _ledger_counts['not_found'],
         'query': _ledger_counts['query'],
-        'tier_counts': dict(sorted(_ledger_tier_counts.items())),
         'unscoped': _ledger_unscoped,
     }
     try:
@@ -228,8 +221,8 @@ def _ledger_emit_locked(day: str) -> None:
     _ledger_last_emit = time.monotonic()
 
 
-def _ledger_record(amount: float, kind: str, project: str | None, tier: str = 'unattributed') -> None:
-    global _ledger_day, _ledger_counts, _ledger_tier_counts, _ledger_unscoped
+def _ledger_record(amount: float, kind: str, project: str | None) -> None:
+    global _ledger_day, _ledger_counts, _ledger_unscoped
     if not _LEDGER_ENABLED:
         return
     try:
@@ -242,13 +235,11 @@ def _ledger_record(amount: float, kind: str, project: str | None, tier: str = 'u
                 _ledger_emit_locked(_ledger_day)
                 _ledger_day = today
                 _ledger_counts = {'lookup': 0, 'not_found': 0, 'query': 0}
-                _ledger_tier_counts = {}
             if project is not None and project != 'based-hardware':
                 return
             if project is None:
                 _ledger_unscoped = 1
             _ledger_counts[kind if kind in _ledger_counts else 'query'] += int(amount)
-            _ledger_tier_counts[tier] = _ledger_tier_counts.get(tier, 0) + int(amount)
             if now - _ledger_last_emit >= 60:
                 _ledger_emit_locked(_ledger_day)
     except Exception:
@@ -473,16 +464,15 @@ def _record(
         kind = 'not_found' if outcome == 'miss' else 'lookup'
     if caller is None:
         caller = 'unattributed'
-    tier = current_tier()
     if _LEDGER_ENABLED:
-        _ledger_record(amount, kind, _sdk_project(sdk_object), tier)
+        _ledger_record(amount, kind, _sdk_project(sdk_object))
     pattern = collection_pattern(path_parts)
     try:
-        FIRESTORE_DOCUMENT_READS.labels(collection=pattern, outcome=outcome, tier=tier).inc(amount)
+        FIRESTORE_DOCUMENT_READS.labels(collection=pattern, outcome=outcome).inc(amount)
     except Exception:
         logger.warning('firestore document read probe failed to record', exc_info=True)
     try:
-        FIRESTORE_BILLED_READS.labels(collection=pattern, kind=kind, tier=tier).inc(amount)
+        FIRESTORE_BILLED_READS.labels(collection=pattern, kind=kind).inc(amount)
     except Exception:
         logger.warning('firestore document read probe failed to record', exc_info=True)
     try:
@@ -494,7 +484,7 @@ def _record(
 def _record_operation(path_parts: Any) -> None:
     """Count one RunQuery operation. Never raises."""
     try:
-        FIRESTORE_QUERY_OPERATIONS.labels(collection=collection_pattern(path_parts), tier=current_tier()).inc()
+        FIRESTORE_QUERY_OPERATIONS.labels(collection=collection_pattern(path_parts)).inc()
     except Exception:
         logger.warning('firestore query operation probe failed to record', exc_info=True)
 
