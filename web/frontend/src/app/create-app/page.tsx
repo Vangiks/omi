@@ -13,7 +13,6 @@ import {
   type TriggerEvent,
   type NotificationScope,
   type AppCapability,
-  type PaymentPlan,
   type AppSubmissionData,
   type ExternalIntegration,
   type ProactiveNotification,
@@ -38,16 +37,12 @@ export default function CreateAppPage() {
   // Data
   const [categories, setCategories] = useState<Category[]>([]);
   const [capabilities, setCapabilities] = useState<AppCapability[]>([]);
-  const [paymentPlans, setPaymentPlans] = useState<PaymentPlan[]>([]);
 
   // Form state
   const [appName, setAppName] = useState('');
   const [appDescription, setAppDescription] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('');
   const [selectedCapabilities, setSelectedCapabilities] = useState<AppCapability[]>([]);
-  const [isPaid, setIsPaid] = useState(false);
-  const [price, setPrice] = useState('');
-  const [selectedPaymentPlan, setSelectedPaymentPlan] = useState<string>('');
   const [makeAppPublic, setMakeAppPublic] = useState(false);
   const [termsAgreed, setTermsAgreed] = useState(false);
 
@@ -86,14 +81,12 @@ export default function CreateAppPage() {
     console.log('🚀 [initializeData] Starting data initialization...');
 
     try {
-      const token = await user?.getIdToken();
       console.log('📋 [initializeData] Fetching app initialization data...');
 
-      const data = await getAppInitializationData(token);
+      const data = await getAppInitializationData();
 
       setCategories(data.categories);
       setCapabilities(data.capabilities);
-      setPaymentPlans(data.paymentPlans);
 
       console.log('✅ [initializeData] Data initialization complete');
     } catch (error) {
@@ -101,7 +94,7 @@ export default function CreateAppPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [user]);
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -291,7 +284,6 @@ export default function CreateAppPage() {
       selectedCapabilities.length > 0 &&
       (imageFile !== null || imagePreview !== '') &&
       termsAgreed &&
-      (!isPaid || (price !== '' && selectedPaymentPlan !== '')) &&
       (!isCapabilitySelectedById('chat') || chatPrompt.trim() !== '') &&
       (!isCapabilitySelectedById('memories') || conversationPrompt.trim() !== '') &&
       (!isCapabilitySelectedById('external_integration') ||
@@ -306,9 +298,6 @@ export default function CreateAppPage() {
     imageFile,
     imagePreview,
     termsAgreed,
-    isPaid,
-    price,
-    selectedPaymentPlan,
     chatPrompt,
     conversationPrompt,
     triggerEvent,
@@ -362,9 +351,6 @@ export default function CreateAppPage() {
         uid: user.uid,
         category: selectedCategory,
         private: !makeAppPublic,
-        is_paid: isPaid,
-        price: isPaid && price ? parseFloat(price) : 0.0,
-        payment_plan: selectedPaymentPlan || null,
         thumbnails: [] as string[],
       };
 
@@ -750,142 +736,6 @@ export default function CreateAppPage() {
               />
             </div>
           </div>
-        </div>
-
-        {/* Pricing Section */}
-        <div className="rounded-[0.5rem] border border-white/10 bg-white/5 p-8 backdrop-blur-sm">
-          <div className="mb-6 flex items-center space-x-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-[0.5rem] bg-gradient-to-r from-emerald-500 to-teal-600">
-              <svg
-                className="h-6 w-6 text-white"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1"
-                />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-xl font-semibold text-white">Pricing Model</h3>
-              <p className="text-sm text-gray-400">
-                Choose how you want to monetize your app
-              </p>
-            </div>
-          </div>
-
-          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div
-              className={`relative cursor-pointer rounded-[0.5rem] border-2 p-6 transition-all ${
-                !isPaid
-                  ? 'border-blue-500 bg-blue-500/10'
-                  : 'border-white/20 bg-white/5 hover:border-white/30'
-              }`}
-              onClick={() => {
-                setIsPaid(false);
-                setSelectedPaymentPlan('');
-                setPrice('');
-              }}
-            >
-              <div className="flex items-center space-x-3">
-                <div
-                  className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${
-                    !isPaid ? 'border-blue-500 bg-blue-500' : 'border-gray-400'
-                  }`}
-                >
-                  {!isPaid && <div className="h-2 w-2 rounded-full bg-white"></div>}
-                </div>
-                <div>
-                  <h4 className="font-semibold text-white">Free</h4>
-                  <p className="text-sm text-gray-400">No cost for users</p>
-                </div>
-              </div>
-            </div>
-
-            {paymentPlans.length > 0 && (
-              <div
-                className={`relative cursor-pointer rounded-[0.5rem] border-2 p-6 transition-all ${
-                  isPaid
-                    ? 'border-emerald-500 bg-emerald-500/10'
-                    : 'border-white/20 bg-white/5 hover:border-white/30'
-                }`}
-                onClick={() => {
-                  setIsPaid(true);
-                  if (paymentPlans.length > 0) {
-                    const monthlyPlan = paymentPlans.find((p) =>
-                      p.title.toLowerCase().includes('monthly'),
-                    );
-                    setSelectedPaymentPlan(
-                      monthlyPlan ? monthlyPlan.id : paymentPlans[0].id,
-                    );
-                  } else {
-                    setSelectedPaymentPlan('');
-                  }
-                }}
-              >
-                <div className="flex items-center space-x-3">
-                  <div
-                    className={`flex h-5 w-5 items-center justify-center rounded-full border-2 ${
-                      isPaid ? 'border-emerald-500 bg-emerald-500' : 'border-gray-400'
-                    }`}
-                  >
-                    {isPaid && <div className="h-2 w-2 rounded-full bg-white"></div>}
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-white">Paid</h4>
-                    <p className="text-sm text-gray-400">Charge users for access</p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {isPaid && (
-            <div className="grid grid-cols-1 gap-6 border-t border-white/10 pt-6 md:grid-cols-2">
-              <div>
-                <label className="mb-3 block text-sm font-medium text-gray-300">
-                  Price (USD) <span className="text-red-400">*</span>
-                </label>
-                <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 transform text-gray-400">
-                    $
-                  </span>
-                  <input
-                    type="number"
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    placeholder="0.00"
-                    min="0"
-                    step="0.01"
-                    className="w-full rounded-[0.5rem] border border-white/20 bg-white/10 py-3 pl-8 pr-4 text-white placeholder-gray-400 transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="mb-3 block text-sm font-medium text-gray-300">
-                  Payment Plan <span className="text-red-400">*</span>
-                </label>
-                <select
-                  value={selectedPaymentPlan}
-                  onChange={(e) => setSelectedPaymentPlan(e.target.value)}
-                  className="w-full rounded-[0.5rem] border border-white/20 bg-white/10 px-4 py-3 text-white transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                >
-                  <option value="" className="bg-gray-800">
-                    Select payment plan
-                  </option>
-                  {paymentPlans.map((plan) => (
-                    <option key={plan.id} value={plan.id} className="bg-gray-800">
-                      {plan.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Preview and Screenshots */}

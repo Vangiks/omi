@@ -9,7 +9,6 @@ export type {
   TriggerEvent,
   NotificationScope,
   AppCapability,
-  PaymentPlan,
   AppInitializationData,
 } from './get-app-initialization-data';
 

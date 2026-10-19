@@ -24,20 +24,12 @@ export interface AppCapability {
   actions?: unknown[];
 }
 
-export interface PaymentPlan {
-  title: string;
-  id: string;
-}
-
 export interface AppInitializationData {
   categories: Category[];
   capabilities: AppCapability[];
-  paymentPlans: PaymentPlan[];
 }
 
-export default async function getAppInitializationData(
-  token?: string,
-): Promise<AppInitializationData> {
+export default async function getAppInitializationData(): Promise<AppInitializationData> {
   const apiUrl = envConfig.API_URL || 'http://localhost:8000';
 
   try {
@@ -65,37 +57,15 @@ export default async function getAppInitializationData(
       ? await capabilitiesResponse.json()
       : [];
 
-    // Fetch payment plans if token is provided
-    let paymentPlans: PaymentPlan[] = [];
-    if (token) {
-      try {
-        const paymentPlansResponse = await fetch(`${apiUrl}/v1/app/plans`, {
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          cache: 'no-cache',
-        });
-
-        if (paymentPlansResponse.ok) {
-          paymentPlans = await paymentPlansResponse.json();
-        }
-      } catch (error) {
-        console.warn('Failed to fetch payment plans:', error);
-      }
-    }
-
     return {
       categories,
       capabilities,
-      paymentPlans,
     };
   } catch (error) {
     console.error('Error fetching app initialization data:', error);
     return {
       categories: [],
       capabilities: [],
-      paymentPlans: [],
     };
   }
 }
