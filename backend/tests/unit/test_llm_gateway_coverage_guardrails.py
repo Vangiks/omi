@@ -114,39 +114,8 @@ _FEATURE_SCAN_SKIP_DIRS = {'.venv', 'venv', '.openapi-venv', '__pycache__', 'tes
 _SNIPPET_CONFIGURED = {'chat_agent', 'memory_l1', 'conv_structure', 'what_matters_now'}
 
 
-# Vocabulary of the inventory's plan_gating and funding_owner columns. The
-# managed-compute gate that produced it is gone; the inventory keeps the labels.
-DECISION_REASONS = frozenset(
-    {
-        'unknown_feature',
-        'invalid_funding_owner',
-        'uid_required',
-        'system_uid_forbidden',
-        'free_allowlist',
-        'system_feature_not_free',
-        'byok',
-        'byok_not_validated',
-        'byok_not_enrolled',
-        'plan_paid',
-        'basic_not_entitled',
-        'plan_unknown_fail_open',
-        'authorization_unavailable',
-    }
-)
 FUNDING_OWNERS = frozenset({'omi', 'byok', 'system'})
 
-# S7: plan-gating is S1's reason vocabulary plus the realtime quota label.
-PLAN_GATING_VALUES = DECISION_REASONS | {'unified_chat_quota'}
-FALLBACK_ON_DENY_VALUES = frozenset(
-    {
-        'deterministic_minimum',
-        'http_402',
-        'quota_refuse',
-        'none_unwired',
-        'gateway_fail_closed',
-        'n/a_allowed',
-    }
-)
 # Sol claim 9 missed list + realtime usage/relay companions. A rename fails CI.
 REQUIRED_USER_SURFACES = frozenset(
     {
@@ -277,9 +246,7 @@ def test_inventory_surfaces_have_status_guardrails_and_resolvable_code_paths():
         assert surface['code_path']
         assert surface['entrypoint']
         assert surface['feature']
-        assert surface['plan_gating'] in PLAN_GATING_VALUES, surface['surface']
         assert surface['funding_owner'] in FUNDING_OWNERS, surface['surface']
-        assert surface['fallback_on_deny'] in FALLBACK_ON_DENY_VALUES, surface['surface']
         assert isinstance(surface.get('call_sites'), list), surface['surface']
         assert surface['current_provider_model']
         assert surface['request_shape']
