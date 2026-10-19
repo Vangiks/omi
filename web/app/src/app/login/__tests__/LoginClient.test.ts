@@ -6,10 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 let query = '';
 let authUser: { uid: string } | null = null;
 const routerHarness = vi.hoisted(() => ({ push: vi.fn() }));
-const referralHarness = vi.hoisted(() => ({
-  claim: vi.fn(),
-  navigate: vi.fn(),
-}));
 
 vi.mock('@tschk/moonshine-next/navigation', () => ({
   useRouter: () => ({ push: routerHarness.push }),
@@ -39,13 +35,6 @@ vi.mock('@/lib/firebase', () => ({
   isFirebaseAuthConfigured: false,
 }));
 
-vi.mock('@/lib/referrals', () => ({
-  claimReferralTrial: referralHarness.claim,
-  navigateToDesktopDownload: referralHarness.navigate,
-  parseReferralEnvironment: (value: string | null) =>
-    value === 'dev' || value === 'prod' ? value : null,
-}));
-
 vi.mock('@/lib/analytics/posthog', () => ({
   PostHogManager: { pageView: vi.fn(), track: vi.fn() },
 }));
@@ -56,8 +45,6 @@ describe('LoginClient geometry', () => {
   beforeEach(() => {
     query = '';
     authUser = null;
-    referralHarness.claim.mockReset();
-    referralHarness.navigate.mockReset();
   });
 
   afterEach(cleanup);
@@ -72,45 +59,6 @@ describe('LoginClient geometry', () => {
       'aria-hidden="true" class="mb-16 hidden h-16 w-16 sm:block"',
     );
     expect(markup).not.toContain('min-h-[52px]');
-  });
-
-  it('shows the promised free month before a referred user signs up', () => {
-    query = 'referral=ref1.test.code&environment=prod';
-
-    const markup = renderToStaticMarkup(createElement(LoginClient));
-
-    expect(markup).toContain('One free month of Pro');
-    expect(markup).toContain('Create your account to claim it');
-    expect(markup).toContain('text-center font-display text-2xl');
-    expect(markup).toContain('Continue with Apple');
-    expect(markup).toContain('Continue with Google');
-  });
-
-  it('claims once and downloads after authentication succeeds', async () => {
-    query = 'referral=ref1.test.code&environment=prod';
-    authUser = { uid: 'new-user' };
-    referralHarness.claim.mockResolvedValue({ claimed: true, trial_days: 30 });
-
-    const view = render(createElement(LoginClient));
-    view.rerender(createElement(LoginClient));
-
-    await waitFor(() => expect(referralHarness.claim).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(referralHarness.navigate).toHaveBeenCalledTimes(1));
-  });
-
-  it('does not download for an ineligible existing account', async () => {
-    query = 'referral=ref1.test.code&environment=prod';
-    authUser = { uid: 'existing-user' };
-    referralHarness.claim.mockResolvedValue({ claimed: false, trial_days: 30 });
-
-    const view = render(createElement(LoginClient));
-
-    await waitFor(() =>
-      expect(
-        view.getByText('This free month is only available to new accounts.'),
-      ).toBeTruthy(),
-    );
-    expect(referralHarness.navigate).not.toHaveBeenCalled();
   });
 });
 
@@ -144,5 +92,18 @@ describe('LoginClient return path', () => {
     query = 'next=%2F.%2F%2Fevil.example';
     render(createElement(LoginClient));
     await waitFor(() => expect(routerHarness.push).toHaveBeenCalledWith('/home'));
+  });
+
+  it('signs in through an old referral link like any other login', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    query = 'referral=ref1.test.code&environment=prod';
+
+    const view = render(createElement(LoginClient));
+
+    await waitFor(() => expect(routerHarness.push).toHaveBeenCalledWith('/home'));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(view.queryByText('Referral unavailable')).toBeNull();
+    vi.unstubAllGlobals();
   });
 });

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from '@tschk/moonshine-next/navigation';
 import Image from '@tschk/moonshine-next/image';
 import Link from '@tschk/moonshine-next/link';
@@ -12,11 +12,6 @@ import { TextSwap } from '@/components/ui/TextSwap';
 import { replayErrorShake } from '@/lib/transitionsDev';
 import { isFirebaseAuthConfigured } from '@/lib/firebase';
 import { safeNextPath } from '@/lib/loginNext';
-import {
-  claimReferralTrial,
-  navigateToDesktopDownload,
-  parseReferralEnvironment,
-} from '@/lib/referrals';
 
 export function getAuthErrorMessage(
   error: unknown,
@@ -73,11 +68,6 @@ export function LoginClient() {
   const searchParams = useSearchParams();
   const [isSigningIn, setIsSigningIn] = useState<'google' | 'apple' | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [referralClaimFailure, setReferralClaimFailure] = useState<string | null>(null);
-  const referralClaimStarted = useRef(false);
-  const referralCode = searchParams.get('referral');
-  const referralEnvironment = parseReferralEnvironment(searchParams.get('environment'));
-  const isReferralFlow = Boolean(referralCode && referralEnvironment);
   const afterLogin = safeNextPath(searchParams.get('next'));
   const signInUnavailable = !isFirebaseAuthConfigured;
   const statusMessage =
@@ -96,38 +86,11 @@ export function LoginClient() {
     PostHogManager.pageView('Login');
   }, []);
 
-  const finishReferral = useCallback(async () => {
-    if (!referralCode || !referralEnvironment || referralClaimStarted.current) {
-      return;
-    }
-    referralClaimStarted.current = true;
-    try {
-      const result = await claimReferralTrial(referralCode, referralEnvironment);
-      PostHogManager.track('Referral Signup Completed', {
-        claimed: result.claimed,
-      });
-      if (!result.claimed) {
-        referralClaimStarted.current = false;
-        setReferralClaimFailure('This free month is only available to new accounts.');
-        return;
-      }
-      navigateToDesktopDownload();
-    } catch (claimError) {
-      referralClaimStarted.current = false;
-      setReferralClaimFailure('We could not apply this referral. Please try again.');
-      console.error(claimError);
-    }
-  }, [referralCode, referralEnvironment]);
-
   useEffect(() => {
     if (!loading && user) {
-      if (isReferralFlow) {
-        void finishReferral();
-      } else {
-        router.push(afterLogin);
-      }
+      router.push(afterLogin);
     }
-  }, [user, loading, router, isReferralFlow, finishReferral, afterLogin]);
+  }, [user, loading, router, afterLogin]);
 
   const handleGoogleSignIn = async () => {
     setIsSigningIn('google');
@@ -135,7 +98,7 @@ export function LoginClient() {
     clearRedirectSignInError();
     try {
       await signInWithGoogle();
-      if (!isReferralFlow) router.push(afterLogin);
+      router.push(afterLogin);
     } catch (err) {
       setError(getAuthErrorMessage(err, 'Google'));
       console.error(err);
@@ -150,7 +113,7 @@ export function LoginClient() {
     clearRedirectSignInError();
     try {
       await signInWithApple();
-      if (!isReferralFlow) router.push(afterLogin);
+      router.push(afterLogin);
     } catch (err) {
       setError(getAuthErrorMessage(err, 'Apple'));
       console.error(err);
@@ -160,31 +123,11 @@ export function LoginClient() {
   };
 
   // Show loading state while checking auth
-  if (loading || (user && isReferralFlow && !referralClaimFailure)) {
+  if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg-primary">
         <div className="flex flex-col items-center gap-3 text-sm text-text-tertiary">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
-          {isReferralFlow && <span>Activating your free month...</span>}
-        </div>
-      </div>
-    );
-  }
-
-  if (user && isReferralFlow && referralClaimFailure) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-black px-5 text-center">
-        <div className="max-w-sm">
-          <h1 className="font-display text-2xl font-semibold text-text-primary">
-            Referral unavailable
-          </h1>
-          <p className="mt-2 text-sm text-text-tertiary">{referralClaimFailure}</p>
-          <a
-            href="https://macos.omi.me"
-            className="mt-6 inline-flex h-12 items-center justify-center rounded-lg bg-white px-5 font-medium text-black hover:bg-gray-100"
-          >
-            Download Omi
-          </a>
         </div>
       </div>
     );
@@ -259,7 +202,7 @@ export function LoginClient() {
               transition={{ duration: 0.3, delay: 0.1 }}
               className="mb-1 text-center font-display text-2xl font-semibold text-text-primary"
             >
-              {isReferralFlow ? 'One free month of Pro' : 'Omi'}
+              Omi
             </motion.h1>
 
             {/* Tagline */}
@@ -269,7 +212,7 @@ export function LoginClient() {
               transition={{ duration: 0.3, delay: 0.3 }}
               className="mb-8 text-sm text-text-tertiary"
             >
-              {isReferralFlow ? 'Create your account to claim it' : 'thought to action'}
+              thought to action
             </motion.p>
 
             {/*
