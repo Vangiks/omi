@@ -51,6 +51,12 @@ DELIBERATELY_REMOVED_ENDPOINTS: frozenset[str] = frozenset(
         # so both returned an inert state; this fork serves a single local user.
         '/v1/fair-use/status',
         '/v1/fair-use/case/{case_ref}/status',
+        # Subscription removed (#54): the fork has no plans, and the desktop,
+        # web and admin clients stopped calling these before the removal.
+        '/v1/users/me/subscription',
+        '/v1/users/me/usage-quota',
+        '/v1/users/me/paywall',
+        '/v1/users/me/trial',
     }
 )
 

@@ -1104,8 +1104,6 @@ export interface ChatMessageCountResponse {
   count: number;
 }
 
-export type ChatQuotaUnit = "questions" | "cost_usd";
-
 export interface ChatRatingResponse {
   status: string;
 }
@@ -1135,18 +1133,6 @@ export interface ChatTool {
   parameters?: Record<string, unknown> | null;
   status_message?: string | null;
   transport?: string;
-}
-
-export interface ChatUsageQuota {
-  allowed?: boolean;
-  is_overage_plan?: boolean;
-  limit?: number | null;
-  percent?: number;
-  plan: string;
-  plan_type: string;
-  reset_at?: number | null;
-  unit: ChatQuotaUnit;
-  used: number;
 }
 
 export interface CheckVerificationRequest {
@@ -3623,10 +3609,6 @@ export interface Participant {
   source: "roster" | "transcript";
 }
 
-export interface PaywallStatusResponse {
-  paywalled: boolean;
-}
-
 export interface PendingSyncResponse {
   pending_export: Array<ActionItemResponse>;
   synced_items: Array<ActionItemResponse>;
@@ -3673,17 +3655,6 @@ export interface PersonRef {
   person_id: string;
 }
 
-export interface PhoneCallQuota {
-  allowed_countries?: Array<string>;
-  has_access: boolean;
-  is_paid: boolean;
-  max_duration_seconds?: number | null;
-  monthly_limit?: number | null;
-  monthly_used?: number;
-  remaining?: number | null;
-  reset_at?: number | null;
-}
-
 export interface PhoneMutationResponse {
   success: boolean;
 }
@@ -3700,48 +3671,6 @@ export interface PhoneNumbersResponse {
   numbers: Array<PhoneNumberResponse>;
 }
 
-export interface PlanIdentitySubscription {
-  cancel_at_period_end?: boolean;
-  current_period_end?: number | null;
-  current_period_start?: number | null;
-  current_price_id?: string | null;
-  deprecated?: boolean;
-  deprecation_message?: string | null;
-  features?: Array<string>;
-  limits?: PlanLimits;
-  plan?: PlanType;
-  status?: SubscriptionStatus;
-}
-
-export interface PlanIdentityUserSubscriptionResponse {
-  available_plans?: Array<SubscriptionPlan>;
-  chat_quota_allowed?: boolean;
-  chat_quota_percent?: number;
-  chat_quota_reset_at?: number | null;
-  chat_quota_unit?: ChatQuotaUnit | null;
-  chat_quota_used?: number;
-  desktop_grandfather_until?: number | null;
-  insights_gained_limit: number;
-  insights_gained_used: number;
-  phone_call_quota?: PhoneCallQuota | null;
-  show_subscription_ui?: boolean;
-  subscription: PlanIdentitySubscription;
-  transcription_seconds_limit: number;
-  transcription_seconds_used: number;
-  words_transcribed_limit: number;
-  words_transcribed_used: number;
-}
-
-export interface PlanLimits {
-  chat_cost_usd_per_month?: number | null;
-  chat_questions_per_month?: number | null;
-  insights_gained?: number | null;
-  transcription_seconds?: number | null;
-  words_transcribed?: number | null;
-}
-
-export type PlanType = "basic" | "unlimited" | "architect" | "operator" | "plus" | "unlimited_v2";
-
 export interface PlatformMinimumBuild {
   minimum_supported_build: number;
   platform: string;
@@ -3750,13 +3679,6 @@ export interface PlatformMinimumBuild {
 export interface PluginResult {
   content: string;
   plugin_id: string | null;
-}
-
-export interface PricingOption {
-  description?: string | null;
-  id: string;
-  price_string: string;
-  title: string;
 }
 
 export interface PrivateCloudSyncResponse {
@@ -4840,32 +4762,6 @@ export interface SttAvailabilityResponse {
 
 export type SubjectAttribution = "user" | "third_party" | "unknown" | "legacy_assumed";
 
-export interface Subscription {
-  cancel_at_period_end?: boolean;
-  current_period_end?: number | null;
-  current_period_start?: number | null;
-  current_price_id?: string | null;
-  deprecated?: boolean;
-  deprecation_message?: string | null;
-  features?: Array<string>;
-  limits?: PlanLimits;
-  plan?: PlanType;
-  status?: SubscriptionStatus;
-}
-
-export interface SubscriptionPlan {
-  description?: string | null;
-  eyebrow?: string | null;
-  features?: Array<string>;
-  id: string;
-  legacy?: boolean;
-  prices?: Array<PricingOption>;
-  subtitle?: string | null;
-  title: string;
-}
-
-export type SubscriptionStatus = "active" | "inactive";
-
 export interface SummaryTaskReference {
   action_item_index: number;
   conversation_id: string;
@@ -5288,16 +5184,6 @@ export interface Translation {
 
 export type TriState = "enabled" | "disabled" | "unknown";
 
-export interface TrialMetadata {
-  plan_after_trial?: string;
-  trial_duration_seconds?: number;
-  trial_ends_at?: number | null;
-  trial_expired?: boolean;
-  trial_features?: Array<string>;
-  trial_remaining_seconds?: number;
-  trial_started_at?: number | null;
-}
-
 export interface TriggerEmbeddingPolicy {
   enabled?: boolean;
   language?: string | null;
@@ -5532,25 +5418,6 @@ export interface UserProfileResponse {
 export interface UserStatusResponse {
   message?: string | null;
   status: string;
-}
-
-export interface UserSubscriptionResponse {
-  available_plans?: Array<SubscriptionPlan>;
-  chat_quota_allowed?: boolean;
-  chat_quota_percent?: number;
-  chat_quota_reset_at?: number | null;
-  chat_quota_unit?: ChatQuotaUnit | null;
-  chat_quota_used?: number;
-  desktop_grandfather_until?: number | null;
-  insights_gained_limit: number;
-  insights_gained_used: number;
-  phone_call_quota?: PhoneCallQuota | null;
-  show_subscription_ui?: boolean;
-  subscription: Subscription;
-  transcription_seconds_limit: number;
-  transcription_seconds_used: number;
-  words_transcribed_limit: number;
-  words_transcribed_used: number;
 }
 
 export interface UserUsageResponse {
@@ -5920,11 +5787,9 @@ export interface OmiApiSchemas {
   "ChatEvidenceReference": ChatEvidenceReference;
   "ChatFirstSubject": ChatFirstSubject;
   "ChatMessageCountResponse": ChatMessageCountResponse;
-  "ChatQuotaUnit": ChatQuotaUnit;
   "ChatRatingResponse": ChatRatingResponse;
   "ChatSessionResponse": ChatSessionResponse;
   "ChatTool": ChatTool;
-  "ChatUsageQuota": ChatUsageQuota;
   "CheckVerificationRequest": CheckVerificationRequest;
   "CheckVerificationResponse": CheckVerificationResponse;
   "ChunkSpan": ChunkSpan;
@@ -6248,24 +6113,17 @@ export interface OmiApiSchemas {
   "OutcomeRecord": OutcomeRecord;
   "PageContext": PageContext;
   "Participant": Participant;
-  "PaywallStatusResponse": PaywallStatusResponse;
   "PendingSyncResponse": PendingSyncResponse;
   "PeopleResponse": PeopleResponse;
   "Person": Person;
   "PersonConfidence": PersonConfidence;
   "PersonConfidenceReason": PersonConfidenceReason;
   "PersonRef": PersonRef;
-  "PhoneCallQuota": PhoneCallQuota;
   "PhoneMutationResponse": PhoneMutationResponse;
   "PhoneNumberResponse": PhoneNumberResponse;
   "PhoneNumbersResponse": PhoneNumbersResponse;
-  "PlanIdentitySubscription": PlanIdentitySubscription;
-  "PlanIdentityUserSubscriptionResponse": PlanIdentityUserSubscriptionResponse;
-  "PlanLimits": PlanLimits;
-  "PlanType": PlanType;
   "PlatformMinimumBuild": PlatformMinimumBuild;
   "PluginResult": PluginResult;
-  "PricingOption": PricingOption;
   "PrivateCloudSyncResponse": PrivateCloudSyncResponse;
   "ProactiveMaterializationDeferral": ProactiveMaterializationDeferral;
   "ProactiveMaterializationReceipt": ProactiveMaterializationReceipt;
@@ -6415,9 +6273,6 @@ export interface OmiApiSchemas {
   "Structured": Structured;
   "SttAvailabilityResponse": SttAvailabilityResponse;
   "SubjectAttribution": SubjectAttribution;
-  "Subscription": Subscription;
-  "SubscriptionPlan": SubscriptionPlan;
-  "SubscriptionStatus": SubscriptionStatus;
   "SummaryTaskReference": SummaryTaskReference;
   "SyncBatchItem": SyncBatchItem;
   "SyncBatchRequest": SyncBatchRequest;
@@ -6479,7 +6334,6 @@ export interface OmiApiSchemas {
   "TranscriptionPreferencesUpdate": TranscriptionPreferencesUpdate;
   "Translation": Translation;
   "TriState": TriState;
-  "TrialMetadata": TrialMetadata;
   "TriggerEmbeddingPolicy": TriggerEmbeddingPolicy;
   "TriggerRuntimePolicy": TriggerRuntimePolicy;
   "TriggerType": TriggerType;
@@ -6511,7 +6365,6 @@ export interface OmiApiSchemas {
   "UserProfile": UserProfile;
   "UserProfileResponse": UserProfileResponse;
   "UserStatusResponse": UserStatusResponse;
-  "UserSubscriptionResponse": UserSubscriptionResponse;
   "UserUsageResponse": UserUsageResponse;
   "UserWebhookUrlResponse": UserWebhookUrlResponse;
   "UserWebhooksStatusResponse": UserWebhooksStatusResponse;
@@ -10320,51 +10173,11 @@ export interface OmiApiPaths {
       };
     };
   };
-  "/v1/users/me/paywall": {
-    get: {
-      operationId: "get_user_paywall_status_v1_users_me_paywall_get";
-      responses: {
-        "200": PaywallStatusResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/users/me/subscription": {
-    get: {
-      operationId: "get_user_subscription_endpoint_v1_users_me_subscription_get";
-      responses: {
-        "200": UserSubscriptionResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/users/me/trial": {
-    get: {
-      operationId: "get_user_trial_status_v1_users_me_trial_get";
-      responses: {
-        "200": TrialMetadata;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
   "/v1/users/me/usage": {
     get: {
       operationId: "get_user_usage_stats_endpoint_v1_users_me_usage_get";
       responses: {
         "200": UserUsageResponse;
-        "401": void;
-        "422": HTTPValidationError;
-      };
-    };
-  };
-  "/v1/users/me/usage-quota": {
-    get: {
-      operationId: "get_user_chat_usage_quota_v1_users_me_usage_quota_get";
-      responses: {
-        "200": ChatUsageQuota;
         "401": void;
         "422": HTTPValidationError;
       };
@@ -18788,67 +18601,6 @@ export async function get_total_llm_cost_v1_users_me_llm_usage_total_get(header:
   return _res.status === 204 ? (undefined as any) : await _res.json();
 }
 
-export async function get_user_paywall_status_v1_users_me_paywall_get(query: { platform?: string | null }, header: { X_App_Platform?: string, authorization?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, init?: OmiApiClientInit): Promise<PaywallStatusResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/users/me/paywall`;
-  const _params = query ? Object.entries(query)
-    .filter(([, v]) => v !== undefined && v !== null)
-    .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&') : '';
-  const _search = _params ? `?${_params}` : "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "GET",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function get_user_subscription_endpoint_v1_users_me_subscription_get(header: { X_App_Platform?: string, X_App_Version?: string, authorization?: string, X_Device_Id_Hash?: string, X_Omi_Plan_Identity?: string }, init?: OmiApiClientInit): Promise<UserSubscriptionResponse> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/users/me/subscription`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "GET",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_Omi_Plan_Identity !== undefined ? { "X-Omi-Plan-Identity": String(header.X_Omi_Plan_Identity) } : {}),
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function get_user_trial_status_v1_users_me_trial_get(header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, init?: OmiApiClientInit): Promise<TrialMetadata> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/users/me/trial`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "GET",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
 export async function get_user_usage_stats_endpoint_v1_users_me_usage_get(query: { period?: UsagePeriod, time_zone?: string | null }, header: { authorization?: string, X_App_Platform?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, init?: OmiApiClientInit): Promise<UserUsageResponse> {
   const _base = init?.baseURL ?? "";
   const _path = `/v1/users/me/usage`;
@@ -18863,25 +18615,6 @@ export async function get_user_usage_stats_endpoint_v1_users_me_usage_get(query:
       ...init?.headers,
       ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
       ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
-      ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
-    },
-  });
-  if (!_res.ok) throw new OmiApiError(_res.status, _res);
-  return _res.status === 204 ? (undefined as any) : await _res.json();
-}
-
-export async function get_user_chat_usage_quota_v1_users_me_usage_quota_get(header: { X_App_Platform?: string, authorization?: string, X_Device_Id_Hash?: string, X_App_Version?: string }, init?: OmiApiClientInit): Promise<ChatUsageQuota> {
-  const _base = init?.baseURL ?? "";
-  const _path = `/v1/users/me/usage-quota`;
-  const _search = "";
-  const _res = await fetch(`${_base}${_path}${_search}`, {
-    method: "GET",
-    headers: {
-      ...(init?.token ? { Authorization: `Bearer ${init.token}` } : {}),
-      ...init?.headers,
-      ...(header.X_App_Platform !== undefined ? { "X-App-Platform": String(header.X_App_Platform) } : {}),
-      ...(header.authorization !== undefined ? { "authorization": String(header.authorization) } : {}),
       ...(header.X_Device_Id_Hash !== undefined ? { "X-Device-Id-Hash": String(header.X_Device_Id_Hash) } : {}),
       ...(header.X_App_Version !== undefined ? { "X-App-Version": String(header.X_App_Version) } : {}),
     },
@@ -21022,4 +20755,4 @@ export async function get_speech_profile_v4_speech_profile_get(header: { authori
   return _res.status === 204 ? (undefined as any) : await _res.json();
 }
 
-// Total: 480 client methods generated.
+// Total: 476 client methods generated.
