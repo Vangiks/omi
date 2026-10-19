@@ -122,7 +122,6 @@ surfaces:
   - utils/llm/followup.py::feature:followup
   - utils/llm/goals.py::feature:goals
   - utils/llm/goals.py::feature:goals_advice
-  - utils/llm/notifications.py::feature:notifications
   - utils/llm/openglass.py::feature:openglass
   - utils/llm/persona.py::feature:<dynamic>
   - utils/llm/persona.py::feature:persona_clone

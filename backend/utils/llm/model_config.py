@@ -88,7 +88,6 @@ _TWO_TIER_MODEL_PROFILE: Dict[str, Tuple[str, str]] = {
     'chat_graph': (LUNA_MODEL, 'openai'),
     'goals': (LUNA_MODEL, 'openai'),
     'goals_advice': (LUNA_MODEL, 'openai'),
-    'notifications': (LUNA_MODEL, 'openai'),
     'proactive_notification': (LUNA_MODEL, 'openai'),
     'what_matters_now': (LUNA_MODEL, 'openai'),
     'openglass': (LUNA_MODEL, 'openai'),

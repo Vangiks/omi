@@ -72,20 +72,7 @@ def _loaded_notifications() -> Iterator[tuple[ModuleType, ModuleType, ModuleType
         'firebase_admin.messaging': messaging,
         'firebase_admin.auth': auth,
         'database.notifications': notification_db,
-        'database.redis_db': _module(
-            'database.redis_db',
-            set_credit_limit_notification_sent=MagicMock(),
-            has_credit_limit_notification_been_sent=MagicMock(),
-            set_silent_user_notification_sent=MagicMock(),
-            has_silent_user_notification_been_sent=MagicMock(),
-        ),
         'database.auth': _module('database.auth', get_user_from_uid=MagicMock()),
-        'utils.llm.notifications': _module(
-            'utils.llm.notifications',
-            generate_notification_message=MagicMock(),
-            generate_credit_limit_notification=MagicMock(),
-            generate_silent_user_notification=MagicMock(),
-        ),
     }
 
     with stub_modules(stubs):

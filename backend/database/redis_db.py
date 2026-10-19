@@ -1013,31 +1013,6 @@ def delete_auth_code(auth_code: str) -> None:
     r.delete(f'auth_code:{auth_code}')
 
 
-# ******************************************************
-# ************** CREDIT LIMIT NOTIFICATIONS ************
-# ******************************************************
-
-
-def set_credit_limit_notification_sent(uid: str, ttl: int = 60 * 60 * 24) -> None:
-    """Cache that credit limit notification was sent to user (24 hours TTL by default)"""
-    r.set(f'users:{uid}:credit_limit_notification_sent', '1', ex=ttl)
-
-
-def has_credit_limit_notification_been_sent(uid: str) -> bool:
-    """Check if credit limit notification was already sent to user recently"""
-    return r.exists(f'users:{uid}:credit_limit_notification_sent')
-
-
-def set_silent_user_notification_sent(uid: str, ttl: int = 60 * 60 * 24) -> None:
-    """Cache that silent user notification was sent to user (24 hours TTL by default)"""
-    r.set(f'users:{uid}:silent_notification_sent', '1', ex=ttl)
-
-
-def has_silent_user_notification_been_sent(uid: str) -> bool:
-    """Check if silent user notification was already sent to user recently"""
-    return r.exists(f'users:{uid}:silent_notification_sent')
-
-
 def try_acquire_byok_llm_error_notification_lock(uid: str, provider: str, reason: str, ttl: int = 60 * 60 * 24) -> bool:
     """Return True once per BYOK provider/error reason per TTL window."""
     return bool(r.set(f'users:{uid}:byok_llm_error:{provider}:{reason}', '1', ex=ttl, nx=True))

@@ -352,7 +352,6 @@ class TestModelQosProfiles:
             'chat_graph',
             'goals',
             'goals_advice',
-            'notifications',
             'proactive_notification',
             'what_matters_now',
             'openglass',
@@ -919,13 +918,6 @@ class TestExpandedCallsiteCoverage:
         assert 'goals' in calls, "Missing get_llm('goals') in goals.py"
         assert 'goals_advice' in calls, "Missing get_llm('goals_advice') in goals.py"
 
-    def test_notifications_py_key(self):
-        import re
-
-        source = self._read_source("utils/llm/notifications.py")
-        calls = re.findall(r"get_llm\(\s*'(\w+)'", source)
-        assert 'notifications' in calls
-
     def test_app_generator_py_all_keys(self):
         import re
 
@@ -1000,7 +992,6 @@ class TestExpandedCallsiteCoverage:
             "utils/llm/proactive_notification.py",
             "utils/llm/external_integrations.py",
             "utils/llm/goals.py",
-            "utils/llm/notifications.py",
             "utils/llm/persona.py",
             "utils/llm/followup.py",
             "utils/llm/app_generator.py",

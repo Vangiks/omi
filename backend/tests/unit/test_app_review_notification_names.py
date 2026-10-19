@@ -40,8 +40,6 @@ def _notifications_with_user(user: Any) -> Iterator[Any]:
             'firebase_admin.messaging',
             'firebase_admin.auth',
             'database.notifications',
-            'database.redis_db',
-            'utils.llm.notifications',
         )
     }
     stubs['database.auth'] = _module('database.auth', get_user_from_uid=lambda _uid: user)
