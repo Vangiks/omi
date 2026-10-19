@@ -13,7 +13,7 @@ source .venv/bin/activate
 uvicorn main:app --host 0.0.0.0 --port 8080
 ```
 
-**Env stages** (`OMI_ENV_STAGE`): `local` (emulator harness, `.env.local-dev`), `offline` (fake providers, `.env.offline`), `dev` (remote dev GCP, `.env.dev`), `prod` (reference only, `.env.prod`). `load_backend_env()` loads the stage file then `backend/.env` overrides. Templates: `backend/.env.*.template`. Harness: `PROVIDER_MODE=offline make dev-up` or `OMI_ENV_STAGE=offline`; both modes use instance-scoped filesystem storage under the owned harness state root, so GCS-backed uploads work without cloud credentials. Dev skips the startup-only Stripe price validation; plan catalog and checkout calls still require mode-matched Stripe credentials.
+**Env stages** (`OMI_ENV_STAGE`): `local` (emulator harness, `.env.local-dev`), `offline` (fake providers, `.env.offline`), `dev` (remote dev GCP, `.env.dev`), `prod` (reference only, `.env.prod`). `load_backend_env()` loads the stage file then `backend/.env` overrides. Templates: `backend/.env.*.template`. Harness: `PROVIDER_MODE=offline make dev-up` or `OMI_ENV_STAGE=offline`; both modes use instance-scoped filesystem storage under the owned harness state root, so GCS-backed uploads work without cloud credentials.
 
 When intentionally changing backend Python dependencies, edit the relevant `requirements*.txt` input file and refresh the lock:
 
@@ -34,15 +34,15 @@ LLM gateway resilience: `OMI_LLM_GATEWAY_CONNECT_TIMEOUT_SECONDS` (default `3`),
 ```
 backend/
   main.py                 # FastAPI entry, middleware, 45+ router registrations
-  models/                 # Pydantic request/response schemas (22 files: conversation, memory, app, chat, user subscription, etc.)
+  models/                 # Pydantic request/response schemas (conversation, memory, app, chat, user, etc.)
   database/               # All persistence — 25+ domain modules
     _client.py            #   Firestore singleton + document_id_from_seed utility
     redis_db.py           #   Cache, rate limiting (Lua scripts), pub/sub, locks, geolocation
     helpers.py            #   Decorators: data protection levels, encryption/decryption on read/write
     conversations.py      #   Conversations with encrypted segments, photos, processing status
     memories.py           #   User facts/learnings with categories, visibility, encryption
-    users.py              #   Profiles, subscriptions, people/contacts, private cloud sync settings
-    apps.py               #   Custom apps/personas, reviews, payment (Stripe), usage history
+    users.py              #   Profiles, people/contacts, private cloud sync settings
+    apps.py               #   Custom apps/personas, reviews, usage history
     action_items.py       #   Tasks with due dates, completion status
     vector_db.py          #   Pinecone integration for semantic search
     knowledge_graph.py    #   Neo4j entity relationships
@@ -52,13 +52,13 @@ backend/
     chat.py               #   /v2/messages — AI chat with tool use, voice messages, file uploads
     conversations.py      #   /v1/conversations — CRUD, merge, search, action items, photos
     memories.py           #   /v3/memories — CRUD, visibility, semantic search
-    apps.py               #   App marketplace, personas, reviews, payment (2000 LOC)
+    apps.py               #   App marketplace, personas, reviews (2000 LOC)
     sync.py               #   /v1/sync — mobile client data sync (1500 LOC)
     auth.py               #   Google/Apple OAuth callbacks, session management
-    users.py              #   Profile, subscription, settings (1200 LOC)
+    users.py              #   Profile, settings (1200 LOC)
     task_integrations.py  #   Todoist, Microsoft Tasks sync (1200 LOC)
     mcp.py, mcp_sse.py    #   Model Context Protocol server endpoints
-    ...                   #   + action_items, goals, knowledge_graph, payment, integrations, etc.
+    ...                   #   + action_items, goals, knowledge_graph, integrations, etc.
   utils/                  # Business logic — 60+ files (never import from routers/)
     llm/                  #   LLM orchestration (14 files): chat processing, conversation post-processing,
                           #   memory extraction, persona management, proactive notifications, goal tracking,
@@ -141,8 +141,6 @@ STT policy: `config/stt_provider_policy.py`. Windowed live rollout: `docs/operat
 - **backend-sync** (`main.py`, same image as backend) — Cloud Run `/v2/sync-local-files` admission: batches ≤6 hours old enter `sync-jobs`; older/untrusted batches enter `sync-backfill` → **backend-sync-backfill**. Fresh keeps its bounded inline fallback; backfill never falls into fresh/inline capacity. Backfill defaults to one in-flight job per UID, four processed speech hours per UID/day, 555 processed speech hours globally/day, a 30-day lookback, and thirty concurrent dispatches (30/second cap). A 45-day Firestore content ledger protects transcription and usage side effects across job expiry and re-upload. Audio playback merges (`/v1/sync/audio/*`) follow the same pattern via queue `audio-merge` building 30-day MP3 artifacts under `playback/` (`AUDIO_MERGE_DISPATCH_MODE`) — per-part files plus one dense per-conversation `conversation.mp3` whose spans manifest + audio_files fingerprint are stamped on the conversation doc (`conversation_audio`); a fingerprint mismatch after late chunks re-enqueues the build. In production, account deletion requires `ACCOUNT_DELETION_DISPATCH_MODE=cloud_tasks` and complete Cloud Tasks bindings to enqueue opaque job IDs to queue `account-deletion`, which posts `/v1/users/account-deletion-wipes/run`; startup rejects inline or incomplete configuration, reconciliation only re-dispatches tasks so the OIDC handler is the sole wipe executor, and the post-deploy queue-drain window accepts the former sync OIDC audience only for legacy UID payloads. API success is returned only after the deletion marker is persisted and the wipe task is durably enqueued.
 - **notifications-job** (`modal/job.py`) — Every-15-minute cron job for local-hour delivery, reads Firestore/Redis, sends push notifications and emits the read-only Redis memory check. Automatic Chat materialization and its weekly decision review are retired. No canonical maintenance flags or Typesense secrets; its deploy removes only those bindings and keeps notification env. Recipient reads + run lock: `docs/runbooks/daily-summary-cutover.md`.
 - **memory-maintenance-job** (`modal/memory_maintenance_job.py`) — Cloud Run Job for deterministic TTL, explicit-submission normalization/completion, committed memory outboxes and already-enqueued recurrence delivery. Retrospective semantic cleanup belongs to Dream; the old consolidation planner, cooldown and selector flags are retired. `MEMORY_CANONICAL_MAINTENANCE_ENABLED` owns this host; `MEMORY_ENABLED=on` does not require it. Required normalization uses gateway Flex with `OMI_BACKGROUND_FLEX_CAPABLE=true`; DB claims/settlement and model calls use separate executor steps. The existing dev hourly Scheduler and deploy workflows stay because they own retention and owed delivery. Runtime env validation requires gateway identity and refuses retired planner bindings.
-
-Subscription plan contract: edit `config/plan_catalog.json`, then run `python scripts/generate_plan_catalog.py`; runtime code imports `config.plan_catalog`, never JSON or a copied plan set. Before review run `python scripts/generate_plan_catalog.py --check --base-ref origin/main`. Current Stripe amounts are import-blocked; follow `.github/agent-docs/plan-source-of-truth.md` and never publish or rebind a Price from an ordinary code-change workflow.
 
 Firestore schema rollout, readiness, and change controls are documented in [Firestore queries and indexes](../.github/agent-docs/firestore-queries-and-indexes.md).
 

@@ -32,9 +32,12 @@ omiGlass and device SDKs were removed. `CLAUDE.md` points here.
 - Upstream release and PR tooling is gone from this fork (most of `.github/`, Codemagic,
   `make preflight`, `scripts/pr-preflight`). Do not rely on it or restore it.
 - Migrate in-tree callers together rather than preserving retired APIs with compatibility wrappers.
-- Take upstream updates by merging `upstream/main` while the backend has not diverged; once it
-  has (own server backend), cherry-pick selectively. Keep changes useful to everyone (e.g. Linux
-  meeting detection) separable so they can go to `upstream` as their own PR.
+- Billing is removed from the fork: no subscriptions, plans, quotas, trials, payments or paid
+  marketplace apps; every user gets every feature. Do not restore any of it.
+- Never merge `upstream/main` wholesale: the fork has diverged, and a merge brings billing back.
+  Cherry-pick upstream commits selectively, together with an agent: drop hunks that touch
+  billing, plans or quotas, and port only what the fork still has. Keep changes useful to
+  everyone (e.g. Linux meeting detection) separable so they can go to `upstream` as their own PR.
 
 ## Задачи: GitHub Issues
 
